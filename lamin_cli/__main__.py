@@ -170,11 +170,11 @@ parser.add_argument(
     help="Print LaminDB version.",
 )
 
-# parse args
-args = parser.parse_args()
-
 
 def main():
+    # parse args
+    args = parser.parse_args()
+
     from lamindb_setup._silence_loggers import silence_loggers
 
     silence_loggers()
