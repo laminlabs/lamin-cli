@@ -3,18 +3,18 @@ from importlib.metadata import PackageNotFoundError, version
 
 
 class instance:
-    storage_root = """Storage root. Either local dir, ``s3://bucket_name`` or ``gs://bucket_name``."""  # noqa
-    db = """Database connection url, do not pass for SQLite."""
-    name = """Instance name."""
-    schema = """Comma-separated string of schema modules. None if not set."""
+    storage_root = """local dir, s3://bucket_name, gs://bucket_name"""
+    db = """postgres database connection URL, do not pass for SQLite"""
+    name = """instance name"""
+    schema = """comma-separated string of schema modules"""
 
 
 class user:
-    email = """User email."""
-    password = """API key or legacy password."""
-    uid = """Universal user ID."""
-    handle = "Unique handle."
-    name = "Full name."
+    email = """user email"""
+    password = """API key or legacy password"""
+    uid = """universal user ID"""
+    handle = "unique handle"
+    name = "full name"
 
 
 login_help = "Log in an already-signed-up user."
@@ -44,10 +44,10 @@ subparsers = parser.add_subparsers(dest="command")
 # init instance
 init = subparsers.add_parser("init", help=init_help)
 aa = init.add_argument
-aa("--storage", type=str, metavar="s", help=instance.storage_root)
-aa("--db", type=str, metavar="d", default=None, help=instance.db)
+aa("--storage", type=str, metavar="storage", help=instance.storage_root)
+aa("--db", type=str, metavar="db", default=None, help=instance.db)
 aa("--schema", type=str, metavar="schema", default=None, help=instance.schema)
-aa("--name", type=str, metavar="n", default=None, help=instance.name)
+aa("--name", type=str, metavar="name", default=None, help=instance.name)
 aa(
     "--vault",
     default=False,
@@ -58,7 +58,7 @@ aa(
 # init instance vault
 init = subparsers.add_parser("init-vault", help=init_help)
 aa = init.add_argument
-aa("--db", type=str, metavar="d", default=None, help=instance.db)
+aa("--db", type=str, metavar="db", default=None, help=instance.db)
 
 # load instance
 load = subparsers.add_parser("load", help=load_help)
@@ -67,7 +67,7 @@ instance_help = """
 The instance identifier can the instance name (owner is
 current user), handle/name, or the URL: https://lamin.ai/handle/name."""
 aa("instance", type=str, metavar="i", default=None, help=instance_help)
-aa("--db", type=str, metavar="d", default=None, help=instance.db)
+aa("--db", type=str, metavar="db", default=None, help=instance.db)
 aa("--storage", type=str, metavar="s", default=None, help=load_storage_help)
 aa(
     "--vault",
@@ -135,14 +135,9 @@ aa("filepath", type=str, metavar="filepath", help=filepath_help)
 # login user
 login = subparsers.add_parser("login", help=login_help)
 aa = login.add_argument
-aa(
-    "user",
-    type=str,
-    metavar="user",
-    help="Email or user handle. Email is needed at first login.",
-)  # noqa
-aa("--key", type=str, metavar="key", default=None, help=user.password)
-aa("--password", type=str, metavar="pw", default=None, help=user.password)
+aa("user", type=str, metavar="user", help="email or user handle")
+aa("--key", type=str, metavar="k", default=None, help="API key")
+aa("--password", type=str, metavar="pw", default=None, help="legacy password")
 
 # manage cache
 cache_parser = subparsers.add_parser("cache", help=cache_help)
