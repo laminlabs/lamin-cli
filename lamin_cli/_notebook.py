@@ -125,7 +125,11 @@ def save(notebook_path: str) -> Optional[str]:
     # convert the notebook file to html
     notebook_path_html = notebook_path.replace(".ipynb", ".html")
     logger.info(f"exporting notebook as html {notebook_path_html}")
-    result = subprocess.run(f"jupyter nbconvert --to html {notebook_path}", shell=True)
+    # log_level is set to 40 to silence the nbconvert logging
+    result = subprocess.run(
+        f"jupyter nbconvert --to html {notebook_path} --Application.log_level=40",
+        shell=True,
+    )
     assert result.returncode == 0
     # copy the notebook file to a temporary file
     notebook_path_stripped = notebook_path.replace(".ipynb", "_stripped.ipynb")
@@ -204,6 +208,7 @@ def save(notebook_path: str) -> Optional[str]:
     )
     report_file.save()
     run.report = report_file
+    run.is_consecutive = is_consecutive
     run.save()
     # annotate transform
     transform.source_file = source_file
