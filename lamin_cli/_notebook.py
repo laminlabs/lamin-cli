@@ -16,13 +16,13 @@ def update_notebook_metadata(nb, notebook_path):
     stem_id = nb.metadata["nbproject"]["id"]
     current_version = nb.metadata["nbproject"]["version"]
     logger.info(
-        f"the notebook {notebook_path} is already tracked (stem_id='{stem_id}',"
+        f"the notebook {notebook_path} is already tracked (uid_prefix='{stem_id}',"
         f" version: '{current_version}')"
     )
     updated = False
     # ask for generating new id
     if os.getenv("LAMIN_TESTING") is None:
-        response = input("Do you want to generate a new id prefix? (y/n) ")
+        response = input("Do you want to generate a new uid prefix? (y/n) ")
     else:
         response = "y"
     if response == "y":
