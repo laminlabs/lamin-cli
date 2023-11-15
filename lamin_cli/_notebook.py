@@ -124,7 +124,6 @@ def save(notebook_path: str) -> Optional[str]:
             return "aborted-save-notebook-created-by-different-user"
     # convert the notebook file to html
     notebook_path_html = notebook_path.replace(".ipynb", ".html")
-    logger.info(f"exporting notebook as html {notebook_path_html}")
     # log_level is set to 40 to silence the nbconvert logging
     result = subprocess.run(
         f"jupyter nbconvert --to html {notebook_path} --Application.log_level=40",
@@ -134,25 +133,21 @@ def save(notebook_path: str) -> Optional[str]:
     # copy the notebook file to a temporary file
     notebook_path_stripped = notebook_path.replace(".ipynb", "_stripped.ipynb")
     shutil.copy2(notebook_path, notebook_path_stripped)
-    logger.info("stripping output of {notebook_path_tmp}")
     result = subprocess.run(f"nbstripout {notebook_path_stripped}", shell=True)
     assert result.returncode == 0
-    # register the html report
+    # find initial versions of source files and html reports
     initial_report = None
     initial_source = None
     if len(transform_family) > 0:
-        for transform in transform_family.order_by("-created_at"):
+        for prev_transform in transform_family.order_by("-created_at"):
             # check for id to avoid query
-            if transform.latest_report_id is not None:
+            if prev_transform.latest_report_id is not None:
                 # any previous latest report of this transform is OK!
-                initial_report = transform.latest_report
-            if transform.source_file_id is not None:
+                initial_report = prev_transform.latest_report
+            if prev_transform.source_file_id is not None:
                 # any previous source file id is OK!
-                initial_source = transform.source_file
-    if hasattr(
-        ln.settings, "silence_file_run_transform_warning"
-    ):  # can remove this from next release on
-        ln.settings.silence_file_run_transform_warning = True
+                initial_source = prev_transform.source_file
+    ln.settings.silence_file_run_transform_warning = True
     # register the source code
     if transform.source_file is not None:
         # this if condition is relevant if we already wrote the source code for
@@ -168,8 +163,8 @@ def save(notebook_path: str) -> Optional[str]:
             # will add this soon!
             if os.getenv("LAMIN_TESTING") is None:
                 response = input(
-                    "You're trying to save new notebook source code with the same"
-                    " version; do you want to replace the existing source code? (y/n)"
+                    f"You try to save a new notebook source file ({source_file.uid}) with the same"
+                    f" version {transform.version}; do you want to replace the existing source file ({transform.source_file})? (y/n)"
                 )
             else:
                 response = "y"
@@ -219,7 +214,7 @@ def save(notebook_path: str) -> Optional[str]:
     Path(notebook_path_html).unlink()
     msg = "saved notebook and wrote source file and html report"
     msg += (
-        f"\n{transform}\ntransform.source_file: {source_file}\ntransform.latest_report:"
+        f"\n\n{transform}\n\ntransform.source_file: {source_file}\ntransform.latest_report:"
         f" {report_file}"
     )
     logger.success(msg)
