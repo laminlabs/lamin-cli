@@ -48,17 +48,6 @@ aa("--storage", type=str, metavar="storage", help=instance.storage_root)
 aa("--db", type=str, metavar="db", default=None, help=instance.db)
 aa("--schema", type=str, metavar="schema", default=None, help=instance.schema)
 aa("--name", type=str, metavar="name", default=None, help=instance.name)
-aa(
-    "--vault",
-    default=False,
-    action="store_true",
-    help="Use vault to manage credentials.",
-)
-
-# init instance vault
-init = subparsers.add_parser("init-vault", help=init_help)
-aa = init.add_argument
-aa("--db", type=str, metavar="db", default=None, help=instance.db)
 
 # load instance
 load = subparsers.add_parser("load", help=load_help)
@@ -69,12 +58,6 @@ current user), handle/name, or the URL: https://lamin.ai/handle/name."""
 aa("instance", type=str, metavar="i", default=None, help=instance_help)
 aa("--db", type=str, metavar="db", default=None, help=instance.db)
 aa("--storage", type=str, metavar="s", default=None, help=load_storage_help)
-aa(
-    "--vault",
-    default=False,
-    action="store_true",
-    help="Use vault to manage credentials.",
-)
 
 # delete instance
 delete_parser = subparsers.add_parser("delete", help=delete_help)
@@ -189,13 +172,6 @@ def main():
             db=args.db,
             schema=args.schema,
             name=args.name,
-            _vault=args.vault,
-        )
-    elif args.command == "init-vault":
-        from lamindb_setup._init_vault import init_vault
-
-        return init_vault(
-            db=args.db,
         )
     elif args.command == "load":
         from lamindb_setup._load_instance import load
@@ -204,7 +180,6 @@ def main():
             identifier=args.instance,
             db=args.db,
             storage=args.storage,
-            _vault=args.vault,
         )
     elif args.command == "close":
         from lamindb_setup._close import close
