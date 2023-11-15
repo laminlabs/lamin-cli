@@ -76,7 +76,7 @@ def test_save_consecutive():
         env=env,
     )
     assert result.returncode == 1
-    assert "Didn't find notebook with stem_id" in result.stdout.decode()
+    assert "Did not find notebook with uid prefix" in result.stdout.decode()
 
     # now, let's re-run this notebook so that ln.track() is actually run
     nbproject_test.execute_notebooks(notebook_path)
@@ -96,10 +96,12 @@ def test_save_consecutive():
 
     # now, assume the user modifies the notebook and saves
     # it without changing id or version
+    # outside of tests, this triggers a dialogue
+    # within tests, it automatically overwrites the source
     from nbproject.dev import read_notebook, write_notebook
 
     nb = read_notebook(notebook_path)
-    # duplicate last cell
+    # simulate editing the notebook (here, duplicate last cell)
     new_cell = nb.cells[-1].copy()
     new_cell["execution_count"] += 1
     nb.cells.append(new_cell)

@@ -107,8 +107,8 @@ def save(notebook_path: str) -> Optional[str]:
     transform_family = ln.Transform.filter(uid__startswith=meta_store.id).all()
     if len(transform_family) == 0:
         logger.error(
-            f"Didn't find notebook with stem_id {meta_store.id} (12 initial characters)"
-            " in transform registry, did you run ln.track() in it?"
+            f"Did not find notebook with uid prefix {meta_store.id} (12 initial characters)"
+            " in transform registry. Did you run ln.track()?"
         )
         return "not-tracked-in-transform-registry"
     # the specific version
@@ -124,7 +124,6 @@ def save(notebook_path: str) -> Optional[str]:
             return "aborted-save-notebook-created-by-different-user"
     # convert the notebook file to html
     notebook_path_html = notebook_path.replace(".ipynb", ".html")
-    logger.info(f"exporting notebook as html {notebook_path_html}")
     # log_level is set to 40 to silence the nbconvert logging
     result = subprocess.run(
         f"jupyter nbconvert --to html {notebook_path} --Application.log_level=40",
@@ -134,56 +133,35 @@ def save(notebook_path: str) -> Optional[str]:
     # copy the notebook file to a temporary file
     notebook_path_stripped = notebook_path.replace(".ipynb", "_stripped.ipynb")
     shutil.copy2(notebook_path, notebook_path_stripped)
-    logger.info("stripping output of {notebook_path_tmp}")
     result = subprocess.run(f"nbstripout {notebook_path_stripped}", shell=True)
     assert result.returncode == 0
-    # register the html report
+    # find initial versions of source files and html reports
     initial_report = None
     initial_source = None
     if len(transform_family) > 0:
-        for transform in transform_family.order_by("-created_at"):
+        for prev_transform in transform_family.order_by("-created_at"):
             # check for id to avoid query
-            if transform.latest_report_id is not None:
+            if prev_transform.latest_report_id is not None:
                 # any previous latest report of this transform is OK!
-                initial_report = transform.latest_report
-            if transform.source_file_id is not None:
+                initial_report = prev_transform.latest_report
+            if prev_transform.source_file_id is not None:
                 # any previous source file id is OK!
-                initial_source = transform.source_file
-    if hasattr(
-        ln.settings, "silence_file_run_transform_warning"
-    ):  # can remove this from next release on
-        ln.settings.silence_file_run_transform_warning = True
+                initial_source = prev_transform.source_file
+    ln.settings.silence_file_run_transform_warning = True
     # register the source code
     if transform.source_file is not None:
-        # this if condition is relevant if we already wrote the source code for
-        # this transform version previously
-        source_file = ln.File(
-            notebook_path_stripped,
-            description=f"Source of transform {transform.uid}",
-            visibility=1,
-        )
-        # if the hash of the notebook file matches, we're trying to overwrite
-        if source_file._state.adding:
-            # this part of the if condition is currently not tested in an auto-mated way
-            # will add this soon!
+        # check if the hash of the notebook source file matches
+        if ln.File(notebook_path_stripped, key="dummy")._state.adding:
             if os.getenv("LAMIN_TESTING") is None:
+                # in test, auto-confirm overwrite
                 response = input(
-                    "You're trying to save new notebook source code with the same"
-                    " version; do you want to replace the existing source code? (y/n)"
+                    f"You try to save a new notebook source file with the same"
+                    f" version {transform.version}; do you want to replace the content of the existing source file ({transform.source_file})? (y/n)"
                 )
             else:
                 response = "y"
             if response == "y":
-                source_file = ln.File.filter(
-                    version=transform_version, initial_version=initial_source
-                ).one_or_none()
-                if source_file is None:
-                    # account for the very first version in the family
-                    source_file = ln.File.filter(
-                        version=transform_version, id=initial_source.id  # type: ignore
-                    ).one_or_none()
-                source_file.replace(notebook_path_stripped)
-                source_file.save()
+                transform.source_file.replace(notebook_path_stripped)
             else:
                 logger.warning(
                     "Please create a new version of the notebook via `lamin track"
@@ -199,28 +177,34 @@ def save(notebook_path: str) -> Optional[str]:
             visibility=1,
         )
         source_file.save()
+        transform.source_file = source_file
     # save report file
-    report_file = ln.File(
-        notebook_path_html,
-        description=f"Report of transform {transform.uid}",
-        is_new_version_of=initial_report,
-        visibility=1,
-    )
-    report_file.save()
-    run.report = report_file
+    if run.report_id is not None:
+        logger.warning(
+            "there is already an existing report for this run, replacing it"
+        )
+        run.report.replace(notebook_path_html)
+    else:
+        report_file = ln.File(
+            notebook_path_html,
+            description=f"Report of transform {transform.uid}",
+            is_new_version_of=initial_report,
+            visibility=1,
+        )
+        report_file.save()
+        run.report = report_file
     run.is_consecutive = is_consecutive
     run.save()
     # annotate transform
-    transform.source_file = source_file
-    transform.latest_report = report_file
+    transform.latest_report = run.report
     transform.save()
     # clean up
     Path(notebook_path_stripped).unlink()
     Path(notebook_path_html).unlink()
     msg = "saved notebook and wrote source file and html report"
     msg += (
-        f"\n{transform}\ntransform.source_file: {source_file}\ntransform.latest_report:"
-        f" {report_file}"
+        f"\n\n{transform}\n\n.source_file: {transform.source_file}\n.latest_report:"
+        f" {transform.latest_report}"
     )
     logger.success(msg)
     return None
