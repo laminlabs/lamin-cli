@@ -54,6 +54,7 @@ def update_metadata(content, filepath):
         response = input("Do you want to generate a new uid prefix? (y/n) ")
     else:
         response = "y"
+    new_version = version
     if response == "y":
         new_uid_prefix = nbproject_id()
         updated = True
@@ -66,8 +67,6 @@ def update_metadata(content, filepath):
         if response == "y":
             new_version = input("Please type the version: ")
             updated = True
-        else:
-            new_version = version
     if updated:
         if is_notebook:
             logger.save("updated notebook")
