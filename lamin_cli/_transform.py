@@ -21,6 +21,17 @@ def init_script_metadata(script_path: str):
         f.write(prepend + content)
 
 
+def get_script_metadata(filepath: str):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("script", filepath)
+    script_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script_module)
+
+    uid_prefix = script_module.__lamindb_uid_prefix__
+    version = script_module.__version__
+    return uid_prefix, version   
+
+
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
 def update_metadata(content, filepath):
     # here, content is either a Mapping representing a Notebook
@@ -35,14 +46,7 @@ def update_metadata(content, filepath):
         version = content.metadata["nbproject"]["version"]        
     else:
         is_notebook = False
-
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("script", filepath)
-        script_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(script_module)
-
-        uid_prefix = script_module.__lamindb_uid_prefix__
-        version = script_module.__version__ 
+        uid_prefix, version = get_script_metadata(filepath)
 
     logger.info(
         f"the transform {filepath} is already tracked (uid_prefix='{uid_prefix}',"
@@ -113,79 +117,89 @@ def track(filepath: str, pypackage: Optional[str] = None) -> None:
     return None
 
 
-def save(notebook_path: str) -> Optional[str]:
-    try:
-        import nbstripout  # noqa
-        from nbproject.dev import (
-            MetaContainer,
-            MetaStore,
-            check_consecutiveness,
-            read_notebook,
-        )
-        from nbproject.dev._meta_live import get_title
-    except ImportError:
-        logger.error("install nbproject & nbstripout: pip install nbproject nbstripout")
-        return None
-    nb = read_notebook(notebook_path)  # type: ignore
-    nb_meta = nb.metadata
-    is_consecutive = check_consecutiveness(nb)
-    if not is_consecutive:
-        if os.getenv("LAMIN_TESTING") is None:
-            decide = input("   Do you still want to proceed with publishing? (y/n) ")
+def save(filepath: str) -> Optional[str]:
+    if filepath.endswith(".ipynb"):
+        is_notebook = True
+        try:
+            import nbstripout  # noqa
+            from nbproject.dev import (
+                MetaContainer,
+                MetaStore,
+                check_consecutiveness,
+                read_notebook,
+            )
+            from nbproject.dev._meta_live import get_title
+        except ImportError:
+            logger.error("install nbproject & nbstripout: pip install nbproject nbstripout")
+            return None
+        nb = read_notebook(filepath)  # type: ignore
+        nb_meta = nb.metadata
+        is_consecutive = check_consecutiveness(nb)
+        if not is_consecutive:
+            if os.getenv("LAMIN_TESTING") is None:
+                decide = input("   Do you still want to proceed with publishing? (y/n) ")
+            else:
+                decide = "n"
+            if decide != "y":
+                logger.error("Aborted (non-consecutive)!")
+                return "aborted-non-consecutive"
+        if get_title(nb) is None:
+            logger.error(
+                f"No title! Update & {colors.bold('save')} your notebook with a title '# My"
+                " title' in the first cell."
+            )
+            return "no-title"
+        if nb_meta is not None and "nbproject" in nb_meta:
+            meta_container = MetaContainer(**nb_meta["nbproject"])
         else:
-            decide = "n"
-        if decide != "y":
-            logger.error("Aborted (non-consecutive)!")
-            return "aborted-non-consecutive"
-    if get_title(nb) is None:
-        logger.error(
-            f"No title! Update & {colors.bold('save')} your notebook with a title '# My"
-            " title' in the first cell."
-        )
-        return "no-title"
-    if nb_meta is not None and "nbproject" in nb_meta:
-        meta_container = MetaContainer(**nb_meta["nbproject"])
-    else:
-        logger.error("notebook isn't initialized, run lamin track <notebook_path>")
-        return "not-initialized"
+            logger.error("notebook isn't initialized, run lamin track <filepath>")
+            return "not-initialized"
 
-    meta_store = MetaStore(meta_container, notebook_path)
+        meta_store = MetaStore(meta_container, filepath)
+        uid_prefix, transform_version = meta_store.id, meta_store.version
+    else:
+        is_notebook = False
+        uid_prefix, transform_version = get_script_metadata(filepath)
+
     import lamindb as ln
 
     ln.settings.verbosity = "success"
-    transform_version = meta_store.version
+
     # the corresponding transform family in the transform table
-    transform_family = ln.Transform.filter(uid__startswith=meta_store.id).all()
+    transform_family = ln.Transform.filter(uid__startswith=uid_prefix).all()
     if len(transform_family) == 0:
         logger.error(
-            f"Did not find notebook with uid prefix {meta_store.id} (12 initial characters)"
+            f"Did not find notebook with uid prefix {uid_prefix}"
             " in transform registry. Did you run ln.track()?"
         )
         return "not-tracked-in-transform-registry"
     # the specific version
     transform = transform_family.filter(version=transform_version).one()
-    # latest run of this transform by user
-    run = ln.Run.filter(transform=transform).order_by("-run_at").first()
-    if run.created_by.id != lamindb_setup.settings.user.id:
-        response = input(
-            "You are trying to save a notebook created by another user: Source and"
-            " report files will be tagged with *your* user id. Proceed? (y/n)"
+    if is_notebook:
+        # latest run of this transform by user
+        run = ln.Run.filter(transform=transform).order_by("-run_at").first()
+        if run.created_by.id != lamindb_setup.settings.user.id:
+            response = input(
+                "You are trying to save a notebook created by another user: Source and"
+                " report files will be tagged with *your* user id. Proceed? (y/n)"
+            )
+            if response != "y":
+                return "aborted-save-notebook-created-by-different-user"        
+        # convert the notebook file to html
+        filepath_html = filepath.replace(".ipynb", ".html")
+        # log_level is set to 40 to silence the nbconvert logging
+        result = subprocess.run(
+            f"jupyter nbconvert --to html {filepath} --Application.log_level=40",
+            shell=True,
         )
-        if response != "y":
-            return "aborted-save-notebook-created-by-different-user"
-    # convert the notebook file to html
-    notebook_path_html = notebook_path.replace(".ipynb", ".html")
-    # log_level is set to 40 to silence the nbconvert logging
-    result = subprocess.run(
-        f"jupyter nbconvert --to html {notebook_path} --Application.log_level=40",
-        shell=True,
-    )
-    assert result.returncode == 0
-    # copy the notebook file to a temporary file
-    notebook_path_stripped = notebook_path.replace(".ipynb", "_stripped.ipynb")
-    shutil.copy2(notebook_path, notebook_path_stripped)
-    result = subprocess.run(f"nbstripout {notebook_path_stripped}", shell=True)
-    assert result.returncode == 0
+        assert result.returncode == 0
+        # copy the notebook file to a temporary file
+        source_file_path = filepath.replace(".ipynb", "_stripped.ipynb")
+        shutil.copy2(filepath, source_file_path)
+        result = subprocess.run(f"nbstripout {source_file_path}", shell=True)
+        assert result.returncode == 0
+    else:
+        source_file_path = filepath
     # find initial versions of source files and html reports
     initial_report = None
     initial_source = None
@@ -202,7 +216,7 @@ def save(notebook_path: str) -> Optional[str]:
     # register the source code
     if transform.source_file is not None:
         # check if the hash of the notebook source file matches
-        if ln.File(notebook_path_stripped, key="dummy")._state.adding:
+        if ln.File(source_file_path, key="dummy")._state.adding:
             if os.getenv("LAMIN_TESTING") is None:
                 # in test, auto-confirm overwrite
                 response = input(
@@ -212,16 +226,16 @@ def save(notebook_path: str) -> Optional[str]:
             else:
                 response = "y"
             if response == "y":
-                transform.source_file.replace(notebook_path_stripped)
+                transform.source_file.replace(source_file_path)
             else:
                 logger.warning(
                     "Please create a new version of the notebook via `lamin track"
-                    " <notebook_path>` and re-run the notebook"
+                    " <filepath>` and re-run the notebook"
                 )
                 return "rerun-the-notebook"
     else:
         source_file = ln.File(
-            notebook_path_stripped,
+            source_file_path,
             description=f"Source of transform {transform.uid}",
             version=transform_version,
             is_new_version_of=initial_source,
@@ -230,32 +244,34 @@ def save(notebook_path: str) -> Optional[str]:
         source_file.save()
         transform.source_file = source_file
     # save report file
-    if run.report_id is not None:
-        logger.warning(
-            "there is already an existing report for this run, replacing it"
-        )
-        run.report.replace(notebook_path_html)
-    else:
-        report_file = ln.File(
-            notebook_path_html,
-            description=f"Report of transform {transform.uid}",
-            is_new_version_of=initial_report,
-            visibility=1,
-        )
-        report_file.save()
-        run.report = report_file
-    run.is_consecutive = is_consecutive
-    run.save()
-    # annotate transform
-    transform.latest_report = run.report
+    if is_notebook:
+        if run.report_id is not None:
+            logger.warning(
+                "there is already an existing report for this run, replacing it"
+            )
+            run.report.replace(filepath_html)
+        else:
+            report_file = ln.File(
+                filepath_html,
+                description=f"Report of transform {transform.uid}",
+                is_new_version_of=initial_report,
+                visibility=1,
+            )
+            report_file.save()
+            run.report = report_file
+        run.is_consecutive = is_consecutive
+        run.save()
+        transform.latest_report = run.report
     transform.save()
-    # clean up
-    Path(notebook_path_stripped).unlink()
-    Path(notebook_path_html).unlink()
-    msg = "saved notebook and wrote source file and html report"
+    if is_notebook:
+        # clean up
+        Path(source_file_path).unlink()
+        Path(filepath_html).unlink()
+    msg = "saved transform"
     msg += (
-        f"\n\n{transform}\n\n.source_file: {transform.source_file}\n.latest_report:"
-        f" {transform.latest_report}"
+        f"\n\n{transform}\n\n.source_file: {transform.source_file}"
     )
+    if is_notebook:
+        msg += f"\n.latest_report: {transform.latest_report}"
     logger.success(msg)
     return None

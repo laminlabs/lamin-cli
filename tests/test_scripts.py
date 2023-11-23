@@ -22,7 +22,7 @@ def test_initialize():
     assert content.startswith(prepend)
 
 
-def test_run():
+def test_run_and_save():
     filepath = scripts_dir / "initialized.py"       
     result = subprocess.run(
         f"python {str(filepath)}",
@@ -31,3 +31,11 @@ def test_run():
     )
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
+
+    result = subprocess.run(
+        f"lamin save {str(filepath)}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "saved transform" in result.stdout.decode()
