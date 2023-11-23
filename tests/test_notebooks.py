@@ -17,7 +17,7 @@ def test_track_not_initialized():
         env=env,
     )
     assert result.returncode == 0
-    assert "attached notebook id to ipynb file" in result.stdout.decode()
+    assert "added uid_prefix & version to ipynb file metadata" in result.stdout.decode()
 
 
 def test_track_no_title():
@@ -31,7 +31,7 @@ def test_track_no_title():
     )
     assert result.returncode == 0
     # see lamindb_setup/_notebooks.py::update_notebook_metadata
-    assert "updated notebook metadata" in result.stdout.decode()
+    assert "updated notebook" in result.stdout.decode()
 
 
 def test_save_no_title():
@@ -91,7 +91,7 @@ def test_save_consecutive():
     print(result.stderr)
     assert result.returncode == 0
     assert (
-        "saved notebook and wrote source file and html report" in result.stdout.decode()
+        "saved transform" in result.stdout.decode()
     )
 
     # now, assume the user modifies the notebook and saves
@@ -116,5 +116,5 @@ def test_save_consecutive():
     print(result.stderr)
     assert result.returncode == 0
     assert (
-        "saved notebook and wrote source file and html report" in result.stdout.decode()
+        "saved transform" in result.stdout.decode()
     )

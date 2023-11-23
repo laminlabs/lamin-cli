@@ -220,11 +220,11 @@ def main():
         if args.action == "view":
             return view()
     elif args.command == "track":
-        from lamin_cli._notebook import track
+        from lamin_cli._transform import track
 
         track(args.filepath, args.pypackage)
     elif args.command == "save":
-        from lamin_cli._notebook import save
+        from lamin_cli._transform import save
 
         return save(args.filepath)
     elif args.command == "cache":
