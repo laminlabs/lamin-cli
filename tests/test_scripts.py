@@ -39,3 +39,4 @@ def test_run_and_save():
     )
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
+    assert filepath.exists()  # test that it's not cleaned out!

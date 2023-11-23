@@ -116,5 +116,5 @@ def test_save_consecutive():
     print(result.stderr)
     assert result.returncode == 0
     assert (
-        "saved notebook and wrote source file and html report" in result.stdout.decode()
+        "saved transform" in result.stdout.decode()
     )
