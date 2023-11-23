@@ -19,6 +19,7 @@ def init_script_metadata(script_path: str):
     prepend = f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
     with open(script_path, "w") as f:
         f.write(prepend + content)
+    logger.success("added __lamindb_uid_prefix__ & __version__ to .py file")
 
 
 def get_script_metadata(filepath: str):
