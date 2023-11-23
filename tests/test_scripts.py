@@ -1,27 +1,31 @@
-import os
+from pathlib import Path
 import subprocess
 
 
-scripts_dir = "./sub/lamin-cli/tests/scripts/"
+scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
+print(scripts_dir)
 
 def test_initialize():
+    filepath = scripts_dir / "not-initialized.py"
+    print(scripts_dir)
     result = subprocess.run(
-        f"lamin track {scripts_dir}not-initialized.py",
+        f"lamin track {str(filepath)}",
         shell=True,
         capture_output=True,
     )
     assert result.returncode == 0
 
-    with open(f"{scripts_dir}not-initialized.py") as f:
+    with open(filepath) as f:
         content = f.read()
     prepend = f'__lamindb_uid_prefix__ = "'
     assert content.startswith(prepend)
 
 
 def test_run():
+    filepath = scripts_dir / "initialized.py"       
     result = subprocess.run(
-        f"python {scripts_dir}initialized.py",
+        f"python {str(filepath)}",
         shell=True,
         capture_output=True,
     )
