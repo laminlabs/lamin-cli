@@ -8,6 +8,19 @@ import lamindb_setup
 from lamin_utils import colors, logger
 
 
+def init_metadata(script_path: str):
+    from lnschema_core.ids import base62_12
+
+    uid_prefix = base62_12()
+    version = "0"
+
+    with open(script_path) as f:
+        content = f.read()
+    prepend = f'___uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"'
+    with open(script_path, "w") as f:
+        f.write(prepend + content)
+
+
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
 def update_notebook_metadata(nb, notebook_path):
     from nbproject.dev import write_notebook
@@ -42,23 +55,28 @@ def update_notebook_metadata(nb, notebook_path):
         write_notebook(nb, notebook_path)
 
 
-def track(notebook_path: str, pypackage: Optional[str] = None) -> None:
+def track(filepath: str, pypackage: Optional[str] = None) -> None:
     try:
         from nbproject.dev import initialize_metadata, read_notebook, write_notebook
     except ImportError:
         logger.error("install nbproject: pip install nbproject")
         return None
 
-    nb = read_notebook(notebook_path)
-    if "nbproject" not in nb.metadata:
-        if pypackage is not None:
-            pypackage = [pp for pp in pypackage.split(",") if len(pp) > 0]  # type: ignore # noqa
-        metadata = initialize_metadata(nb, pypackage=pypackage).dict()
-        nb.metadata["nbproject"] = metadata
-        write_notebook(nb, notebook_path)
-        logger.success("attached notebook id to ipynb file")
+    if filepath.endswith(".ipynb"):
+        nb = read_notebook(filepath)
+        if "nbproject" not in nb.metadata:
+            if pypackage is not None:
+                pypackage = [pp for pp in pypackage.split(",") if len(pp) > 0]  # type: ignore # noqa
+            metadata = initialize_metadata(nb, pypackage=pypackage).dict()
+            nb.metadata["nbproject"] = metadata
+            write_notebook(nb, filepath)
+            logger.success("attached notebook id to ipynb file")
+        else:
+            update_notebook_metadata(nb, filepath)
+    elif filepath.endswith(".py"):
+        init_metadata(filepath)
     else:
-        update_notebook_metadata(nb, notebook_path)
+        raise ValueError("Only .py and .ipynb files can be tracked as transforms")
     return None
 
 
