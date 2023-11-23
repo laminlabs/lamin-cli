@@ -4,6 +4,8 @@ __version__ = "0"
 
 import lamindb as ln
 
-ln.track()
 
-print("hello!")
+if __name__ == "__main__":
+    ln.track()
+
+    print("hello!")

@@ -221,7 +221,7 @@ def save(filepath: str) -> Optional[str]:
                 # in test, auto-confirm overwrite
                 response = input(
                     f"You try to save a new notebook source file with the same"
-                    f" version {transform.version}; do you want to replace the content of the existing source file ({transform.source_file})? (y/n)"
+                    f" version '{transform.version}'; do you want to replace the content of the existing source file {transform.source_file}? (y/n)"
                 )
             else:
                 response = "y"
