@@ -66,6 +66,8 @@ def update_metadata(content, filepath):
         if response == "y":
             new_version = input("Please type the version: ")
             updated = True
+        else:
+            new_version = version
     if updated:
         if is_notebook:
             logger.save("updated notebook")
