@@ -8,7 +8,7 @@ import lamindb_setup
 from lamin_utils import colors, logger
 
 
-def init_metadata(script_path: str):
+def init_script_metadata(script_path: str):
     from lnschema_core.ids import base62_12
 
     uid_prefix = base62_12()
@@ -16,21 +16,37 @@ def init_metadata(script_path: str):
 
     with open(script_path) as f:
         content = f.read()
-    prepend = f'___uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"'
+    prepend = f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
     with open(script_path, "w") as f:
         f.write(prepend + content)
 
 
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
-def update_notebook_metadata(nb, notebook_path):
-    from nbproject.dev import write_notebook
-    from nbproject.dev._initialize import nbproject_id
+def update_metadata(content, filepath):
+    # here, content is either a Mapping representing a Notebook
+    # or the content of a source file
+    if filepath.endswith(".ipynb"):
+        is_notebook = True
 
-    stem_id = nb.metadata["nbproject"]["id"]
-    current_version = nb.metadata["nbproject"]["version"]
+        from nbproject.dev import write_notebook
+        from nbproject.dev._initialize import nbproject_id
+
+        uid_prefix = content.metadata["nbproject"]["id"]
+        version = content.metadata["nbproject"]["version"]        
+    else:
+        is_notebook = False
+
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("script", filepath)
+        script_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(script_module)
+
+        uid_prefix = script_module.__lamindb_uid_prefix__
+        version = script_module.__version__ 
+
     logger.info(
-        f"the notebook {notebook_path} is already tracked (uid_prefix='{stem_id}',"
-        f" version: '{current_version}')"
+        f"the transform {filepath} is already tracked (uid_prefix='{uid_prefix}',"
+        f" version: '{version}')"
     )
     updated = False
     # ask for generating new id
@@ -39,20 +55,31 @@ def update_notebook_metadata(nb, notebook_path):
     else:
         response = "y"
     if response == "y":
-        nb.metadata["nbproject"]["id"] = nbproject_id()
+        new_uid_prefix = nbproject_id()
         updated = True
     else:
+        new_uid_prefix = uid_prefix
         response = input(
-            f"The current version is '{current_version}' - do you want to set a new"
+            f"The current version is '{version}' - do you want to set a new"
             " version? (y/n) "
         )
         if response == "y":
             new_version = input("Please type the version: ")
-            nb.metadata["nbproject"]["version"] = new_version
             updated = True
     if updated:
-        logger.save("updated notebook metadata")
-        write_notebook(nb, notebook_path)
+        if is_notebook:
+            logger.save("updated notebook")
+            content.metadata["nbproject"]["id"] = new_uid_prefix
+            content.metadata["nbproject"]["version"] = new_version
+            write_notebook(content, filepath)
+        else:
+            logger.save("updated script")
+            old_metadata = f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
+            new_metadata = f'__lamindb_uid_prefix__ = "{new_uid_prefix}"\n__version__ = "{new_version}"\n'
+            if old_metadata not in content:
+                raise ValueError(f"Cannot find {old_metadata} block in script, please re-format as block to update")
+            with open(filepath, "w") as f:
+                f.write(content.replace(old_metadata, new_metadata))
 
 
 def track(filepath: str, pypackage: Optional[str] = None) -> None:
@@ -70,11 +97,16 @@ def track(filepath: str, pypackage: Optional[str] = None) -> None:
             metadata = initialize_metadata(nb, pypackage=pypackage).dict()
             nb.metadata["nbproject"] = metadata
             write_notebook(nb, filepath)
-            logger.success("attached notebook id to ipynb file")
+            logger.success("added uid_prefix & version to ipynb file metadata")
         else:
-            update_notebook_metadata(nb, filepath)
+            update_metadata(nb, filepath)
     elif filepath.endswith(".py"):
-        init_metadata(filepath)
+        with open(filepath) as f:
+            content = f.read()
+        if "__lamindb_uid_prefix__" not in content:
+            init_script_metadata(filepath)
+        else:
+            update_metadata(content, filepath)
     else:
         raise ValueError("Only .py and .ipynb files can be tracked as transforms")
     return None

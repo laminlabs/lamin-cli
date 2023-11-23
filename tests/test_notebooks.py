@@ -31,7 +31,7 @@ def test_track_no_title():
     )
     assert result.returncode == 0
     # see lamindb_setup/_notebooks.py::update_notebook_metadata
-    assert "updated notebook metadata" in result.stdout.decode()
+    assert "updated notebook" in result.stdout.decode()
 
 
 def test_save_no_title():
