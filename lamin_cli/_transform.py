@@ -216,7 +216,8 @@ def save(filepath: str) -> Optional[str]:
     # register the source code
     if transform.source_file is not None:
         # check if the hash of the notebook source file matches
-        if ln.File(source_file_path, key="dummy")._state.adding:
+        check_source_file = ln.File(source_file_path, key="dummy")
+        if check_source_file._state.adding:
             if os.getenv("LAMIN_TESTING") is None:
                 # in test, auto-confirm overwrite
                 response = input(
@@ -267,11 +268,7 @@ def save(filepath: str) -> Optional[str]:
         # clean up
         Path(source_file_path).unlink()
         Path(filepath_html).unlink()
-    msg = "saved transform"
-    msg += (
-        f"\n\n{transform}\n\n.source_file: {transform.source_file}"
-    )
+    logger.success(f"saved transform.source_file: {transform.source_file}")
     if is_notebook:
-        msg += f"\n.latest_report: {transform.latest_report}"
-    logger.success(msg)
+        logger.success(f"saved transform.latest_report: {transform.latest_report}")
     return None
