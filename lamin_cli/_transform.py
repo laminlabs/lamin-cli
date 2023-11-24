@@ -72,7 +72,7 @@ def update_transform_source_metadata(
     new_version = version
     if bump_version:
         new_uid_prefix = uid_prefix
-        if os.getenv["LAMIN_TESTING"] is None:
+        if os.getenv("LAMIN_TESTING") is None:
             new_version = input(
                 f"The current version is '{version}' - please type the new version: "
             )
