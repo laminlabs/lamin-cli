@@ -53,7 +53,7 @@ def test_run_and_save():
         env=env,
     )
     assert result.returncode == 1
-    assert "You can now rerun the script." in result.stdout.decode()
+    assert "You can now rerun the script." in result.stderr.decode()
 
     result = subprocess.run(
         f"python {str(filepath)}",
