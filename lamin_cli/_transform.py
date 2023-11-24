@@ -24,22 +24,23 @@ def init_script_metadata(script_path: str):
 
 def get_script_metadata(filepath: str):
     import importlib.util
+
     spec = importlib.util.spec_from_file_location("script", filepath)
-    script_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(script_module)
+    script_module = importlib.util.module_from_spec(spec)  # type:ignore
+    spec.loader.exec_module(script_module)  # type:ignore
 
     uid_prefix = script_module.__lamindb_uid_prefix__
     version = script_module.__version__
-    return uid_prefix, version   
+    return uid_prefix, version
 
 
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
 def update_transform_source_metadata(
     content: Any,
     filepath: str,
-    run_from_cli: bool = True, 
-    bump_version: bool = False,    
-) -> (bool, str, str):
+    run_from_cli: bool = True,
+    bump_version: bool = False,
+) -> (bool, str, str):  # type:ignore
     # here, content is either a Mapping representing the Notebook metadata
     # or the content of a source file
     if filepath.endswith(".ipynb"):
@@ -49,13 +50,12 @@ def update_transform_source_metadata(
         from nbproject.dev._initialize import nbproject_id
 
         uid_prefix = content.metadata["nbproject"]["id"]
-        version = content.metadata["nbproject"]["version"]        
+        version = content.metadata["nbproject"]["version"]
     else:
         is_notebook = False
         uid_prefix, version = get_script_metadata(filepath)
     logger.important(
-        f"transform is tracked with uid_prefix='{uid_prefix}',"
-        f" version: '{version}'"
+        f"transform is tracked with uid_prefix='{uid_prefix}', version: '{version}'"
     )
     updated = False
     # ask for generating a new uid prefix
@@ -68,7 +68,7 @@ def update_transform_source_metadata(
             new_uid_prefix = nbproject_id()
             updated = True
         else:
-            bump_version = True            
+            bump_version = True
     new_version = version
     if bump_version:
         new_uid_prefix = uid_prefix
@@ -87,16 +87,26 @@ def update_transform_source_metadata(
             write_notebook(content, filepath)
         else:
             logger.save("updated script")
-            old_metadata = f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
-            new_metadata = f'__lamindb_uid_prefix__ = "{new_uid_prefix}"\n__version__ = "{new_version}"\n'
+            old_metadata = (
+                f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
+            )
+            new_metadata = (
+                f'__lamindb_uid_prefix__ = "{new_uid_prefix}"\n__version__ ='
+                f' "{new_version}"\n'
+            )
             if old_metadata not in content:
-                raise ValueError(f"Cannot find {old_metadata} block in script, please re-format as block to update")
+                raise ValueError(
+                    f"Cannot find {old_metadata} block in script, please re-format as"
+                    " block to update"
+                )
             with open(filepath, "w") as f:
                 f.write(content.replace(old_metadata, new_metadata))
     return updated, new_uid_prefix, new_version
 
 
-def track(filepath: str, pypackage: Optional[str] = None, bump_version: bool = False) -> None:
+def track(
+    filepath: str, pypackage: Optional[str] = None, bump_version: bool = False
+) -> None:
     try:
         from nbproject.dev import initialize_metadata, read_notebook, write_notebook
     except ImportError:
@@ -120,7 +130,9 @@ def track(filepath: str, pypackage: Optional[str] = None, bump_version: bool = F
         if "__lamindb_uid_prefix__" not in content:
             init_script_metadata(filepath)
         else:
-            update_transform_source_metadata(content, filepath, bump_version=bump_version)
+            update_transform_source_metadata(
+                content, filepath, bump_version=bump_version
+            )
     else:
         raise ValueError("Only .py and .ipynb files can be tracked as transforms")
     return None
@@ -139,14 +151,18 @@ def save(filepath: str) -> Optional[str]:
             )
             from nbproject.dev._meta_live import get_title
         except ImportError:
-            logger.error("install nbproject & nbstripout: pip install nbproject nbstripout")
+            logger.error(
+                "install nbproject & nbstripout: pip install nbproject nbstripout"
+            )
             return None
         nb = read_notebook(filepath)  # type: ignore
         nb_meta = nb.metadata
         is_consecutive = check_consecutiveness(nb)
         if not is_consecutive:
             if os.getenv("LAMIN_TESTING") is None:
-                decide = input("   Do you still want to proceed with publishing? (y/n) ")
+                decide = input(
+                    "   Do you still want to proceed with publishing? (y/n) "
+                )
             else:
                 decide = "n"
             if decide != "y":
@@ -154,8 +170,8 @@ def save(filepath: str) -> Optional[str]:
                 return "aborted-non-consecutive"
         if get_title(nb) is None:
             logger.error(
-                f"No title! Update & {colors.bold('save')} your notebook with a title '# My"
-                " title' in the first cell."
+                f"No title! Update & {colors.bold('save')} your notebook with a title"
+                " '# My title' in the first cell."
             )
             return "no-title"
         if nb_meta is not None and "nbproject" in nb_meta:
@@ -193,7 +209,7 @@ def save(filepath: str) -> Optional[str]:
                 " report files will be tagged with *your* user id. Proceed? (y/n)"
             )
             if response != "y":
-                return "aborted-save-notebook-created-by-different-user"        
+                return "aborted-save-notebook-created-by-different-user"
         # convert the notebook file to html
         filepath_html = filepath.replace(".ipynb", ".html")
         # log_level is set to 40 to silence the nbconvert logging
@@ -230,8 +246,9 @@ def save(filepath: str) -> Optional[str]:
             if os.getenv("LAMIN_TESTING") is None:
                 # in test, auto-confirm overwrite
                 response = input(
-                    f"You try to save a new notebook source file with the same"
-                    f" version '{transform.version}'; do you want to replace the content of the existing source file {transform.source_file}? (y/n)"
+                    "You try to save a new notebook source file with the same version"
+                    f" '{transform.version}'; do you want to replace the content of the"
+                    f" existing source file {transform.source_file}? (y/n)"
                 )
             else:
                 response = "y"
@@ -249,7 +266,7 @@ def save(filepath: str) -> Optional[str]:
             description=f"Source of transform {transform.uid}",
             version=transform_version,
             is_new_version_of=initial_source,
-            visibility=1,
+            visibility=0,  # hidden file
         )
         source_file.save()
         transform.source_file = source_file
@@ -265,7 +282,7 @@ def save(filepath: str) -> Optional[str]:
                 filepath_html,
                 description=f"Report of transform {transform.uid}",
                 is_new_version_of=initial_report,
-                visibility=1,
+                visibility=0,  # hidden file
             )
             report_file.save()
             run.report = report_file
