@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import lamindb_setup
 from lamin_utils import colors, logger
@@ -34,8 +34,13 @@ def get_script_metadata(filepath: str):
 
 
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
-def update_metadata(content, filepath):
-    # here, content is either a Mapping representing a Notebook
+def update_transform_source_metadata(
+    content: Any,
+    filepath: str,
+    run_from_cli: bool = True, 
+    bump_version: bool = False,    
+):
+    # here, content is either a Mapping representing the Notebook metadata
     # or the content of a source file
     if filepath.endswith(".ipynb"):
         is_notebook = True
@@ -48,31 +53,32 @@ def update_metadata(content, filepath):
     else:
         is_notebook = False
         uid_prefix, version = get_script_metadata(filepath)
-
-    logger.info(
-        f"the transform {filepath} is already tracked (uid_prefix='{uid_prefix}',"
-        f" version: '{version}')"
+    logger.important(
+        f"transform is tracked with uid_prefix='{uid_prefix}',"
+        f" version: '{version}'"
     )
     updated = False
-    # ask for generating new id
-    if os.getenv("LAMIN_TESTING") is None:
-        response = input("Do you want to generate a new uid prefix? (y/n) ")
-    else:
-        response = "y"
+    # ask for generating a new uid prefix
+    if not bump_version:
+        if os.getenv("LAMIN_TESTING") is None:
+            response = input("Do you want to generate a new uid prefix? (y/n) ")
+        else:
+            response = "y"
+        if response == "y":
+            new_uid_prefix = nbproject_id()
+            updated = True
+        else:
+            bump_version = True            
     new_version = version
-    if response == "y":
-        new_uid_prefix = nbproject_id()
-        updated = True
-    else:
+    if bump_version:
         new_uid_prefix = uid_prefix
         response = input(
-            f"The current version is '{version}' - do you want to set a new"
-            " version? (y/n) "
+            f"The current version is '{version}' - do you want to bump it? (y/n) "
         )
         if response == "y":
             new_version = input("Please type the version: ")
             updated = True
-    if updated:
+    if updated and run_from_cli:
         if is_notebook:
             logger.save("updated notebook")
             content.metadata["nbproject"]["id"] = new_uid_prefix
@@ -86,9 +92,10 @@ def update_metadata(content, filepath):
                 raise ValueError(f"Cannot find {old_metadata} block in script, please re-format as block to update")
             with open(filepath, "w") as f:
                 f.write(content.replace(old_metadata, new_metadata))
+    return new_uid_prefix, new_version
 
 
-def track(filepath: str, pypackage: Optional[str] = None) -> None:
+def track(filepath: str, pypackage: Optional[str] = None, bump_version: bool = False) -> None:
     try:
         from nbproject.dev import initialize_metadata, read_notebook, write_notebook
     except ImportError:
@@ -105,14 +112,14 @@ def track(filepath: str, pypackage: Optional[str] = None) -> None:
             write_notebook(nb, filepath)
             logger.success("added uid_prefix & version to ipynb file metadata")
         else:
-            update_metadata(nb, filepath)
+            update_transform_source_metadata(nb, filepath, bump_version=bump_version)
     elif filepath.endswith(".py"):
         with open(filepath) as f:
             content = f.read()
         if "__lamindb_uid_prefix__" not in content:
             init_script_metadata(filepath)
         else:
-            update_metadata(content, filepath)
+            update_transform_source_metadata(content, filepath, bump_version=bump_version)
     else:
         raise ValueError("Only .py and .ipynb files can be tracked as transforms")
     return None
