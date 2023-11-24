@@ -40,3 +40,19 @@ def test_run_and_save():
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
     assert filepath.exists()  # test that it's not cleaned out!
+
+    # now, trying to run the same thing again will error
+    result = subprocess.run(
+        f"python {str(filepath)}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 1
+    assert "You can now rerun the script." in result.stdout.decode()
+
+    result = subprocess.run(
+        f"python {str(filepath)}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0

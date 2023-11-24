@@ -39,7 +39,7 @@ def update_transform_source_metadata(
     filepath: str,
     run_from_cli: bool = True, 
     bump_version: bool = False,    
-):
+) -> (bool, str, str):
     # here, content is either a Mapping representing the Notebook metadata
     # or the content of a source file
     if filepath.endswith(".ipynb"):
@@ -72,12 +72,13 @@ def update_transform_source_metadata(
     new_version = version
     if bump_version:
         new_uid_prefix = uid_prefix
-        response = input(
-            f"The current version is '{version}' - do you want to bump it? (y/n) "
-        )
-        if response == "y":
-            new_version = input("Please type the version: ")
-            updated = True
+        if os.getenv["LAMIN_TESTING"] is None:
+            new_version = input(
+                f"The current version is '{version}' - please type the new version: "
+            )
+        else:
+            new_version = str(int(version) + 1)
+        updated = new_version != version
     if updated and run_from_cli:
         if is_notebook:
             logger.save("updated notebook")
@@ -92,7 +93,7 @@ def update_transform_source_metadata(
                 raise ValueError(f"Cannot find {old_metadata} block in script, please re-format as block to update")
             with open(filepath, "w") as f:
                 f.write(content.replace(old_metadata, new_metadata))
-    return new_uid_prefix, new_version
+    return updated, new_uid_prefix, new_version
 
 
 def track(filepath: str, pypackage: Optional[str] = None, bump_version: bool = False) -> None:
