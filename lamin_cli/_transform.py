@@ -1,9 +1,10 @@
 import os
 import shutil
+from typing import Tuple
 import subprocess
 from pathlib import Path
 from typing import Optional, Any
-
+import re
 import lamindb_setup
 from lamin_utils import colors, logger
 
@@ -22,17 +23,24 @@ def init_script_metadata(script_path: str):
     logger.success("added __lamindb_uid_prefix__ & __version__ to .py file")
 
 
-def get_script_metadata(filepath: str):
-    import importlib.util
+def get_script_metadata(file_path: str) -> Tuple[str, str]:
+    with open(file_path, 'r') as file:
+        content = file.read()
 
-    spec = importlib.util.spec_from_file_location("script", filepath)
-    script_module = importlib.util.module_from_spec(spec)  # type:ignore
-    spec.loader.exec_module(script_module)  # type:ignore
+    # Define patterns for __lamindb_uid_prefix__ and __version__ variables
+    uid_prefix_pattern = re.compile(r'__lamindb_uid_prefix__\s*=\s*[\'"]([^\'"]+)[\'"]')
+    version_pattern = re.compile(r'__version__\s*=\s*[\'"]([^\'"]+)[\'"]')
 
-    uid_prefix = script_module.__lamindb_uid_prefix__
-    version = script_module.__version__
+    # Search for matches in the file content
+    uid_prefix_match = uid_prefix_pattern.search(content)
+    version_match = version_pattern.search(content)
+
+    # Extract values if matches are found
+    uid_prefix = uid_prefix_match.group(1) if uid_prefix_match else None
+    version = version_match.group(1) if version_match else None
+    if uid_prefix is not None or version is not None:
+        raise ValueError(f"Did not find __lamindb_uid_prefix__ and __version__ in script {file_path}")
     return uid_prefix, version
-
 
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
 def update_transform_source_metadata(
