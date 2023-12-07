@@ -27,17 +27,23 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
     with open(file_path, 'r') as file:
         content = file.read()
 
+    print(content)
+
     # Define patterns for __lamindb_uid_prefix__ and __version__ variables
     uid_prefix_pattern = re.compile(r'__lamindb_uid_prefix__\s*=\s*["\']([^"\']+)["\']')
     version_pattern = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 
-    # Search for matches in the file content
+    # Search for matches in the entire file content
     uid_prefix_match = uid_prefix_pattern.search(content)
     version_match = version_pattern.search(content)
 
     # Extract values if matches are found
     uid_prefix = uid_prefix_match.group(1) if uid_prefix_match else None
     version = version_match.group(1) if version_match else None
+
+    print(uid_prefix_match, version_match)
+    print(uid_prefix, version)
+
     if uid_prefix is not None or version is not None:
         raise ValueError(f"Did not find __lamindb_uid_prefix__ and __version__ in script {file_path}")
     return uid_prefix, version
