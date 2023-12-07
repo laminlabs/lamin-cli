@@ -28,8 +28,8 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
         content = file.read()
 
     # Define patterns for __lamindb_uid_prefix__ and __version__ variables
-    uid_prefix_pattern = re.compile(r'__lamindb_uid_prefix__\s*=\s*[\'"]([^\'"]+)[\'"]')
-    version_pattern = re.compile(r'__version__\s*=\s*[\'"]([^\'"]+)[\'"]')
+    uid_prefix_pattern = re.compile(r'__lamindb_uid_prefix__\s*=\s*["\']([^"\']+)["\']')
+    version_pattern = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 
     # Search for matches in the file content
     uid_prefix_match = uid_prefix_pattern.search(content)
