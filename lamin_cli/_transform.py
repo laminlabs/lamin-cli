@@ -241,7 +241,7 @@ def save(filepath: str) -> Optional[str]:
     # register the source code
     if transform.source_file is not None:
         # check if the hash of the notebook source file matches
-        check_source_file = ln.File(source_file_path, key="dummy")
+        check_source_artifact = ln.Artifact(source_file_path, key="dummy")
         if check_source_file._state.adding:
             if os.getenv("LAMIN_TESTING") is None:
                 # in test, auto-confirm overwrite
@@ -261,7 +261,7 @@ def save(filepath: str) -> Optional[str]:
                 )
                 return "rerun-the-notebook"
     else:
-        source_file = ln.File(
+        source_artifact = ln.Artifact(
             source_file_path,
             description=f"Source of transform {transform.uid}",
             version=transform_version,
@@ -278,7 +278,7 @@ def save(filepath: str) -> Optional[str]:
             )
             run.report.replace(filepath_html)
         else:
-            report_file = ln.File(
+            report_artifact = ln.Artifact(
                 filepath_html,
                 description=f"Report of transform {transform.uid}",
                 is_new_version_of=initial_report,
