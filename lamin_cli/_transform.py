@@ -24,7 +24,7 @@ def init_script_metadata(script_path: str):
 
 
 def get_script_metadata(file_path: str) -> Tuple[str, str]:
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         content = file.read()
 
     # Define patterns for __lamindb_uid_prefix__ and __version__ variables
@@ -40,8 +40,11 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
     version = version_match.group(1) if version_match else None
 
     if uid_prefix is None or version is None:
-        raise ValueError(f"Did not find __lamindb_uid_prefix__ and __version__ in script {file_path}")
+        raise ValueError(
+            f"Did not find __lamindb_uid_prefix__ and __version__ in script {file_path}"
+        )
     return uid_prefix, version
+
 
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
 def update_transform_source_metadata(
@@ -263,6 +266,7 @@ def save(filepath: str) -> Optional[str]:
                 response = "y"
             if response == "y":
                 transform.source_file.replace(source_file_path)
+                transform.source_file.save()
             else:
                 logger.warning(
                     "Please create a new version of the notebook via `lamin track"
@@ -286,6 +290,7 @@ def save(filepath: str) -> Optional[str]:
                 "there is already an existing report for this run, replacing it"
             )
             run.report.replace(filepath_html)
+            run.report.save()
         else:
             report_file = ln.File(
                 filepath_html,
