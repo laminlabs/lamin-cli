@@ -54,7 +54,7 @@ def update_transform_source_metadata(
     bump_version: bool = False,
 ) -> (bool, str, str):  # type:ignore
     # here, content is either a Mapping representing the Notebook metadata
-    # or the content of a source file
+    # or the content of a source code
     if filepath.endswith(".ipynb"):
         is_notebook = True
 
@@ -231,13 +231,13 @@ def save(filepath: str) -> Optional[str]:
         )
         assert result.returncode == 0
         # copy the notebook file to a temporary file
-        source_file_path = filepath.replace(".ipynb", "_stripped.ipynb")
-        shutil.copy2(filepath, source_file_path)
-        result = subprocess.run(f"nbstripout {source_file_path}", shell=True)
+        source_code_path = filepath.replace(".ipynb", "_stripped.ipynb")
+        shutil.copy2(filepath, source_code_path)
+        result = subprocess.run(f"nbstripout {source_code_path}", shell=True)
         assert result.returncode == 0
     else:
-        source_file_path = filepath
-    # find initial versions of source files and html reports
+        source_code_path = filepath
+    # find initial versions of source codes and html reports
     initial_report = None
     initial_source = None
     if len(transform_family) > 0:
@@ -246,27 +246,27 @@ def save(filepath: str) -> Optional[str]:
             if prev_transform.latest_report_id is not None:
                 # any previous latest report of this transform is OK!
                 initial_report = prev_transform.latest_report
-            if prev_transform.source_file_id is not None:
-                # any previous source file id is OK!
-                initial_source = prev_transform.source_file
+            if prev_transform.source_code_id is not None:
+                # any previous source code id is OK!
+                initial_source = prev_transform.source_code
     ln.settings.silence_file_run_transform_warning = True
     # register the source code
-    if transform.source_file is not None:
-        # check if the hash of the notebook source file matches
-        check_source_file = ln.File(source_file_path, key="dummy")
-        if check_source_file._state.adding:
+    if transform.source_code is not None:
+        # check if the hash of the notebook source code matches
+        check_source_code = ln.Artifact(source_code_path, key="dummy")
+        if check_source_code._state.adding:
             if os.getenv("LAMIN_TESTING") is None:
                 # in test, auto-confirm overwrite
                 response = input(
-                    "You try to save a new notebook source file with the same version"
+                    "You try to save a new notebook source code with the same version"
                     f" '{transform.version}'; do you want to replace the content of the"
-                    f" existing source file {transform.source_file}? (y/n)"
+                    f" existing source code {transform.source_code}? (y/n)"
                 )
             else:
                 response = "y"
             if response == "y":
-                transform.source_file.replace(source_file_path)
-                transform.source_file.save()
+                transform.source_code.replace(source_code_path)
+                transform.source_code.save()
             else:
                 logger.warning(
                     "Please create a new version of the notebook via `lamin track"
@@ -274,15 +274,15 @@ def save(filepath: str) -> Optional[str]:
                 )
                 return "rerun-the-notebook"
     else:
-        source_file = ln.File(
-            source_file_path,
+        source_code = ln.Artifact(
+            source_code_path,
             description=f"Source of transform {transform.uid}",
             version=transform_version,
             is_new_version_of=initial_source,
             visibility=0,  # hidden file
         )
-        source_file.save()
-        transform.source_file = source_file
+        source_code.save()
+        transform.source_code = source_code
     # save report file
     if is_notebook:
         if run.report_id is not None:
@@ -292,7 +292,7 @@ def save(filepath: str) -> Optional[str]:
             run.report.replace(filepath_html)
             run.report.save()
         else:
-            report_file = ln.File(
+            report_file = ln.Artifact(
                 filepath_html,
                 description=f"Report of transform {transform.uid}",
                 is_new_version_of=initial_report,
@@ -306,9 +306,9 @@ def save(filepath: str) -> Optional[str]:
     transform.save()
     if is_notebook:
         # clean up
-        Path(source_file_path).unlink()
+        Path(source_code_path).unlink()
         Path(filepath_html).unlink()
-    logger.success(f"saved transform.source_file: {transform.source_file}")
+    logger.success(f"saved transform.source_code: {transform.source_code}")
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
     return None
