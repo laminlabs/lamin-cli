@@ -17,18 +17,18 @@ def init_script_metadata(script_path: str):
 
     with open(script_path) as f:
         content = f.read()
-    prepend = f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
+    prepend = f'__transform_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
     with open(script_path, "w") as f:
         f.write(prepend + content)
-    logger.success("added __lamindb_uid_prefix__ & __version__ to .py file")
+    logger.success("added __transform_uid_prefix__ & __version__ to .py file")
 
 
 def get_script_metadata(file_path: str) -> Tuple[str, str]:
     with open(file_path, "r") as file:
         content = file.read()
 
-    # Define patterns for __lamindb_uid_prefix__ and __version__ variables
-    uid_prefix_pattern = re.compile(r'__lamindb_uid_prefix__\s*=\s*["\']([^"\']+)["\']')
+    # Define patterns for __transform_uid_prefix__ and __version__ variables
+    uid_prefix_pattern = re.compile(r'__transform_uid_prefix__\s*=\s*["\']([^"\']+)["\']')
     version_pattern = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 
     # Search for matches in the entire file content
@@ -41,7 +41,7 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
 
     if uid_prefix is None or version is None:
         raise ValueError(
-            f"Did not find __lamindb_uid_prefix__ and __version__ in script {file_path}"
+            f"Did not find __transform_uid_prefix__ and __version__ in script {file_path}"
         )
     return uid_prefix, version
 
@@ -100,10 +100,10 @@ def update_transform_source_metadata(
         else:
             logger.save("updated script")
             old_metadata = (
-                f'__lamindb_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
+                f'__transform_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
             )
             new_metadata = (
-                f'__lamindb_uid_prefix__ = "{new_uid_prefix}"\n__version__ ='
+                f'__transform_uid_prefix__ = "{new_uid_prefix}"\n__version__ ='
                 f' "{new_version}"\n'
             )
             if old_metadata not in content:
@@ -139,7 +139,7 @@ def track(
     elif filepath.endswith(".py"):
         with open(filepath) as f:
             content = f.read()
-        if "__lamindb_uid_prefix__" not in content:
+        if "__transform_uid_prefix__" not in content:
             init_script_metadata(filepath)
         else:
             update_transform_source_metadata(
