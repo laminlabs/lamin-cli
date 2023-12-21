@@ -212,16 +212,16 @@ def save(filepath: str) -> Optional[str]:
         return "not-tracked-in-transform-registry"
     # the specific version
     transform = transform_family.filter(version=transform_version).one()
+    # latest run of this transform by user
+    run = ln.Run.filter(transform=transform).order_by("-run_at").first()
+    if run.created_by.id != lamindb_setup.settings.user.id:
+        response = input(
+            "You are trying to save a transform created by another user: Source and"
+            " report files will be tagged with *your* user id. Proceed? (y/n)"
+        )
+        if response != "y":
+            return "aborted-save-notebook-created-by-different-user"
     if is_notebook:
-        # latest run of this transform by user
-        run = ln.Run.filter(transform=transform).order_by("-run_at").first()
-        if run.created_by.id != lamindb_setup.settings.user.id:
-            response = input(
-                "You are trying to save a notebook created by another user: Source and"
-                " report files will be tagged with *your* user id. Proceed? (y/n)"
-            )
-            if response != "y":
-                return "aborted-save-notebook-created-by-different-user"
         # convert the notebook file to html
         filepath_html = filepath.replace(".ipynb", ".html")
         # log_level is set to 40 to silence the nbconvert logging
