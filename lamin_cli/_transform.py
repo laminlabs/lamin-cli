@@ -283,8 +283,16 @@ def save(filepath: str) -> Optional[str]:
         )
         source_code.save()
         transform.source_code = source_code
+    # track environment
+    filepath = lamindb_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}"
+    if filepath.exists():
+        artifact = ln.Artifact(filepath, description="requirements.txt")
+        run.environment = artifact
+        logger.success(f"saved run.environment: {run.environment}")
     # save report file
-    if is_notebook:
+    if not is_notebook:
+        run.save()
+    else:
         if run.report_id is not None:
             logger.warning(
                 "there is already an existing report for this run, replacing it"
