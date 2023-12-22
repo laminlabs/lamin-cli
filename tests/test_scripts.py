@@ -33,6 +33,7 @@ def test_run_and_save():
         shell=True,
         capture_output=True,
     )
+    print(result)
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
 

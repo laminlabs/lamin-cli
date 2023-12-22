@@ -17,31 +17,31 @@ def init_script_metadata(script_path: str):
 
     with open(script_path) as f:
         content = f.read()
-    prepend = f'__transform_uid_prefix__ = "{stem_uid}"\n__version__ = "{version}"\n'
+    prepend = f'__transform_stem_uid__ = "{stem_uid}"\n__version__ = "{version}"\n'
     with open(script_path, "w") as f:
         f.write(prepend + content)
-    logger.success("added __transform_uid_prefix__ & __version__ to .py file")
+    logger.success("added __transform_stem_uid__ & __version__ to .py file")
 
 
 def get_script_metadata(file_path: str) -> Tuple[str, str]:
     with open(file_path, "r") as file:
         content = file.read()
 
-    # Define patterns for __transform_uid_prefix__ and __version__ variables
-    uid_prefix_pattern = re.compile(r'__transform_uid_prefix__\s*=\s*["\']([^"\']+)["\']')
+    # Define patterns for __transform_stem_uid__ and __version__ variables
+    stem_uid_pattern = re.compile(r'__transform_stem_uid__\s*=\s*["\']([^"\']+)["\']')
     version_pattern = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 
     # Search for matches in the entire file content
-    uid_prefix_match = uid_prefix_pattern.search(content)
+    stem_uid_match = stem_uid_pattern.search(content)
     version_match = version_pattern.search(content)
 
     # Extract values if matches are found
-    stem_uid = uid_prefix_match.group(1) if uid_prefix_match else None
+    stem_uid = stem_uid_match.group(1) if stem_uid_match else None
     version = version_match.group(1) if version_match else None
 
     if stem_uid is None or version is None:
         raise ValueError(
-            f"Did not find __transform_uid_prefix__ and __version__ in script {file_path}"
+            f"Did not find __transform_stem_uid__ and __version__ in script {file_path}"
         )
     return stem_uid, version
 
@@ -77,13 +77,13 @@ def update_transform_source_metadata(
         else:
             response = "y"
         if response == "y":
-            new_uid_prefix = nbproject_id()
+            new_stem_uid = nbproject_id()
             updated = True
         else:
             bump_version = True
     new_version = version
     if bump_version:
-        new_uid_prefix = stem_uid
+        new_stem_uid = stem_uid
         if os.getenv("LAMIN_TESTING") is None:
             new_version = input(
                 f"The current version is '{version}' - please type the new version: "
@@ -94,16 +94,16 @@ def update_transform_source_metadata(
     if updated and run_from_cli:
         if is_notebook:
             logger.save("updated notebook")
-            content.metadata["nbproject"]["id"] = new_uid_prefix
+            content.metadata["nbproject"]["id"] = new_stem_uid
             content.metadata["nbproject"]["version"] = new_version
             write_notebook(content, filepath)
         else:
             logger.save("updated script")
             old_metadata = (
-                f'__transform_uid_prefix__ = "{stem_uid}"\n__version__ = "{version}"\n'
+                f'__transform_stem_uid__ = "{stem_uid}"\n__version__ = "{version}"\n'
             )
             new_metadata = (
-                f'__transform_uid_prefix__ = "{new_uid_prefix}"\n__version__ ='
+                f'__transform_stem_uid__ = "{new_stem_uid}"\n__version__ ='
                 f' "{new_version}"\n'
             )
             if old_metadata not in content:
@@ -113,7 +113,7 @@ def update_transform_source_metadata(
                 )
             with open(filepath, "w") as f:
                 f.write(content.replace(old_metadata, new_metadata))
-    return updated, new_uid_prefix, new_version
+    return updated, new_stem_uid, new_version
 
 
 def track(
@@ -139,7 +139,7 @@ def track(
     elif filepath.endswith(".py"):
         with open(filepath) as f:
             content = f.read()
-        if "__transform_uid_prefix__" not in content:
+        if "__transform_stem_uid__" not in content:
             init_script_metadata(filepath)
         else:
             update_transform_source_metadata(
