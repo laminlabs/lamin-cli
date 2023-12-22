@@ -19,7 +19,7 @@ def test_initialize():
 
     with open(filepath) as f:
         content = f.read()
-    prepend = f'__transform_uid_prefix__ = "'
+    prepend = f'__transform_stem_uid__ = "'
     assert content.startswith(prepend)
 
 
