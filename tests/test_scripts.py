@@ -52,6 +52,7 @@ def test_run_and_save():
         capture_output=True,
         env=env,
     )
+    print(result)
     assert result.returncode == 1
     assert "You can now rerun the script." in result.stderr.decode()
 
@@ -60,4 +61,5 @@ def test_run_and_save():
         shell=True,
         capture_output=True,
     )
+    print(result)
     assert result.returncode == 0
