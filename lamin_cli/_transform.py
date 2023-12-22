@@ -12,12 +12,12 @@ from lamin_utils import colors, logger
 def init_script_metadata(script_path: str):
     from lnschema_core.ids import base62_12
 
-    uid_prefix = base62_12()
+    stem_uid = base62_12()
     version = "0"
 
     with open(script_path) as f:
         content = f.read()
-    prepend = f'__transform_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
+    prepend = f'__transform_uid_prefix__ = "{stem_uid}"\n__version__ = "{version}"\n'
     with open(script_path, "w") as f:
         f.write(prepend + content)
     logger.success("added __transform_uid_prefix__ & __version__ to .py file")
@@ -36,14 +36,14 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
     version_match = version_pattern.search(content)
 
     # Extract values if matches are found
-    uid_prefix = uid_prefix_match.group(1) if uid_prefix_match else None
+    stem_uid = uid_prefix_match.group(1) if uid_prefix_match else None
     version = version_match.group(1) if version_match else None
 
-    if uid_prefix is None or version is None:
+    if stem_uid is None or version is None:
         raise ValueError(
             f"Did not find __transform_uid_prefix__ and __version__ in script {file_path}"
         )
-    return uid_prefix, version
+    return stem_uid, version
 
 
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
@@ -61,13 +61,13 @@ def update_transform_source_metadata(
         from nbproject.dev import write_notebook
         from nbproject.dev._initialize import nbproject_id
 
-        uid_prefix = content.metadata["nbproject"]["id"]
+        stem_uid = content.metadata["nbproject"]["id"]
         version = content.metadata["nbproject"]["version"]
     else:
         is_notebook = False
-        uid_prefix, version = get_script_metadata(filepath)
+        stem_uid, version = get_script_metadata(filepath)
     logger.important(
-        f"transform is tracked with uid_prefix='{uid_prefix}', version: '{version}'"
+        f"transform is tracked with stem_uid='{stem_uid}', version: '{version}'"
     )
     updated = False
     # ask for generating a new uid prefix
@@ -83,7 +83,7 @@ def update_transform_source_metadata(
             bump_version = True
     new_version = version
     if bump_version:
-        new_uid_prefix = uid_prefix
+        new_uid_prefix = stem_uid
         if os.getenv("LAMIN_TESTING") is None:
             new_version = input(
                 f"The current version is '{version}' - please type the new version: "
@@ -100,7 +100,7 @@ def update_transform_source_metadata(
         else:
             logger.save("updated script")
             old_metadata = (
-                f'__transform_uid_prefix__ = "{uid_prefix}"\n__version__ = "{version}"\n'
+                f'__transform_uid_prefix__ = "{stem_uid}"\n__version__ = "{version}"\n'
             )
             new_metadata = (
                 f'__transform_uid_prefix__ = "{new_uid_prefix}"\n__version__ ='
@@ -133,7 +133,7 @@ def track(
             metadata = initialize_metadata(nb, pypackage=pypackage).dict()
             nb.metadata["nbproject"] = metadata
             write_notebook(nb, filepath)
-            logger.success("added uid_prefix & version to ipynb file metadata")
+            logger.success("added stem_uid & version to ipynb file metadata")
         else:
             update_transform_source_metadata(nb, filepath, bump_version=bump_version)
     elif filepath.endswith(".py"):
@@ -193,20 +193,20 @@ def save(filepath: str) -> Optional[str]:
             return "not-initialized"
 
         meta_store = MetaStore(meta_container, filepath)
-        uid_prefix, transform_version = meta_store.id, meta_store.version
+        stem_uid, transform_version = meta_store.id, meta_store.version
     else:
         is_notebook = False
-        uid_prefix, transform_version = get_script_metadata(filepath)
+        stem_uid, transform_version = get_script_metadata(filepath)
 
     import lamindb as ln
 
     ln.settings.verbosity = "success"
 
     # the corresponding transform family in the transform table
-    transform_family = ln.Transform.filter(uid__startswith=uid_prefix).all()
+    transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
     if len(transform_family) == 0:
         logger.error(
-            f"Did not find notebook with uid prefix {uid_prefix}"
+            f"Did not find notebook with uid prefix {stem_uid}"
             " in transform registry. Did you run ln.track()?"
         )
         return "not-tracked-in-transform-registry"

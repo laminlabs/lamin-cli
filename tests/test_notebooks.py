@@ -17,7 +17,7 @@ def test_track_not_initialized():
         env=env,
     )
     assert result.returncode == 0
-    assert "added uid_prefix & version to ipynb file metadata" in result.stdout.decode()
+    assert "added stem_uid & version to ipynb file metadata" in result.stdout.decode()
 
 
 def test_track_no_title():
