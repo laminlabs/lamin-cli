@@ -27,7 +27,8 @@ def test_run_and_save():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     
-    filepath = scripts_dir / "initialized.py"       
+    filepath = scripts_dir / "initialized.py"
+    # python sub/lamin-cli/tests/scripts/initialized.py     
     result = subprocess.run(
         f"python {str(filepath)}",
         shell=True,
@@ -37,6 +38,8 @@ def test_run_and_save():
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
 
+    # save the script
+    # lamin save sub/lamin-cli/tests/scripts/initialized.py
     result = subprocess.run(
         f"lamin save {str(filepath)}",
         shell=True,
@@ -46,6 +49,7 @@ def test_run_and_save():
     assert "saved transform" in result.stdout.decode()
     assert filepath.exists()  # test that it's not cleaned out!
 
+    # python sub/lamin-cli/tests/scripts/initialized.py
     # now, trying to run the same thing again will error
     result = subprocess.run(
         f"python {str(filepath)}",
