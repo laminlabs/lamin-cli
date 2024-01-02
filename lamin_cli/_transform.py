@@ -286,7 +286,7 @@ def save(filepath: str) -> Optional[str]:
     # track environment
     filepath = lamindb_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}"
     if filepath.exists():
-        artifact = ln.Artifact(filepath, description="requirements.txt")
+        artifact = ln.Artifact(filepath, description="requirements.txt", visibility=0)
         if artifact._state.adding:
             artifact.save()
         run.environment = artifact
