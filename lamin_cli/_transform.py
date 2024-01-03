@@ -70,16 +70,19 @@ def update_transform_source_metadata(
     import hashlib
     # the following line is duplicated with get_transform_kwargs_from_stem_uid
     # in lamindb - we should move it, e.g., to lamin-utils
-    uid_ext = encodebytes(hashlib.md5(version.encode()).digest())[:4] 
-    logger.important(
-        f"transform is tracked with stem_uid='{stem_uid}' & version='{version}' (uid='{stem_uid}{uid_ext}')"
+    # it also occurs a few lines below
+    uid_ext = encodebytes(hashlib.md5(version.encode()).digest())[:4]
+    # it simply looks better here to not use the logger because we won't have an emoji also for the subsequent
+    # input question
+    print(
+        f"Transform is tracked with stem_uid='{stem_uid}' & version='{version}' (uid='{stem_uid}{uid_ext}')"
     )
     updated = False
     # ask for generating a new stem uid
     response = "bump"
     if not bump_version:
         if os.getenv("LAMIN_TESTING") is None:
-            response = input("To create a new stem uid, type 'new', to bump the version, type 'bump' or a custom version")
+            response = input("To create a new stem uid, type 'new'. To bump the version, type 'bump' or a custom version: ")
         else:
             response = "new"
         if response == "new":
@@ -101,13 +104,16 @@ def update_transform_source_metadata(
             new_version = response
         updated = new_version != version
     if updated and run_from_cli:
+        display_info = f"version='{new_version}'" if bump_version else f"stem_uid='{new_stem_uid}'"
+        new_uid_ext = encodebytes(hashlib.md5(new_version.encode()).digest())[:4]
+        display_info += f" (uid='{new_stem_uid}{new_uid_ext}')"
         if is_notebook:
-            logger.save("updated notebook")
+            logger.save(f"updated notebook: {display_info}")
             content.metadata["nbproject"]["id"] = new_stem_uid
             content.metadata["nbproject"]["version"] = new_version
             write_notebook(content, filepath)
         else:
-            logger.save("updated script")
+            logger.save(f"updated script: {display_info}")
             old_metadata = (
                 f'__transform_stem_uid__ = "{stem_uid}"\n__version__ = "{version}"\n'
             )
