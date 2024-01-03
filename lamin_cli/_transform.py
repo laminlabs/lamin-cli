@@ -66,17 +66,23 @@ def update_transform_source_metadata(
     else:
         is_notebook = False
         stem_uid, version = get_script_metadata(filepath)
+    from lamin_utils._base62 import encodebytes
+    import hashlib
+    # the following line is duplicated with get_transform_kwargs_from_stem_uid
+    # in lamindb - we should move it, e.g., to lamin-utils
+    uid_ext = encodebytes(hashlib.md5(version.encode()).digest())[:4] 
     logger.important(
-        f"transform is tracked with stem_uid='{stem_uid}', version: '{version}'"
+        f"transform is tracked with stem_uid='{stem_uid}' & version='{version}' (uid='{stem_uid}{uid_ext}')"
     )
     updated = False
-    # ask for generating a new uid prefix
+    # ask for generating a new stem uid
+    response = "bump"
     if not bump_version:
         if os.getenv("LAMIN_TESTING") is None:
-            response = input("Do you want to generate a new uid prefix? (y/n) ")
+            response = input("To create a new stem uid, type 'new', to bump the version, type 'bump' or a custom version")
         else:
-            response = "y"
-        if response == "y":
+            response = "new"
+        if response == "new":
             new_stem_uid = nbproject_id()
             updated = True
         else:
@@ -84,12 +90,15 @@ def update_transform_source_metadata(
     new_version = version
     if bump_version:
         new_stem_uid = stem_uid
-        if os.getenv("LAMIN_TESTING") is None:
-            new_version = input(
-                f"The current version is '{version}' - please type the new version: "
-            )
+        if response == "bump":
+            try:
+                new_version = str(int(version) + 1)
+            except ValueError:
+                new_version = input(
+                    f"The current version is '{version}' - please type the new version: "
+                )
         else:
-            new_version = str(int(version) + 1)
+            new_version = response
         updated = new_version != version
     if updated and run_from_cli:
         if is_notebook:
