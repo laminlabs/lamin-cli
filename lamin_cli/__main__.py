@@ -17,24 +17,6 @@ class user:
     name = "full name"
 
 
-login_help = "Log in an already-signed-up user."
-init_help = "Init & config instance with db & storage."
-load_help = "Load instance by name."
-set_storage_help = "Set storage used by an instance."
-load_storage_help = "Load the instance with an updated default storage."
-info_help = "Show current instance information."
-close_help = "Close instance."
-migr_help = "Manage migrations."
-delete_help = "Delete an instance."
-schema_help = "View schema."
-register_help = (
-    "Register instance on hub (local instances are not automatically registered)."
-)
-track_help = "Track a notebook (init notebook metadata)."
-save_help = "Save a notebook."
-cache_help = "Manage cache."
-version_help = "Show the version and exit."
-
 description_cli = "Configure LaminDB and perform simple actions."
 parser = argparse.ArgumentParser(
     description=description_cli, formatter_class=argparse.RawTextHelpFormatter
@@ -42,7 +24,7 @@ parser = argparse.ArgumentParser(
 subparsers = parser.add_subparsers(dest="command")
 
 # init instance
-init = subparsers.add_parser("init", help=init_help)
+init = subparsers.add_parser("init", help="init a lamindb instance")
 aa = init.add_argument
 aa("--storage", type=str, metavar="storage", help=instance.storage_root)
 aa("--db", type=str, metavar="db", default=None, help=instance.db)
@@ -50,38 +32,44 @@ aa("--schema", type=str, metavar="schema", default=None, help=instance.schema)
 aa("--name", type=str, metavar="name", default=None, help=instance.name)
 
 # load instance
-load = subparsers.add_parser("load", help=load_help)
+load = subparsers.add_parser("load", help="load a lamindb instance")
 aa = load.add_argument
 instance_help = """
 The instance identifier can the instance name (owner is
 current user), handle/name, or the URL: https://lamin.ai/handle/name."""
 aa("instance", type=str, metavar="i", default=None, help=instance_help)
 aa("--db", type=str, metavar="db", default=None, help=instance.db)
-aa("--storage", type=str, metavar="s", default=None, help=load_storage_help)
+aa(
+    "--storage",
+    type=str,
+    metavar="s",
+    default=None,
+    help="update storage while loading",
+)
 
 # delete instance
-delete_parser = subparsers.add_parser("delete", help=delete_help)
+delete_parser = subparsers.add_parser("delete", help="delete instance")
 aa = delete_parser.add_argument
 aa("instance", type=str, metavar="i", default=None, help=instance.name)
 aa = delete_parser.add_argument
 aa("--force", default=False, action="store_true", help="Do not ask for confirmation")
 
 # show instance info
-info_parser = subparsers.add_parser("info", help=info_help)
+info_parser = subparsers.add_parser("info", help="show user & instance info")
 
 # set storage
-set_storage_parser = subparsers.add_parser("set", help=set_storage_help)
+set_storage_parser = subparsers.add_parser("set", help="update settings")
 aa = set_storage_parser.add_argument
 aa("--storage", type=str, metavar="f", help=instance.storage_root)
 
 # close instance
-subparsers.add_parser("close", help=close_help)
+subparsers.add_parser("close", help="close instance")
 
 # register instance
-subparsers.add_parser("register", help=register_help)
+subparsers.add_parser("register", help="register instance on hub")
 
 # migrate
-migr = subparsers.add_parser("migrate", help=migr_help)
+migr = subparsers.add_parser("migrate", help="manage migrations")
 aa = migr.add_argument
 aa(
     "action",
@@ -93,7 +81,7 @@ aa("--end-number", type=str, default=None)
 aa("--start-number", type=str, default=None)
 
 # schema
-schema_parser = subparsers.add_parser("schema", help=schema_help)
+schema_parser = subparsers.add_parser("schema", help="view schema")
 aa = schema_parser.add_argument
 aa(
     "action",
@@ -101,29 +89,30 @@ aa(
     help="View schema.",
 )
 
-# track a notebook (init nbproject metadata)
-track_parser = subparsers.add_parser("track", help=track_help)
+# track
+track_parser = subparsers.add_parser("track", help="track notebook or script")
 aa = track_parser.add_argument
 filepath_help = "A path to the notebook."
 aa("filepath", type=str, metavar="filepath", help=filepath_help)
 pypackage_help = "One or more (delimited by ',') python packages to track."
 aa("--pypackage", type=str, metavar="pypackage", default=None, help=pypackage_help)
 
-# save a notebook (in the future, any file)
-save_parser = subparsers.add_parser("save", help=save_help)
+# save
+save_parser = subparsers.add_parser("save", help="save notebook or script")
 aa = save_parser.add_argument
 filepath_help = "A path to the notebook."
 aa("filepath", type=str, metavar="filepath", help=filepath_help)
 
-# login user
-login = subparsers.add_parser("login", help=login_help)
+# login and logout user
+login = subparsers.add_parser("login", help="log in")
 aa = login.add_argument
 aa("user", type=str, metavar="user", help="email or user handle")
 aa("--key", type=str, metavar="k", default=None, help="API key")
 aa("--password", type=str, metavar="pw", default=None, help="legacy password")
+logout = subparsers.add_parser("logout", help="logout")
 
 # manage cache
-cache_parser = subparsers.add_parser("cache", help=cache_help)
+cache_parser = subparsers.add_parser("cache", help="manage cache")
 cache_subparser = cache_parser.add_subparsers(dest="cache_action")
 clear_parser = cache_subparser.add_parser("clear", help="Clear the cache directory.")
 set_parser = cache_subparser.add_parser("set", help="Set the cache directory.")
@@ -139,18 +128,17 @@ aa(
 try:
     lamindb_version = version("lamindb")
 except PackageNotFoundError:
-    lamindb_version = "LaminDB not found."
+    lamindb_version = "lamindb installation not found"
 
 parser.add_argument(
     "--version",
     action="version",
     version=lamindb_version,
-    help="Print LaminDB version.",
+    help="show lamindb version",
 )
 
 
 def main():
-    # parse args
     args = parser.parse_args()
 
     from lamindb_setup._silence_loggers import silence_loggers
@@ -164,6 +152,10 @@ def main():
             key=args.key,
             password=args.password,
         )
+    elif args.command == "logout":
+        from lamindb_setup._setup_user import logout
+
+        return logout()
     elif args.command == "init":
         from lamindb_setup._init_instance import init
 
