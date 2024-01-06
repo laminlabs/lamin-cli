@@ -68,21 +68,26 @@ def update_transform_source_metadata(
         stem_uid, version = get_script_metadata(filepath)
     from lamin_utils._base62 import encodebytes
     import hashlib
+
     # the following line is duplicated with get_transform_kwargs_from_stem_uid
     # in lamindb - we should move it, e.g., to lamin-utils
     # it also occurs a few lines below
     uid_ext = encodebytes(hashlib.md5(version.encode()).digest())[:4]
-    # it simply looks better here to not use the logger because we won't have an emoji also for the subsequent
-    # input question
+    # it simply looks better here to not use the logger because we won't have an
+    # emoji also for the subsequent input question
     print(
-        f"Transform is tracked with stem_uid='{stem_uid}' & version='{version}' (uid='{stem_uid}{uid_ext}')"
+        f"Transform is tracked with stem_uid='{stem_uid}' & version='{version}'"
+        f" (uid='{stem_uid}{uid_ext}')"
     )
     updated = False
     # ask for generating a new stem uid
     response = "bump"
     if not bump_version:
         if os.getenv("LAMIN_TESTING") is None:
-            response = input("To create a new stem uid, type 'new'. To bump the version, type 'bump' or a custom version: ")
+            response = input(
+                "To create a new stem uid, type 'new'. To bump the version, type 'bump'"
+                " or a custom version: "
+            )
         else:
             response = "new"
         if response == "new":
@@ -98,13 +103,16 @@ def update_transform_source_metadata(
                 new_version = str(int(version) + 1)
             except ValueError:
                 new_version = input(
-                    f"The current version is '{version}' - please type the new version: "
+                    f"The current version is '{version}' - please type the new"
+                    " version: "
                 )
         else:
             new_version = response
         updated = new_version != version
     if updated and run_from_cli:
-        display_info = f"version='{new_version}'" if bump_version else f"stem_uid='{new_stem_uid}'"
+        display_info = (
+            f"version='{new_version}'" if bump_version else f"stem_uid='{new_stem_uid}'"
+        )
         new_uid_ext = encodebytes(hashlib.md5(new_version.encode()).digest())[:4]
         display_info += f" (uid='{new_stem_uid}{new_uid_ext}')"
         if is_notebook:
@@ -299,9 +307,13 @@ def save(filepath: str) -> Optional[str]:
         source_code.save()
         transform.source_code = source_code
     # track environment
-    filepath = lamindb_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}.txt"
-    if filepath.exists():
-        artifact = ln.Artifact(filepath, description="requirements.txt", visibility=0)
+    filepath_env = (
+        lamindb_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}.txt"
+    )
+    if filepath_env.exists():
+        artifact = ln.Artifact(
+            filepath_env, description="requirements.txt", visibility=0
+        )
         if artifact._state.adding:
             artifact.save()
         run.environment = artifact
