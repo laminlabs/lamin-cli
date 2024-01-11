@@ -331,7 +331,7 @@ def save(filepath: str) -> Optional[str]:
         else:
             report_file = ln.Artifact(
                 filepath_html,
-                description=f"Report of transform {transform.uid}",
+                description=f"Report of run {run.uid}",
                 is_new_version_of=initial_report,
                 visibility=0,  # hidden file
             )
