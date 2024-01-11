@@ -13,7 +13,7 @@ def init_script_metadata(script_path: str):
     from lnschema_core.ids import base62_12
 
     stem_uid = base62_12()
-    version = "0"
+    version = "1"
 
     with open(script_path) as f:
         content = f.read()
