@@ -100,8 +100,12 @@ aa("--pypackage", type=str, metavar="pypackage", default=None, help=pypackage_he
 # save
 save_parser = subparsers.add_parser("save", help="save notebook or script")
 aa = save_parser.add_argument
-filepath_help = "A path to the notebook."
-aa("filepath", type=str, metavar="filepath", help=filepath_help)
+aa("filepath", type=str, metavar="filepath", help="filepath to notebook or script")
+
+# stage
+save_parser = subparsers.add_parser("stage", help="stage a notebook or script")
+aa = save_parser.add_argument
+aa("url", type=str, metavar="url", help="a lamin.ai url")
 
 # login and logout user
 login = subparsers.add_parser("login", help="log in")
@@ -219,6 +223,10 @@ def main():
         from lamin_cli._transform import save
 
         return save(args.filepath)
+    elif args.command == "stage":
+        from lamin_cli._stage import stage
+
+        return stage(args.url)
     elif args.command == "cache":
         from lamindb_setup._cache import clear_cache_dir, get_cache_dir, set_cache_dir
 

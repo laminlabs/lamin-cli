@@ -7,6 +7,7 @@ scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
 print(scripts_dir)
 
+
 def test_initialize():
     filepath = scripts_dir / "not-initialized.py"
     print(scripts_dir)
@@ -19,16 +20,16 @@ def test_initialize():
 
     with open(filepath) as f:
         content = f.read()
-    prepend = f'__transform_stem_uid__ = "'
+    prepend = '__transform_stem_uid__ = "'
     assert content.startswith(prepend)
 
 
-def test_run_and_save():
+def test_run_save_stage():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
-    
+
     filepath = scripts_dir / "initialized.py"
-    # python sub/lamin-cli/tests/scripts/initialized.py     
+    # python sub/lamin-cli/tests/scripts/initialized.py
     result = subprocess.run(
         f"python {str(filepath)}",
         shell=True,
@@ -63,6 +64,14 @@ def test_run_and_save():
 
     result = subprocess.run(
         f"python {str(filepath)}",
+        shell=True,
+        capture_output=True,
+    )
+    print(result)
+    assert result.returncode == 0
+
+    result = subprocess.run(
+        "lamin stage 'transform m5uCHTTpJnjQ5zKv'",
         shell=True,
         capture_output=True,
     )

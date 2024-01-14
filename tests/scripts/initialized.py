@@ -1,5 +1,5 @@
 __transform_stem_uid__ = "m5uCHTTpJnjQ"
-__version__ = "0"
+__version__ = "1"
 
 
 import lamindb as ln
