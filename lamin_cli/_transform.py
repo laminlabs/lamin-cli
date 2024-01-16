@@ -239,7 +239,8 @@ def save(filepath: str) -> Optional[str]:
     run = ln.Run.filter(transform=transform).order_by("-run_at").first()
     if run is None:
         logger.warning(
-            "You haven't yet run your script or notebook. Please save after running it!"
+            "You either don't call ln.track() in your code or you haven't yet run it."
+            " Please save after running it!"
         )
         return None
     else:
