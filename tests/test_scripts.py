@@ -36,7 +36,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
-    assert result.returncode == 0
+    assert result.returncode == 1
     assert "Did you run ln.track()" in result.stdout.decode()
 
     # python sub/lamin-cli/tests/scripts/initialized.py
