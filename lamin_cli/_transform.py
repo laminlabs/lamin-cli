@@ -237,6 +237,13 @@ def save(filepath: str) -> Optional[str]:
     transform = transform_family.filter(version=transform_version).one()
     # latest run of this transform by user
     run = ln.Run.filter(transform=transform).order_by("-run_at").first()
+    if run is None:
+        logger.warning(
+            "You haven't yet run your script or notebook. Please save after running it!"
+        )
+        return None
+    else:
+        logger.success(f"Loaded latest run: {run}")
     if run.created_by.id != lamindb_setup.settings.user.id:
         response = input(
             "You are trying to save a transform created by another user: Source and"
