@@ -29,7 +29,7 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
 
     # Define patterns for __transform_stem_uid__ and __version__ variables
     stem_uid_pattern = re.compile(r'__transform_stem_uid__\s*=\s*["\']([^"\']+)["\']')
-    version_pattern = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
+    version_pattern = re.compile(r'__version__\s*=\s*["\']?([^"\']+)["\']?')
 
     # Search for matches in the entire file content
     stem_uid_match = stem_uid_pattern.search(content)
@@ -41,8 +41,11 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
 
     if stem_uid is None or version is None:
         raise ValueError(
-            f"Did not find __transform_stem_uid__ and __version__ in script {file_path}"
+            "Did not find __transform_stem_uid__ or __version__ in script"
+            f" {file_path} with {content[:50]}. Ensure that __transform_stem_uid__ is a"
+            " string."
         )
+
     return stem_uid, version
 
 
