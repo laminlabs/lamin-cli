@@ -1,4 +1,9 @@
-import rich_click as click
+import os
+
+if os.environ.get("NO_RICH"):
+    import click as click
+else:
+    import rich_click as click
 
 
 @click.group()

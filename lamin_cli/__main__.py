@@ -1,7 +1,15 @@
+import os
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
 
-import rich_click as click
+# https://github.com/ewels/rich-click/issues/19
+# Otherwise rich-click takes over the formatting.
+if os.environ.get("NO_RICH"):
+    import click as click
+else:
+    import rich_click as click
+
+from click import Command, Context
 from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._cache import cache
@@ -164,6 +172,25 @@ def stage(url: str):
 
 main.add_command(cache)
 main.add_command(migrate)
+
+
+# https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
+def _generate_help():
+    out: dict[str, str] = {}
+
+    def recursive_help(
+        cmd: Command, parent: Optional[Context] = None, name: tuple[str, ...] = ()
+    ):
+        ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
+        assert cmd.name
+        name = (*name, cmd.name)
+        out[" ".join(name)] = cmd.get_help(ctx)
+        for sub in getattr(cmd, "commands", {}).values():
+            recursive_help(sub, ctx, name=name)
+
+    recursive_help(main)
+    return out
+
 
 if __name__ == "__main__":
     main()
