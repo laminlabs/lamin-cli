@@ -29,6 +29,16 @@ def test_run_save_stage():
     env["LAMIN_TESTING"] = "true"
 
     filepath = scripts_dir / "initialized.py"
+    # attempt to save the script without it yet being run
+    # lamin save sub/lamin-cli/tests/scripts/initialized.py
+    result = subprocess.run(
+        f"lamin save {str(filepath)}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 1
+    assert "Did you run ln.track()" in result.stdout.decode()
+
     # python sub/lamin-cli/tests/scripts/initialized.py
     result = subprocess.run(
         f"python {str(filepath)}",
