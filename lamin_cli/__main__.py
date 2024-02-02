@@ -1,4 +1,5 @@
 import os
+import sys
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
 
@@ -158,7 +159,8 @@ def save(filepath: str):
     """Save notebook or script."""
     from lamin_cli._transform import save
 
-    return save(filepath)
+    if save(filepath) is not None:
+        sys.exit(1)
 
 
 @main.command()
