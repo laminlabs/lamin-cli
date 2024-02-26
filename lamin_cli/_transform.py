@@ -1,14 +1,12 @@
 import os
-import re
 import shutil
+from typing import Tuple
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
-
+from typing import Optional, Any
+import re
 import lamindb_setup
-import nbformat
 from lamin_utils import colors, logger
-from nbconvert import HTMLExporter
 
 
 def init_script_metadata(script_path: str):
@@ -48,19 +46,6 @@ def get_script_metadata(file_path: str) -> Tuple[str, str]:
     return stem_uid, version
 
 
-def _convert_notebook_to_html(
-    notebook_path: Union[Path, str], output_folder: Union[Path, str]
-) -> None:
-    notebook_path, output_folder = Path(notebook_path), Path(output_folder)
-    nb = nbformat.reads(notebook_path.read_text(), as_version=4)
-    (body, resources) = HTMLExporter(template_name="classic").from_notebook_node(nb)
-
-    Path(output_folder).mkdir(exist_ok=True)
-    (output_folder / "index.html").write_text(body)
-    for name, data in resources.get("outputs", {}).items():
-        Path(output_folder / name).write_bytes(data)
-
-
 # also see lamindb.dev._run_context.reinitialize_notebook for related code
 def update_transform_source_metadata(
     content: Any,
@@ -81,9 +66,8 @@ def update_transform_source_metadata(
     else:
         is_notebook = False
         stem_uid, version = get_script_metadata(filepath)
-    import hashlib
-
     from lamin_utils._base62 import encodebytes
+    import hashlib
 
     # the following line is duplicated with get_transform_kwargs_from_stem_uid
     # in lamindb - we should move it, e.g., to lamin-utils
@@ -270,9 +254,13 @@ def save(filepath: str) -> Optional[str]:
             return "aborted-save-notebook-created-by-different-user"
     if is_notebook:
         # convert the notebook file to html
-        filepath_html = filepath.replace(".ipynb", "/")
+        filepath_html = filepath.replace(".ipynb", ".html")
         # log_level is set to 40 to silence the nbconvert logging
-        _convert_notebook_to_html(filepath, filepath_html)
+        result = subprocess.run(
+            f"jupyter nbconvert --to html {filepath} --Application.log_level=40",
+            shell=True,
+        )
+        assert result.returncode == 0
         # copy the notebook file to a temporary file
         source_code_path = filepath.replace(".ipynb", "_stripped.ipynb")
         shutil.copy2(filepath, source_code_path)
