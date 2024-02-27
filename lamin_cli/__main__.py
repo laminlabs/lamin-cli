@@ -137,21 +137,6 @@ def schema(action: str):
 
 
 @main.command()
-@click.argument("filepath", type=click.Path(exists=True))
-@click.option(
-    "--pypackage",
-    type=str,
-    default=None,
-    help="One or more (delimited by ',') python packages to track.",
-)
-def track(filepath: str, pypackage: Optional[str]):
-    """Track notebook or script."""
-    from lamin_cli._transform import track
-
-    track(filepath, pypackage)
-
-
-@main.command()
 @click.argument(
     "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
 )
