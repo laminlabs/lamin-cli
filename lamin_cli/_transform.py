@@ -4,13 +4,14 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 import lamindb_setup
-from lamin_utils import colors, logger
+from lamin_utils import logger
 
 
 def save(filepath: str) -> Optional[str]:
-    is_notebook = False
+    import lamindb as ln
     from lamindb.dev._run_context import get_stem_uid_and_version_from_file
 
+    is_notebook = False
     stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
 
     if filepath.endswith(".ipynb"):
@@ -21,7 +22,6 @@ def save(filepath: str) -> Optional[str]:
                 check_consecutiveness,
                 read_notebook,
             )
-            from nbproject.dev._meta_live import get_title
         except ImportError:
             logger.error(
                 "install nbproject & nbstripout: pip install nbproject nbstripout"
@@ -39,14 +39,6 @@ def save(filepath: str) -> Optional[str]:
             if decide != "y":
                 logger.error("Aborted (non-consecutive)!")
                 return "aborted-non-consecutive"
-        if get_title(nb) is None:
-            logger.error(
-                f"No title! Update & {colors.bold('save')} your notebook with a title"
-                " '# My title' in the first cell."
-            )
-            return "no-title"
-
-    import lamindb as ln
 
     ln.settings.verbosity = "success"
 
