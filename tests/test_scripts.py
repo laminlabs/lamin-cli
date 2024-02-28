@@ -5,24 +5,6 @@ import os
 
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
-print(scripts_dir)
-
-
-def test_initialize():
-    filepath = scripts_dir / "not-initialized.py"
-    print(scripts_dir)
-    result = subprocess.run(
-        f"lamin track {str(filepath)}",
-        shell=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0
-
-    with open(filepath) as f:
-        content = f.read()
-    prepend = '__transform_stem_uid__ = "'
-    assert content.startswith(prepend)
-
 
 def test_run_save_stage():
     env = os.environ
@@ -36,6 +18,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
+    print(result.stdout.decode())
     assert result.returncode == 1
     assert "Did you run ln.track()" in result.stdout.decode()
 
@@ -45,7 +28,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
-    print(result)
+    print(result.stdout.decode())
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
 
@@ -56,6 +39,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
+    print(result.stdout.decode())
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
     assert filepath.exists()  # test that it's not cleaned out!
@@ -68,22 +52,13 @@ def test_run_save_stage():
         capture_output=True,
         env=env,
     )
-    print(result)
+    print(result.stdout.decode())
     assert result.returncode == 1
-    assert "You can now rerun the script." in result.stderr.decode()
-
-    result = subprocess.run(
-        f"python {str(filepath)}",
-        shell=True,
-        capture_output=True,
-    )
-    print(result)
-    assert result.returncode == 0
+    assert "Please update your transform settings as follows" in result.stdout.decode()
 
     result = subprocess.run(
         "lamin stage 'transform m5uCHTTpJnjQ5zKv'",
         shell=True,
         capture_output=True,
     )
-    print(result)
     assert result.returncode == 0

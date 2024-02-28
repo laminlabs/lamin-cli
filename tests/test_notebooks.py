@@ -7,44 +7,21 @@ import nbproject_test
 notebook_dir = "./sub/lamin-cli/tests/notebooks/"
 
 
-def test_track_not_initialized():
+def test_save_not_initialized():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     result = subprocess.run(
-        f"lamin track {notebook_dir}not-initialized.ipynb",
+        f"lamin save {notebook_dir}not-initialized.ipynb",
         shell=True,
         capture_output=True,
         env=env,
     )
-    assert result.returncode == 0
-    assert "added stem_uid & version to ipynb file metadata" in result.stdout.decode()
-
-
-def test_track_no_title():
-    env = os.environ
-    env["LAMIN_TESTING"] = "true"
-    result = subprocess.run(
-        f"lamin track {notebook_dir}no-title.ipynb",
-        shell=True,
-        capture_output=True,
-        env=env,
-    )
-    assert result.returncode == 0
-    # see lamindb_setup/_notebooks.py::update_notebook_metadata
-    assert "updated notebook" in result.stdout.decode()
-
-
-def test_save_no_title():
-    env = os.environ
-    env["LAMIN_TESTING"] = "true"
-    result = subprocess.run(
-        f"lamin save {notebook_dir}no-title.ipynb",
-        shell=True,
-        capture_output=True,
-        env=env,
-    )
+    print(result.stdout.decode())
     assert result.returncode == 1
-    assert "No title!" in result.stdout.decode()
+    assert (
+        "Call ln.track() and copy/paste the output into the notebook"
+        in result.stdout.decode()
+    )
 
 
 def test_save_non_consecutive():
@@ -56,6 +33,7 @@ def test_save_non_consecutive():
         capture_output=True,
         env=env,
     )
+    print(result.stdout.decode())
     assert result.returncode == 1
     assert "Aborted (non-consecutive)!" in result.stdout.decode()
 
@@ -90,9 +68,7 @@ def test_save_consecutive():
     print(result.stdout)
     print(result.stderr)
     assert result.returncode == 0
-    assert (
-        "saved transform" in result.stdout.decode()
-    )
+    assert "saved transform" in result.stdout.decode()
 
     # now, assume the user modifies the notebook and saves
     # it without changing id or version
@@ -115,6 +91,4 @@ def test_save_consecutive():
     print(result.stdout)
     print(result.stderr)
     assert result.returncode == 0
-    assert (
-        "saved transform" in result.stdout.decode()
-    )
+    assert "saved transform" in result.stdout.decode()
