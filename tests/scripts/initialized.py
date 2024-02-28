@@ -1,8 +1,8 @@
-__transform_stem_uid__ = "m5uCHTTpJnjQ"
-__version__ = "1"
-
-
 import lamindb as ln
+
+
+ln.transform.stem_uid = "m5uCHTTpJnjQ"
+ln.transform.version = "1"
 
 
 if __name__ == "__main__":
