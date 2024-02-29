@@ -54,7 +54,7 @@ def test_run_save_stage():
     )
     print(result.stdout.decode())
     assert result.returncode == 1
-    assert "Please update your transform settings as follows" in result.stdout.decode()
+    assert "Please update your transform settings as follows" in result.stderr.decode()
 
     result = subprocess.run(
         "lamin stage 'transform m5uCHTTpJnjQ5zKv'",
