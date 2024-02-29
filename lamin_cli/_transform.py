@@ -9,7 +9,7 @@ from lamin_utils import logger
 
 def save(filepath: str) -> Optional[str]:
     import lamindb as ln
-    from lamindb.dev._run_context import get_stem_uid_and_version_from_file
+    from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
     is_notebook = False
     stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
