@@ -3,7 +3,7 @@ from lamin_utils import logger
 
 
 def decompose_url(url: str) -> Tuple[str, str, str]:
-    assert "Transform" in url
+    assert "transform" in url
     uid = url.split("transform/")[1]
     instance_identifier = "/".join(url.replace("https://lamin.ai/", "").split("/")[:2])
     return instance_identifier, "transform", uid
