@@ -119,7 +119,7 @@ def test_save_consecutive():
     new_path = notebook_path.with_name("new_name.ipynb")
     os.system(f"cp {notebook_path} {new_path}")
 
-    # upon re-running it, they should be asked whether it's still the same notebook
+    # upon re-running it, the user is asked whether it's still the same notebook
     with pytest.raises(CellExecutionError) as error:
         nbproject_test.execute_notebooks(new_path, print_outputs=True)
 
