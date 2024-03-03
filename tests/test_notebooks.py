@@ -16,11 +16,10 @@ def test_save_not_initialized():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
     assert result.returncode == 1
     assert (
         "Call ln.track() and copy/paste the output into the notebook"
-        in result.stdout.decode()
+        in result.stderr.decode()
     )
 
 
@@ -33,7 +32,6 @@ def test_save_non_consecutive():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
     assert result.returncode == 1
     assert "Aborted (non-consecutive)!" in result.stdout.decode()
 
