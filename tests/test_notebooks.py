@@ -46,11 +46,8 @@ def test_save_consecutive():
     # let's inspect what got written to the database
     import lamindb as ln
 
-    # there is no transform record
-    # comment this out because there might be caching of the Django queryset
-    # at play
-    # transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
-    # assert transform is None
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
+    assert transform is None
 
     # let's try to save a notebook for which `ln.track()` was never run
     result = subprocess.run(
@@ -63,7 +60,7 @@ def test_save_consecutive():
     assert "Did not find stem uid 'hlsFXswrJjtt'" in result.stdout.decode()
 
     # now, let's re-run this notebook so that ln.track() is actually run
-    nbproject_test.execute_notebooks(notebook_path)
+    nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
 
     # now, there is a transform record, but we're missing all artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
