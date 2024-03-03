@@ -46,8 +46,8 @@ def save(filepath: str) -> Optional[str]:
     transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
     if len(transform_family) == 0:
         logger.error(
-            f"Did not find notebook with uid prefix {stem_uid}"
-            " in transform registry. Did you run ln.track()?"
+            f"Did not find stem uid '{stem_uid}'"
+            " in Transform registry. Did you run ln.track()?"
         )
         return "not-tracked-in-transform-registry"
     # the specific version
