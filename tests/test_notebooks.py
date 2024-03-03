@@ -82,15 +82,15 @@ def test_save_consecutive():
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
 
-    # now, there is a transform record, but we're missing all artifacts
+    # now, we have the associated artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
     assert transform.latest_report is not None
-    assert transform.source_code.hash == "UCtT10NinyLWs42q7PbhOw"
+    assert transform.source_code.hash == "bcn5xWBd9dEUGHxyHDtcVA"
     assert transform.latest_run.environment is not None
 
     # now, assume the user modifies the notebook and saves
-    # it without changing id or version
+    # it without changing stem uid or version
     # outside of tests, this triggers a dialogue
     # within tests, it automatically overwrites the source
     from nbproject.dev import read_notebook, write_notebook
@@ -109,3 +109,11 @@ def test_save_consecutive():
     )
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
+
+    # now, the source code should be overwritten
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
+    print(transform.source_code)
+    assert transform is not None
+    assert transform.latest_report is not None
+    assert transform.source_code.hash == "UCtT10NinyLWs42q7PbhOw"
+    assert transform.latest_run.environment is not None
