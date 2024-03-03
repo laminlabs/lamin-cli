@@ -80,6 +80,13 @@ def test_save_consecutive():
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
 
+    # now, there is a transform record, but we're missing all artifacts
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
+    assert transform is not None
+    assert transform.latest_report is not None
+    assert transform.source_code.hash == "UCtT10NinyLWs42q7PbhOw"
+    assert transform.latest_run.environment is not None
+
     # now, assume the user modifies the notebook and saves
     # it without changing id or version
     # outside of tests, this triggers a dialogue
@@ -98,7 +105,5 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
-    print(result.stdout)
-    print(result.stderr)
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
