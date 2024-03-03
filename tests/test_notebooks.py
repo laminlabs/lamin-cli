@@ -1,7 +1,6 @@
 import os
 import subprocess
 from pathlib import Path
-from time import sleep
 import nbproject_test
 
 notebook_dir = "./sub/lamin-cli/tests/notebooks/"
@@ -63,7 +62,6 @@ def test_save_consecutive():
     nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
 
     # now, there is a transform record, but we're missing all artifacts
-    sleep(7)  # locally, I don't need this, but on CI this fails otherwise
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
     assert transform.latest_report is None
