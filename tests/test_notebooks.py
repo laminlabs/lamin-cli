@@ -2,6 +2,8 @@ import os
 import subprocess
 from pathlib import Path
 import nbproject_test
+import pytest
+from nbclient.exceptions import CellExecutionError
 
 notebook_dir = "./sub/lamin-cli/tests/notebooks/"
 
@@ -50,7 +52,7 @@ def test_save_consecutive():
 
     # let's try to save a notebook for which `ln.track()` was never run
     result = subprocess.run(
-        f"lamin save {str(notebook_path)}",
+        f"lamin save {notebook_path}",
         shell=True,
         capture_output=True,
         env=env,
@@ -70,7 +72,7 @@ def test_save_consecutive():
 
     # and save again
     result = subprocess.run(
-        f"lamin save {str(notebook_path)}",
+        f"lamin save {notebook_path}",
         shell=True,
         capture_output=True,
         env=env,
@@ -98,7 +100,7 @@ def test_save_consecutive():
     nb.cells.append(new_cell)
     write_notebook(nb, notebook_path)
     result = subprocess.run(
-        f"lamin save {str(notebook_path)}",
+        f"lamin save {notebook_path}",
         shell=True,
         capture_output=True,
         env=env,
@@ -114,4 +116,11 @@ def test_save_consecutive():
     assert transform.latest_run.environment is not None
 
     # now, assume the user renames the notebook
+    new_path = notebook_path.with_name("new_name.ipynb")
+    os.system(f"cp {notebook_path} {new_path}")
+
     # upon re-running it, they should be asked whether it's still the same notebook
+    with pytest.raises(CellExecutionError) as error:
+        nbproject_test.execute_notebooks(new_path, print_outputs=True)
+
+    assert "Please update your transform settings as follows" in error.exconly()
