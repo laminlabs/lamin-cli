@@ -45,8 +45,14 @@ def test_save_consecutive():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
 
+    # let's inspect what got written to the database
+    import lamindb as ln
+
+    # there is no transform record
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
+    assert transform is None
+
     # let's try to save a notebook for which `ln.track()` was never run
-    # it's going to fail
     result = subprocess.run(
         f"lamin save {str(notebook_path)}",
         shell=True,
@@ -54,10 +60,18 @@ def test_save_consecutive():
         env=env,
     )
     assert result.returncode == 1
-    assert "Did not find notebook with uid prefix" in result.stdout.decode()
+    assert "Did not find stem uid 'hlsFXswrJjtt'" in result.stdout.decode()
 
     # now, let's re-run this notebook so that ln.track() is actually run
     nbproject_test.execute_notebooks(notebook_path)
+
+    # now, there is a transform record, but we're missing all artifacts
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
+    assert transform is not None
+    assert transform.latest_report is None
+    assert transform.source_code is None
+    assert transform.latest_run.environment is None
+
     # and save again
     result = subprocess.run(
         f"lamin save {str(notebook_path)}",
@@ -65,8 +79,6 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
-    print(result.stdout)
-    print(result.stderr)
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
 
