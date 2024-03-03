@@ -14,7 +14,7 @@ def test_run_save_stage():
     # attempt to save the script without it yet being run
     # lamin save sub/lamin-cli/tests/scripts/initialized.py
     result = subprocess.run(
-        f"lamin save {str(filepath)}",
+        f"lamin save {filepath}",
         shell=True,
         capture_output=True,
     )
@@ -24,18 +24,31 @@ def test_run_save_stage():
 
     # python sub/lamin-cli/tests/scripts/initialized.py
     result = subprocess.run(
-        f"python {str(filepath)}",
+        f"python {filepath}",
         shell=True,
         capture_output=True,
     )
     print(result.stdout.decode())
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
+    assert "saved: Run" in result.stdout.decode()
+
+    # re-run the script
+    # python sub/lamin-cli/tests/scripts/initialized.py
+    result = subprocess.run(
+        f"python {filepath}",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    assert result.returncode == 0
+    assert "loaded: Transform" in result.stdout.decode()
+    assert "loaded: Run" in result.stdout.decode()
 
     # save the script
     # lamin save sub/lamin-cli/tests/scripts/initialized.py
     result = subprocess.run(
-        f"lamin save {str(filepath)}",
+        f"lamin save {filepath}",
         shell=True,
         capture_output=True,
     )
@@ -47,7 +60,7 @@ def test_run_save_stage():
     # python sub/lamin-cli/tests/scripts/initialized.py
     # now, trying to run the same thing again will error
     result = subprocess.run(
-        f"python {str(filepath)}",
+        f"python {filepath}",
         shell=True,
         capture_output=True,
         env=env,
