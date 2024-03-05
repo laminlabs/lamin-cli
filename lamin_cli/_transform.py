@@ -165,4 +165,7 @@ def save(filepath: str) -> Optional[str]:
     logger.success(f"saved transform.source_code: {transform.source_code}")
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
+    print("\n")  # print a new line, redesign later
+    identifier = lamindb_setup.settings.instance.identifier
+    logger.success(f"Go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
     return None
