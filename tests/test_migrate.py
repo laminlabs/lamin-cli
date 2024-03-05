@@ -1,7 +1,7 @@
 import os
 
-# from lamindb_setup.dev._hub_crud import sb_select_instance_by_id
-# from lamindb_setup.dev._hub_client import call_with_fallback_auth
+# from lamindb_setup.core._hub_crud import sb_select_instance_by_id
+# from lamindb_setup.core._hub_client import call_with_fallback_auth
 # import lamindb_setup as ln_setup
 
 
