@@ -5,8 +5,8 @@ import subprocess
 def test_decompose_url():
     url = "https://lamin.ai/laminlabs/arrayloader-benchmarks/core/transform/1GCKs8zLtkc85zKv"  # noqa
     result = decompose_url(url)
-    instance_identifier, entity, uid = result
-    assert instance_identifier == "laminlabs/arrayloader-benchmarks"
+    instance_slug, entity, uid = result
+    assert instance_slug == "laminlabs/arrayloader-benchmarks"
     assert entity == "transform"
     assert uid == "1GCKs8zLtkc85zKv"
 
