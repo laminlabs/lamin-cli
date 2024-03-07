@@ -47,6 +47,8 @@ def test_save_consecutive():
     # let's inspect what got written to the database
     import lamindb as ln
 
+    ln.connect("lamindb-setup-notebook-tests")
+
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is None
 
@@ -84,7 +86,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
     assert transform.latest_report is not None
-    assert transform.source_code.hash == "bcn5xWBd9dEUGHxyHDtcVA"
+    assert transform.source_code.hash == "6-8KV-p3YkRaeMRSLKdlIg"
     assert transform.latest_run.environment is not None
 
     # now, assume the user modifies the notebook and saves
@@ -112,7 +114,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
     assert transform.latest_report is not None
-    assert transform.source_code.hash == "UCtT10NinyLWs42q7PbhOw"
+    assert transform.source_code.hash == "x5sT09ofzAocBmchbh6Aog"
     assert transform.latest_run.environment is not None
 
     # now, assume the user renames the notebook
