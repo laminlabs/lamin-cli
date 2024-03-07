@@ -32,9 +32,9 @@ def main():
 @main.command()
 def info():
     """Show user & instance info."""
-    from lamindb_setup._info import info
+    import lamindb_setup
 
-    return info()
+    print(lamindb_setup.settings)
 
 
 # fmt: off
