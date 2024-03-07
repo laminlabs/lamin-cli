@@ -82,7 +82,7 @@ def load(instance: str, db: Optional[str], storage: Optional[str]):
     The instance identifier can the instance name (owner is
     current user), handle/name, or the URL: https://lamin.ai/handle/name.
     """
-    from lamindb_setup._load_instance import load
+    from lamindb_setup._connect_instance import load
 
     return load(identifier=instance, db=db, storage=storage)
 
