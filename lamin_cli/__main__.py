@@ -2,6 +2,7 @@ import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
+from lamin_utils import logger
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
@@ -77,14 +78,41 @@ def logout():
 @click.option("--storage", type=str, default=None, help="Update storage while loading")
 # fmt: on
 def load(instance: str, db: Optional[str], storage: Optional[str]):
-    """Load a lamindb instance.
+    """Load a lamindb instance (deprecated).
 
-    The instance identifier can the instance name (owner is
-    current user), handle/name, or the URL: https://lamin.ai/handle/name.
+    The instance slug is handle/name or the URL: https://lamin.ai/handle/name.
+
+    If the owner is the current user, passing only the instance name suffices.
     """
     from lamindb_setup import load
 
-    return load(identifier=instance, db=db, storage=storage)
+    logger.warning(
+        "if you want to auto-connect to an instance upon lamindb import as for lamindb"
+        " <= 0.68.2, call: lamin set --auto-connect true"
+    )
+    return load(slug=instance, db=db, storage=storage)
+
+
+@main.command()
+@click.argument("instance", type=str, default=None)
+@click.option(
+    "--db",
+    type=str,
+    default=None,
+    help="Postgres database connection URL, do not pass for SQLite",
+)  # noqa: E501
+@click.option("--storage", type=str, default=None, help="Update storage while loading")
+# fmt: on
+def connect(instance: str, db: Optional[str], storage: Optional[str]):
+    """Load a lamindb instance to auto connect to.
+
+    The instance slug is handle/name or the URL: https://lamin.ai/handle/name.
+
+    If the owner is the current user, passing only the instance name suffices.
+    """
+    from lamindb_setup import connect
+
+    return connect(slug=instance, db=db, storage=storage)
 
 
 # fmt: off
@@ -101,13 +129,15 @@ def delete(instance: str, force: bool = False):
 
 @main.command(name="set")
 @click.option(
-    "--storage", type=str, help="local dir, s3://bucket_name, gs://bucket_name"
+    "--auto-connect",
+    type=bool,
+    help="auto-connect to current instance upon lamindb import",
 )
-def set_(storage):
+def set_(auto_connect: bool):
     """Update settings."""
-    from lamindb_setup._set import set as set_
+    from lamindb_setup import settings
 
-    return set_.storage(storage)
+    settings.auto_connect = auto_connect
 
 
 @main.command()
