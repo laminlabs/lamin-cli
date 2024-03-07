@@ -18,7 +18,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 1
     assert "Did you run ln.track()" in result.stdout.decode()
 
@@ -28,7 +28,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
     assert "saved: Run" in result.stdout.decode()
@@ -74,4 +74,5 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
+    print(result.stderr.decode())
     assert result.returncode == 0

@@ -3,12 +3,18 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
-import lamindb_setup
+import lamindb_setup as ln_setup
 from lamin_utils import logger
 
 
 def save(filepath: str) -> Optional[str]:
+    # this will be gone once we get rid of lamin load or enable loading multiple
+    # instances sequentially
+    auto_connect_state = ln_setup.settings.auto_connect
+    ln_setup.settings.auto_connect = True
     import lamindb as ln
+
+    ln_setup.settings.auto_connect = auto_connect_state
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
     is_notebook = False
@@ -54,7 +60,7 @@ def save(filepath: str) -> Optional[str]:
     transform = transform_family.filter(version=transform_version).one()
     # latest run of this transform by user
     run = ln.Run.filter(transform=transform).order_by("-run_at").first()
-    if run.created_by.id != lamindb_setup.settings.user.id:
+    if run.created_by.id != ln_setup.settings.user.id:
         response = input(
             "You are trying to save a transform created by another user: Source and"
             " report files will be tagged with *your* user id. Proceed? (y/n)"
@@ -124,9 +130,7 @@ def save(filepath: str) -> Optional[str]:
         source_code.save()
         transform.source_code = source_code
     # track environment
-    filepath_env = (
-        lamindb_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}.txt"
-    )
+    filepath_env = ln_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}.txt"
     if filepath_env.exists():
         artifact = ln.Artifact(
             filepath_env, description="requirements.txt", visibility=0
@@ -166,6 +170,6 @@ def save(filepath: str) -> Optional[str]:
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
     print("\n")  # print a new line, redesign later
-    identifier = lamindb_setup.settings.instance.slug
+    identifier = ln_setup.settings.instance.slug
     logger.success(f"Go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
     return None

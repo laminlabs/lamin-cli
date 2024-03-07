@@ -1,6 +1,6 @@
 import lamindb as ln
 
-
+ln.connect("lamindb-setup-notebook-tests")
 ln.transform.stem_uid = "m5uCHTTpJnjQ"
 ln.transform.version = "1"
 
