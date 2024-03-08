@@ -118,16 +118,14 @@ def delete(instance: str, force: bool = False):
 
 
 @main.command(name="set")
-@click.option(
-    "--auto-connect",
-    type=bool,
-    help="auto-connect to current instance upon lamindb import",
-)
-def set_(auto_connect: bool):
+@click.argument("setting", type=click.Choice(["auto-connect"], case_sensitive=False))
+@click.argument("value", type=click.BOOL)
+def set_(setting: str, value: bool):
     """Update settings."""
     from lamindb_setup import settings
 
-    settings.auto_connect = auto_connect
+    if setting == "auto-connect":
+        settings.auto_connect = value
 
 
 @main.command()
