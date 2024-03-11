@@ -174,9 +174,6 @@ def save(filepath_str: str) -> Optional[str]:
         run.save()
         transform.latest_report = run.report
     transform.save()
-    if is_notebook:
-        source_code_path.unlink()
-        filepath_html.unlink()
     logger.success(f"saved transform.source_code: {transform.source_code}")
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
