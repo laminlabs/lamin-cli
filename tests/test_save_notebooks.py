@@ -85,9 +85,11 @@ def test_save_consecutive():
     # now, we have the associated artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
-    assert transform.latest_report is not None
+    assert transform.latest_report.path.exists()
+    assert transform.latest_run.report.path == transform.latest_report.path
     assert transform.source_code.hash == "6-8KV-p3YkRaeMRSLKdlIg"
-    assert transform.latest_run.environment is not None
+    assert transform.latest_run.environment.path.exists()
+    assert transform.source_code.path.exists()
 
     # now, assume the user modifies the notebook and saves
     # it without changing stem uid or version
@@ -113,9 +115,11 @@ def test_save_consecutive():
     # now, the source code should be overwritten
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
-    assert transform.latest_report is not None
+    assert transform.latest_report.path.exists()
+    assert transform.latest_run.report.path == transform.latest_report.path
     assert transform.source_code.hash == "x5sT09ofzAocBmchbh6Aog"
-    assert transform.latest_run.environment is not None
+    assert transform.latest_run.environment.path.exists()
+    assert transform.source_code.path.exists()
 
     # now, assume the user renames the notebook
     new_path = notebook_path.with_name("new_name.ipynb")

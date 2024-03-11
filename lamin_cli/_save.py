@@ -7,7 +7,7 @@ import lamindb_setup as ln_setup
 from lamin_utils import logger
 
 
-def save(filepath: str) -> Optional[str]:
+def save(filepath_str: str) -> Optional[str]:
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
     auto_connect_state = ln_setup.settings.auto_connect
@@ -18,9 +18,10 @@ def save(filepath: str) -> Optional[str]:
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
     is_notebook = False
-    stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
+    stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath_str)
+    filepath = Path(filepath_str)
 
-    if filepath.endswith(".ipynb"):
+    if filepath.suffix == ".ipynb":
         is_notebook = True
         try:
             import nbstripout  # noqa
@@ -69,16 +70,27 @@ def save(filepath: str) -> Optional[str]:
             return "aborted-save-notebook-created-by-different-user"
     if is_notebook:
         # convert the notebook file to html
-        filepath_html = filepath.replace(".ipynb", ".html")
         # log_level is set to 40 to silence the nbconvert logging
         result = subprocess.run(
-            f"jupyter nbconvert --to html {filepath} --Application.log_level=40",
+            "jupyter nbconvert --to html"
+            f" {filepath.as_posix()} --Application.log_level=40",
             shell=True,
         )
+        # move the temporary file into the cache dir in case it's accidentally
+        # in an existing storage location -> we want to move associated
+        # artifacts into default storage and not register them in an existing
+        # location
+        filepath_html = filepath.with_suffix(".html")  # current location
+        filepath_html.rename(
+            ln_setup.settings.storage.cache_dir / filepath_html.name
+        )  # move
+        filepath_html = (
+            ln_setup.settings.storage.cache_dir / filepath_html.name
+        )  # adjust location
         assert result.returncode == 0
         # copy the notebook file to a temporary file
-        source_code_path = filepath.replace(".ipynb", "_stripped.ipynb")
-        shutil.copy2(filepath, source_code_path)
+        source_code_path = ln_setup.settings.storage.cache_dir / filepath.name
+        shutil.copy2(filepath, source_code_path)  # copy
         result = subprocess.run(f"nbstripout {source_code_path}", shell=True)
         assert result.returncode == 0
     else:
@@ -163,9 +175,8 @@ def save(filepath: str) -> Optional[str]:
         transform.latest_report = run.report
     transform.save()
     if is_notebook:
-        # clean up
-        Path(source_code_path).unlink()
-        Path(filepath_html).unlink()
+        source_code_path.unlink()
+        filepath_html.unlink()
     logger.success(f"saved transform.source_code: {transform.source_code}")
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
