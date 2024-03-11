@@ -160,7 +160,7 @@ def schema(action: str):
 )
 def save(filepath: str):
     """Save notebook or script."""
-    from lamin_cli._transform import save
+    from lamin_cli._save import save
 
     if save(filepath) is not None:
         sys.exit(1)
