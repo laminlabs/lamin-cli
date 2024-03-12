@@ -47,7 +47,7 @@ def test_save_consecutive():
     # let's inspect what got written to the database
     import lamindb as ln
 
-    ln.connect("lamindb-setup-notebook-tests")
+    ln.connect("lamindb-unit-tests")
 
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is None
