@@ -1,9 +1,10 @@
 import lamindb as ln
 
-ln.connect("lamindb-unit-tests")
+ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
 ln.transform.stem_uid = "m5uCHTTpJnjQ"
 ln.transform.version = "1"
 
+ln.connect("lamindb-unit-tests")
 
 if __name__ == "__main__":
     # we're using new_run here to mock the notebook situation
