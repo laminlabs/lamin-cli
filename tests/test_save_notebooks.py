@@ -47,7 +47,7 @@ def test_save_consecutive():
     # let's inspect what got written to the database
     import lamindb as ln
 
-    ln.connect("lamindb-setup-notebook-tests")
+    ln.connect("lamindb-unit-tests")
 
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is None
@@ -87,7 +87,7 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    assert transform.source_code.hash == "6-8KV-p3YkRaeMRSLKdlIg"
+    assert transform.source_code.hash == "todu0h-2FwYlIOPCXt_iGg"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
@@ -117,7 +117,7 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    assert transform.source_code.hash == "x5sT09ofzAocBmchbh6Aog"
+    assert transform.source_code.hash == "HqINPei-eIdkG65UMw2RTg"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 

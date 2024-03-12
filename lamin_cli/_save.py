@@ -81,9 +81,10 @@ def save(filepath_str: str) -> Optional[str]:
         # artifacts into default storage and not register them in an existing
         # location
         filepath_html = filepath.with_suffix(".html")  # current location
-        filepath_html.rename(
-            ln_setup.settings.storage.cache_dir / filepath_html.name
-        )  # move
+        shutil.move(
+            filepath_html, ln_setup.settings.storage.cache_dir / filepath_html.name
+        )  # move; don't use Path.rename here because of cross-device link error
+        # see https://laminlabs.slack.com/archives/C04A0RMA0SC/p1710259102686969
         filepath_html = (
             ln_setup.settings.storage.cache_dir / filepath_html.name
         )  # adjust location
