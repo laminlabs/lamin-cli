@@ -28,6 +28,7 @@ def test_run_save_stage():
         shell=True,
         capture_output=True,
     )
+    print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
     assert "saved: Transform" in result.stdout.decode()
