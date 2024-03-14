@@ -2,12 +2,14 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 import lamindb_setup as ln_setup
 from lamin_utils import logger
 
 
-def save(filepath_str: str) -> Optional[str]:
+def save(filepath: Union[str, Path]) -> Optional[str]:
+    if not isinstance(filepath, Path):
+        filepath = Path(filepath)
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
     auto_connect_state = ln_setup.settings.auto_connect
@@ -18,8 +20,7 @@ def save(filepath_str: str) -> Optional[str]:
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
     is_notebook = False
-    stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath_str)
-    filepath = Path(filepath_str)
+    stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
 
     if filepath.suffix == ".ipynb":
         is_notebook = True
