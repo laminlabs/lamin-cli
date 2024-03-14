@@ -15,10 +15,12 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
     import lamindb as ln
-
-    ln_setup.settings.auto_connect = auto_connect_state
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
+    ln_setup.settings.auto_connect = auto_connect_state
+    # nothing here should be tracked as an output artifact!
+    run_context_run = ln.run_context.run
+    ln.run_context.run = None
     is_notebook = False
     stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
 
@@ -181,4 +183,5 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
     identifier = ln_setup.settings.instance.slug
     logger.success(f"Go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
+    ln.run_context.run = run_context_run
     return None
