@@ -2,24 +2,27 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 import lamindb_setup as ln_setup
 from lamin_utils import logger
 
 
-def save(filepath_str: str) -> Optional[str]:
+def save(filepath: Union[str, Path]) -> Optional[str]:
+    if not isinstance(filepath, Path):
+        filepath = Path(filepath)
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
     import lamindb as ln
-
-    ln_setup.settings.auto_connect = auto_connect_state
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
+    ln_setup.settings.auto_connect = auto_connect_state
+    # nothing here should be tracked as an output artifact!
+    run_context_run = ln.run_context.run
+    ln.run_context.run = None
     is_notebook = False
-    stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath_str)
-    filepath = Path(filepath_str)
+    stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
 
     if filepath.suffix == ".ipynb":
         is_notebook = True
@@ -178,7 +181,7 @@ def save(filepath_str: str) -> Optional[str]:
     logger.success(f"saved transform.source_code: {transform.source_code}")
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
-    print("\n")  # print a new line, redesign later
     identifier = ln_setup.settings.instance.slug
     logger.success(f"Go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
+    ln.run_context.run = run_context_run
     return None
