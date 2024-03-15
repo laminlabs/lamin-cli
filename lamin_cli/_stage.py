@@ -29,7 +29,7 @@ def stage(instance_identifier: str):
     if entity == "transform":
         transform = ln.Transform.using(instance_slug).filter(uid=uid).one()
         filepath_cache = transform.source_code.stage()
-        target_filename = f"{transform.short_name}.ipynb"
+        target_filename = f"{transform.key}.ipynb"
         filepath_cache.rename(target_filename)
         logger.success(f"staged source code of transform {uid} as {target_filename}")
     else:
