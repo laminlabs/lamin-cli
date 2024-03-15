@@ -63,7 +63,7 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
     # the specific version
     transform = transform_family.filter(version=transform_version).one()
     # latest run of this transform by user
-    run = ln.Run.filter(transform=transform).order_by("-run_at").first()
+    run = ln.Run.filter(transform=transform).order_by("-started_at").first()
     if run.created_by.id != ln_setup.settings.user.id:
         response = input(
             "You are trying to save a transform created by another user: Source and"
