@@ -35,7 +35,7 @@ def test_run_save_stage():
     assert "saved: Run" in result.stdout.decode()
 
     # python sub/lamin-cli/tests/scripts/initialized.py
-    # now, trying to run the same thing again will error
+    # you can rerun the same script
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -44,8 +44,7 @@ def test_run_save_stage():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert result.returncode == 1
-    assert "Please update your transform settings as follows" in result.stderr.decode()
+    assert result.returncode == 0
 
     result = subprocess.run(
         "lamin stage 'transform m5uCHTTpJnjQ5zKv'",
