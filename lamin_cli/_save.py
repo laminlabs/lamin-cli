@@ -145,6 +145,7 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
         )
         source_code.save()
         transform.source_code = source_code
+        logger.success(f"saved transform.source_code: {transform.source_code}")
     # track environment
     filepath_env = ln_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}.txt"
     if filepath_env.exists():
@@ -178,10 +179,9 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
         run.save()
         transform.latest_report = run.report
     transform.save()
-    logger.success(f"saved transform.source_code: {transform.source_code}")
     if is_notebook:
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
     identifier = ln_setup.settings.instance.slug
-    logger.success(f"Go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
+    logger.success(f"go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
     ln.core.run_context.run = run_context_run
     return None
