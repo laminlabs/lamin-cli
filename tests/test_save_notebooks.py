@@ -34,8 +34,12 @@ def test_save_non_consecutive():
 
     ln.connect("lamindb-unit-tests")
 
+    # here, we're mimicking a non-consecutive run
     transform = ln.Transform(
-        uid="HDMGkxN9rgFA", version="1", name="My test notebook (non-consecutive)"
+        uid="HDMGkxN9rgFA",
+        version="1",
+        name="My test notebook (non-consecutive)",
+        type="notebook",
     )
     transform.save()
     run = ln.Run(transform=transform)

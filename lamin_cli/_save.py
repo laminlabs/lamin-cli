@@ -33,8 +33,6 @@ def save_from_filepath_cli(filepath: Union[str, Path]) -> Optional[str]:
         )
         return "not-tracked-in-transform-registry"
     # the specific version
-    print(transform_family)
-    print(transform_version)
     transform = transform_family.filter(version=transform_version).one()
     # latest run of this transform by user
     run = ln.Run.filter(transform=transform).order_by("-started_at").first()
