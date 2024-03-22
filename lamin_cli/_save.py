@@ -165,7 +165,7 @@ def save_run_context_core(
             version=transform.version,
             is_new_version_of=initial_source,
             visibility=0,  # hidden file
-            run=None,
+            run=False,
         )
         source_code.save()
         transform.source_code = source_code
@@ -177,7 +177,7 @@ def save_run_context_core(
             filepath_env,
             description="requirements.txt",
             visibility=0,
-            run=None,
+            run=False,
         )
         if artifact._state.adding:
             artifact.save()
@@ -199,7 +199,7 @@ def save_run_context_core(
                 description=f"Report of run {run.uid}",
                 is_new_version_of=initial_report,
                 visibility=0,  # hidden file
-                run=None,
+                run=False,
             )
             report_file.save()
             run.report = report_file
