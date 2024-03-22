@@ -27,12 +27,27 @@ def test_save_not_initialized():
 def test_save_non_consecutive():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
+    notebook_path = Path(
+        f"{notebook_dir}with-title-and-initialized-non-consecutive.ipynb"
+    ).resolve()
+    import lamindb as ln
+
+    ln.connect("lamindb-unit-tests")
+
+    transform = ln.Transform(
+        uid="HDMGkxN9rgFA", version="1", name="My test notebook (non-consecutive)"
+    )
+    transform.save()
+    run = ln.Run(transform=transform)
+    run.save()
     result = subprocess.run(
-        f"lamin save {notebook_dir}with-title-and-initialized-non-consecutive.ipynb",  # noqa
+        f"lamin save {notebook_path}",  # noqa
         shell=True,
         capture_output=True,
         env=env,
     )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 1
     assert "Aborted (non-consecutive)!" in result.stdout.decode()
 
