@@ -5,52 +5,24 @@ from pathlib import Path
 from typing import Optional, Union
 import lamindb_setup as ln_setup
 from lamin_utils import logger
+from datetime import datetime, timezone
 
 
-def save(filepath: Union[str, Path]) -> Optional[str]:
+def save_from_filepath_cli(filepath: Union[str, Path]) -> Optional[str]:
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
+
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
+
     import lamindb as ln
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
 
     ln_setup.settings.auto_connect = auto_connect_state
-    # nothing here should be tracked as an output artifact!
-    run_context_run = ln.core.run_context.run
-    ln.core.run_context.run = None
-    is_notebook = False
+
     stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
-
-    if filepath.suffix == ".ipynb":
-        is_notebook = True
-        try:
-            import nbstripout  # noqa
-            from nbproject.dev import (
-                check_consecutiveness,
-                read_notebook,
-            )
-        except ImportError:
-            logger.error(
-                "install nbproject & nbstripout: pip install nbproject nbstripout"
-            )
-            return None
-        nb = read_notebook(filepath)  # type: ignore
-        is_consecutive = check_consecutiveness(nb)
-        if not is_consecutive:
-            if os.getenv("LAMIN_TESTING") is None:
-                decide = input(
-                    "   Do you still want to proceed with publishing? (y/n) "
-                )
-            else:
-                decide = "n"
-            if decide != "y":
-                logger.error("Aborted (non-consecutive)!")
-                return "aborted-non-consecutive"
-
-    ln.settings.verbosity = "success"
 
     # the corresponding transform family in the transform table
     transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
@@ -71,7 +43,56 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
         )
         if response != "y":
             return "aborted-save-notebook-created-by-different-user"
-    if is_notebook:
+
+    return save_run_context_core(
+        run=run,
+        transform=transform,
+        filepath=filepath,
+        transform_family=transform_family,
+    )
+
+
+# do not type because we need to be aware of lnschema_core import order
+def save_run_context_core(
+    *,
+    run,  # Run
+    transform,  # Transform
+    filepath,  # StrPath
+    transform_family=None,  # QuerySet
+    is_consecutive: bool = True,
+    notebook_content=None,  # nbproject.Notebook
+    finished_at: bool = False,
+) -> Optional[str]:
+    import lamindb as ln
+
+    ln.settings.verbosity = "success"
+
+    if transform.type == "notebook":
+        try:
+            import nbstripout  # noqa
+            from nbproject.dev import (
+                check_consecutiveness,
+                read_notebook,
+            )
+        except ImportError:
+            logger.error(
+                "install nbproject & nbstripout: pip install nbproject nbstripout"
+            )
+            return None
+        if notebook_content is None:
+            notebook_content = read_notebook(filepath)  # type: ignore
+        is_consecutive = check_consecutiveness(notebook_content)
+        if not is_consecutive:
+            if os.getenv("LAMIN_TESTING") is None:
+                decide = input(
+                    "   Do you still want to proceed with publishing? (y/n) "
+                )
+            else:
+                decide = "n"
+            if decide != "y":
+                logger.error("Aborted (non-consecutive)!")
+                return "aborted-non-consecutive"
+
         # convert the notebook file to html
         # log_level is set to 40 to silence the nbconvert logging
         result = subprocess.run(
@@ -102,6 +123,8 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
     # find initial versions of source codes and html reports
     initial_report = None
     initial_source = None
+    if transform_family is None:
+        transform_family = transform.versions
     if len(transform_family) > 0:
         for prev_transform in transform_family.order_by("-created_at"):
             # check for id to avoid query
@@ -139,9 +162,10 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
         source_code = ln.Artifact(
             source_code_path,
             description=f"Source of transform {transform.uid}",
-            version=transform_version,
+            version=transform.version,
             is_new_version_of=initial_source,
             visibility=0,  # hidden file
+            run=None,
         )
         source_code.save()
         transform.source_code = source_code
@@ -150,14 +174,17 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
     filepath_env = ln_setup.settings.storage.cache_dir / f"run_env_pip_{run.uid}.txt"
     if filepath_env.exists():
         artifact = ln.Artifact(
-            filepath_env, description="requirements.txt", visibility=0
+            filepath_env,
+            description="requirements.txt",
+            visibility=0,
+            run=None,
         )
         if artifact._state.adding:
             artifact.save()
         run.environment = artifact
         logger.success(f"saved run.environment: {run.environment}")
     # save report file
-    if not is_notebook:
+    if not transform.type == "notebook":
         run.save()
     else:
         if run.report_id is not None:
@@ -172,16 +199,19 @@ def save(filepath: Union[str, Path]) -> Optional[str]:
                 description=f"Report of run {run.uid}",
                 is_new_version_of=initial_report,
                 visibility=0,  # hidden file
+                run=None,
             )
             report_file.save()
             run.report = report_file
         run.is_consecutive = is_consecutive
+        if finished_at:
+            run.finished_at = datetime.now(timezone.utc)
         run.save()
         transform.latest_report = run.report
     transform.save()
-    if is_notebook:
+    if transform.type == "notebook":
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
     identifier = ln_setup.settings.instance.slug
     logger.success(f"go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
-    ln.core.run_context.run = run_context_run
+    assert ln.Run.filter(uid=transform.latest_run.uid).one().report is not None
     return None
