@@ -213,5 +213,4 @@ def save_run_context_core(
         logger.success(f"saved transform.latest_report: {transform.latest_report}")
     identifier = ln_setup.settings.instance.slug
     logger.success(f"go to: https://lamin.ai/{identifier}/transform/{transform.uid}")
-    assert ln.Run.filter(uid=transform.latest_run.uid).one().report is not None
     return None
