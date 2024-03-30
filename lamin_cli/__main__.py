@@ -152,10 +152,10 @@ def save(filepath: str):
 @main.command()
 @click.argument("url", type=str)
 def get(url: str):
-    """Stage to a lamin.ai url."""
-    from lamin_cli._stage import stage
+    """Get an object from a lamin.ai URL."""
+    from lamin_cli._get import get
 
-    return stage(url)
+    return get(url)
 
 
 main.add_command(cache)

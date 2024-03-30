@@ -11,9 +11,9 @@ def test_decompose_url():
     assert uid == "1GCKs8zLtkc85zKv"
 
 
-def test_stage():
+def test_get():
     result = subprocess.run(
-        "lamin stage"
+        "lamin get"
         " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/core/transform/1GCKs8zLtkc85zKv'",  # noqa
         shell=True,
         capture_output=True,
