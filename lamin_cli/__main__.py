@@ -77,32 +77,15 @@ def logout():
 @click.option("--storage", type=str, default=None, help="Update storage while loading")
 # fmt: on
 def load(instance: str, db: Optional[str], storage: Optional[str]):
-    """Load a lamindb instance (deprecated)."""
-    from lamindb_setup import load
-
-    return load(slug=instance, db=db, storage=storage)
-
-
-@main.command()
-@click.argument("instance", type=str, default=None)
-@click.option(
-    "--db",
-    type=str,
-    default=None,
-    help="Postgres database connection URL, do not pass for SQLite",
-)  # noqa: E501
-@click.option("--storage", type=str, default=None, help="Update storage while loading")
-# fmt: on
-def connect(instance: str, db: Optional[str], storage: Optional[str]):
-    """Connect to a lamindb instance.
+    """Auto-connect to a lamindb instance.
 
     The instance slug is 'handle/name' or the URL: https://lamin.ai/handle/name.
 
     If the owner is the current user, passing only the instance name suffices.
     """
-    from lamindb_setup import connect
+    from lamindb_setup import load
 
-    return connect(slug=instance, db=db, storage=storage)
+    return load(slug=instance, db=db, storage=storage)
 
 
 # fmt: off
