@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess
 import os
+from lamindb_setup import settings
 
 
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
@@ -47,7 +48,8 @@ def test_run_save_stage():
     assert result.returncode == 0
 
     result = subprocess.run(
-        "lamin stage 'transform m5uCHTTpJnjQ5zKv'",
+        "lamin get"
+        f" https://lamin.ai/{settings.user.handle}/lamindb-unit-tests/transform/m5uCHTTpJnjQ5zKv",  # noqa
         shell=True,
         capture_output=True,
     )
