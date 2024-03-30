@@ -72,26 +72,28 @@ def logout():
 
 # fmt: off
 @main.command()
-@click.argument("instance", type=str, default=None)
-@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite")  # noqa: E501
-@click.option("--storage", type=str, default=None, help="Update storage while loading")
+@click.argument("identifier", type=str, default=None)
+@click.option("--db", type=str, default=None, help="Update database URL.")  # noqa: E501
+@click.option("--storage", type=str, default=None, help="Update storage while loading.")
 # fmt: on
-def load(instance: str, db: Optional[str], storage: Optional[str]):
+def load(identifier: str, db: Optional[str], storage: Optional[str]):
     """Auto-connect to a lamindb instance.
 
-    The instance slug is 'handle/name' or the URL: https://lamin.ai/handle/name.
+    Identifier can be slug (account_handle/instance_name) or url
+    (https://lamin.ai/account_handle/instance_name).
 
-    If the owner is the current user, passing only the instance name suffices.
+    If the owner is the current user the instance_name suffices.
     """
-    from lamindb_setup import load
+    from lamindb_setup import settings, connect
 
-    return load(slug=instance, db=db, storage=storage)
+    settings.auto_connect = True
+    return connect(slug=identifier, db=db, storage=storage)
 
 
 # fmt: off
 @main.command()
 @click.argument("instance", type=str, default=None)
-@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation")  # noqa: E501
+@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
 # fmt: on
 def delete(instance: str, force: bool = False):
     """Delete instance."""
