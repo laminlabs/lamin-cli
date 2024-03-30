@@ -151,7 +151,7 @@ def save(filepath: str):
 
 @main.command()
 @click.argument("url", type=str)
-def stage(url: str):
+def get(url: str):
     """Stage to a lamin.ai url."""
     from lamin_cli._stage import stage
 
