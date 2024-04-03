@@ -22,15 +22,18 @@ def save_from_filepath_cli(
     ln_setup.settings.auto_connect = auto_connect_state
 
     if filepath.suffix not in {".py", ".ipynb"}:
-        if key is None or description is None:
+        if key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
         artifact = ln.Artifact(filepath, key=key, description=description)
         artifact.save()
         slug = ln_setup.settings.instance.slug
+        logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if ln_setup.settings.instance.is_remote:
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
+        if ln_setup.settings.storage.type == "s3":
+            logger.important(f"storage url: {artifact.path.to_url()}")
         return None
     else:
         # consider notebooks & scripts a transform
