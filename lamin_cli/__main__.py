@@ -143,11 +143,13 @@ def schema(action: str):
 @click.argument(
     "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
 )
-def save(filepath: str):
-    """Save notebook or script."""
+@click.argument("key", type=str, default=None)
+@click.argument("description", type=str, default=None)
+def save(filepath: str, key: str, description: str):
+    """Save file or folder."""
     from lamin_cli._save import save_from_filepath_cli
 
-    if save_from_filepath_cli(filepath) is not None:
+    if save_from_filepath_cli(filepath, key, description) is not None:
         sys.exit(1)
 
 

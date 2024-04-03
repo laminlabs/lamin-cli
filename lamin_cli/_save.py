@@ -4,7 +4,9 @@ import lamindb_setup as ln_setup
 from lamin_utils import logger
 
 
-def save_from_filepath_cli(filepath: Union[str, Path]) -> Optional[str]:
+def save_from_filepath_cli(
+    filepath: Union[str, Path], key: Optional[str], description: Optional[str]
+) -> Optional[str]:
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
 
@@ -17,12 +19,21 @@ def save_from_filepath_cli(filepath: Union[str, Path]) -> Optional[str]:
     from lamindb.core._run_context import get_stem_uid_and_version_from_file
     from lamindb._finish import save_run_context_core
 
-    ln_setup.settings.auto_connect = auto_connect_state    
-    
-    if not in filepath.suffix in {".py", ".ipynb}:
-        artifact = ln.Artifact(filepath, description=f"CLI upload {filepath.name}")
+    ln_setup.settings.auto_connect = auto_connect_state
+
+    if filepath.suffix not in {".py", ".ipynb"}:
+        if key is None or description is None:
+            logger.error("Please pass a key or description via --key or --description")
+            return "missing-key-or-description"
+        artifact = ln.Artifact(filepath, key=key, description=description)
         artifact.save()
+        slug = ln_setup.settings.instance.slug
+        logger.important(f"storage path: {artifact.path}")
+        if ln_setup.settings.instance.is_remote:
+            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
+        return None
     else:
+        # consider notebooks & scripts a transform
         stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
         # the corresponding transform family in the transform table
         transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
