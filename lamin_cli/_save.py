@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Union
 import lamindb_setup as ln_setup
