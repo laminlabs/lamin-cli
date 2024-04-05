@@ -6,7 +6,7 @@ scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
 
 def run_script():
-    filepath = scripts_dir / "initialized.py"
+    filepath = scripts_dir / "initialized-no-git-sync.py"
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
