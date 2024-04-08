@@ -14,6 +14,7 @@ def run_script():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
+    assert result.returncode == 0
 
 
 def test_parallel_execution():
