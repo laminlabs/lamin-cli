@@ -17,7 +17,7 @@ def run_script():
 
 
 def test_parallel_execution():
-    num_processes = 4
+    num_processes = 16
     processes = []
 
     # Create and start new processes
