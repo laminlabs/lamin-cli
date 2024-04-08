@@ -17,11 +17,11 @@ def run_script():
 
 
 def test_parallel_execution():
-    num_processes = 16
+    n_processes = 32
     processes = []
 
     # Create and start new processes
-    for _ in range(num_processes):
+    for _ in range(n_processes):
         p = Process(target=run_script)
         p.start()
         processes.append(p)
