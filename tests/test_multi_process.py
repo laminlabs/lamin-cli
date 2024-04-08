@@ -30,3 +30,6 @@ def test_parallel_execution():
     # Wait for all processes to finish
     for p in processes:
         p.join()
+
+    for p in processes:
+        assert p.exitcode == 0
