@@ -7,7 +7,7 @@ from lamindb_setup import settings
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
 
-def test_run_save_download():
+def test_run_save_cache():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
 
