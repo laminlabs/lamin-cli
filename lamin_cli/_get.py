@@ -29,9 +29,9 @@ def get(url: str):
 
     if entity == "transform":
         transform = ln.Transform.filter(uid=uid).one()
-        filepath_cache = transform.source_code.stage()
+        filepath_cache = transform.source_code.download()
         target_filename = f"{transform.key}.ipynb"
         filepath_cache.rename(target_filename)
-        logger.success(f"staged source code of transform {uid} as {target_filename}")
+        logger.success(f"downloadd source code of transform {uid} as {target_filename}")
     else:
         raise NotImplementedError
