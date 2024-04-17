@@ -53,7 +53,7 @@ def test_save_non_consecutive():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Aborted (non-consecutive)!" in result.stdout.decode()
+    assert "were not run consecutively" in result.stdout.decode()
 
 
 def test_save_consecutive():
