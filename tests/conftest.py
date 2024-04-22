@@ -14,5 +14,5 @@ def pytest_sessionstart(session: pytest.Session):
 
 def pytest_sessionfinish(session: pytest.Session):
     logger.set_verbosity(1)
-    ln.setup.delete("lamindb-unit-tests", force=True)
     shutil.rmtree("./default_storage")
+    ln.setup.delete("lamindb-unit-tests", force=True)
