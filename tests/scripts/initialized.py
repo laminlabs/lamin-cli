@@ -13,3 +13,5 @@ if __name__ == "__main__":
     ln.track(new_run=False)
 
     print("hello!")
+
+    ln.finish()
