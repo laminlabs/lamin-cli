@@ -7,12 +7,12 @@ from lamin_utils import logger
 
 def pytest_sessionstart(session: pytest.Session):
     ln.setup.init(
-        storage="./default_storage",
-        name="lamindb-unit-tests",
+        storage="./default_storage_ci",
+        name="laminci-unit-tests",
     )
 
 
 def pytest_sessionfinish(session: pytest.Session):
     logger.set_verbosity(1)
-    shutil.rmtree("./default_storage")
-    ln.setup.delete("lamindb-unit-tests", force=True)
+    shutil.rmtree("./default_storage_ci")
+    ln.setup.delete("laminci-unit-tests", force=True)
