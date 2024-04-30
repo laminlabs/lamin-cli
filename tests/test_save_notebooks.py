@@ -100,7 +100,7 @@ def test_save_consecutive():
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
     print(transform.source_code.path.read_text())
-    assert transform.source_code.hash == "-tysu3DpnYTsS99C07ndVw"
+    assert transform.source_code.hash == "kse4wTAVrvp_w24MrkYkFA"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
@@ -130,9 +130,19 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    assert transform.source_code.hash == "y3R40pMr8RLMJH4PyIK50g"
+    assert transform.source_code.hash == "ocLybD0Hv_L3NhhXgTyQcw"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
+
+    # get the the source code via command line
+    result = subprocess.run(
+        "lamin get"
+        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt5zKv",  # noqa
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stderr.decode())
+    assert result.returncode == 0
 
     # now, assume the user renames the notebook
     new_path = notebook_path.with_name("new_name.ipynb")
