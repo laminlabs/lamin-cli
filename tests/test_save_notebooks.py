@@ -4,6 +4,7 @@ from pathlib import Path
 import nbproject_test
 import pytest
 from nbclient.exceptions import CellExecutionError
+import lamindb as ln
 
 notebook_dir = "./sub/lamin-cli/tests/notebooks/"
 
@@ -30,9 +31,6 @@ def test_save_non_consecutive():
     notebook_path = Path(
         f"{notebook_dir}with-title-and-initialized-non-consecutive.ipynb"
     ).resolve()
-    import lamindb as ln
-
-    ln.connect("lamindb-unit-tests")
 
     # here, we're mimicking a non-consecutive run
     transform = ln.Transform(
@@ -62,11 +60,6 @@ def test_save_consecutive():
     ).resolve()
     env = os.environ
     env["LAMIN_TESTING"] = "true"
-
-    # let's inspect what got written to the database
-    import lamindb as ln
-
-    ln.connect("lamindb-unit-tests")
 
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is None
@@ -106,7 +99,7 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    assert transform.source_code.hash == "AvZdpq4EHax5rNcnW-RACw"
+    assert transform.source_code.hash == "ur4ba9DSorUTYQ0WhP8G3Q"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
@@ -136,7 +129,7 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    assert transform.source_code.hash == "-hK6xaIrA04vJFAY2wWAQQ"
+    assert transform.source_code.hash == "y3R40pMr8RLMJH4PyIK50g"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 

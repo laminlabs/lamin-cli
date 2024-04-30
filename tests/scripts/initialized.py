@@ -1,7 +1,5 @@
 import lamindb as ln
 
-ln.connect("lamindb-unit-tests")
-
 ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
 ln.settings.transform.stem_uid = "m5uCHTTpJnjQ"
 ln.settings.transform.version = "1"
