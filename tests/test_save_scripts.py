@@ -49,7 +49,7 @@ def test_run_save_cache():
 
     result = subprocess.run(
         "lamin get"
-        f" https://lamin.ai/{settings.user.handle}/lamindb-unit-tests/transform/m5uCHTTpJnjQ5zKv",  # noqa
+        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ5zKv",  # noqa
         shell=True,
         capture_output=True,
     )
