@@ -30,7 +30,9 @@ def get(url: str):
     if entity == "transform":
         transform = ln.Transform.filter(uid=uid).one()
         filepath_cache = transform.source_code.cache()
-        target_filename = f"{transform.key}.ipynb"
+        target_filename = transform.key
+        if not target_filename.endswith(transform.source_code.suffix):
+            target_filename += transform.source_code.suffix
         filepath_cache.rename(target_filename)
         logger.success(f"cached source code of transform {uid} as {target_filename}")
     else:

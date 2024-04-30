@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess
 import os
+import lamindb as ln
 from lamindb_setup import settings
 
 
@@ -23,7 +24,7 @@ def test_run_save_cache():
     assert result.returncode == 1
     assert "Did you run ln.track()" in result.stdout.decode()
 
-    # python sub/lamin-cli/tests/scripts/initialized.py
+    # run the script
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -35,7 +36,11 @@ def test_run_save_cache():
     assert "saved: Transform" in result.stdout.decode()
     assert "saved: Run" in result.stdout.decode()
 
-    # python sub/lamin-cli/tests/scripts/initialized.py
+    transform = ln.Transform.get("m5uCHTTpJnjQ")
+    assert transform.source_code.hash == "-QN2dVdC8T3xWG8vBl-wew"
+    assert transform.latest_run.environment.path.exists()
+    assert transform.source_code.path.exists()
+
     # you can rerun the same script
     result = subprocess.run(
         f"python {filepath}",
@@ -47,6 +52,7 @@ def test_run_save_cache():
     print(result.stderr.decode())
     assert result.returncode == 0
 
+    # try to get the the source code via command line
     result = subprocess.run(
         "lamin get"
         f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ5zKv",  # noqa
