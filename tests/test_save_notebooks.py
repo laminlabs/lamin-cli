@@ -100,7 +100,7 @@ def test_save_consecutive():
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
     print(transform.source_code.path.read_text())
-    assert transform.source_code.hash == "kse4wTAVrvp_w24MrkYkFA"
+    assert transform.source_code.hash == "5nc_HMjPvT9n26OWrjq6uQ"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
@@ -137,7 +137,7 @@ def test_save_consecutive():
     # get the the source code via command line
     result = subprocess.run(
         "lamin get"
-        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt5zKv",  # noqa
+        f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt5zKv",  # noqa
         shell=True,
         capture_output=True,
     )
