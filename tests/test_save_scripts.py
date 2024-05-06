@@ -90,7 +90,7 @@ def test_run_save_cache():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Did not find blob hash" in result.stderr.decode()
+    assert "Please update your transform settings as follows" in result.stderr.decode()
 
     # try to get the the source code via command line
     result = subprocess.run(
