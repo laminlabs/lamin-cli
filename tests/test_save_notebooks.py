@@ -100,7 +100,6 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    print(transform.source_code.path.read_text())
     assert transform.source_code.hash == "5nc_HMjPvT9n26OWrjq6uQ"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
@@ -114,13 +113,15 @@ def test_save_consecutive():
     write_notebook(nb, notebook_path)
 
     # try re-running - it fails
-    nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
+    with pytest.raises(CellExecutionError) as error:
+        nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
     assert (
-        "Call ln.track() and copy/paste the output into the notebook"
-        in result.stderr.decode()
+        "UpdateTransformSettings: Please update your transform settings as follows"
+        in error.exconly()
     )
 
-    # try re-saving
+    # try re-saving - it works but will issue an interactive warning dialogue
+    # that clarifies that the user is about to re-save the notebook
     result = subprocess.run(
         f"lamin save {notebook_path}",
         shell=True,
@@ -129,10 +130,8 @@ def test_save_consecutive():
     )
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
-
-    # now, the source code is overwritten with the edits, reflected in a new hash
-    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
-    assert transform is not None
+    # the source code is overwritten with the edits, reflected in a new hash
+    transform = ln.Transform.get("hlsFXswrJjtt5zKv")
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
     assert transform.source_code.hash == "ocLybD0Hv_L3NhhXgTyQcw"
