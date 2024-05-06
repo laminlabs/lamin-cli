@@ -11,7 +11,7 @@ scripts_dir = Path(__file__).parent.resolve() / "scripts"
 def test_run_save_cache():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
-    filepath = scripts_dir / "initialized.py"
+    filepath = scripts_dir / "run-track-and-finish-sync-git.py"
 
     # attempt to save the script without it yet being run
     result = subprocess.run(
