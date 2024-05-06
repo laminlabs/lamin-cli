@@ -33,7 +33,8 @@ def test_run_save_cache():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert 'saved: Transform(uid="m5uCHTTpJnjQ5zKv")' in result.stdout.decode()
+    assert "saved: Transform" in result.stdout.decode()
+    assert "m5uCHTTpJnjQ5zKv" in result.stdout.decode()
     assert "saved: Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
@@ -51,13 +52,15 @@ def test_run_save_cache():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert 'loaded: Transform(uid="m5uCHTTpJnjQ5zKv")' in result.stdout.decode()
+    assert "loaded: Transform" in result.stdout.decode()
+    assert "m5uCHTTpJnjQ5zKv" in result.stdout.decode()
     assert "loaded: Run" in result.stdout.decode()
 
-    # edit the script and try to run it
+    # edit the script
     content = filepath.read_text() + "\n # edited"
     filepath.write_text(content)
 
+    # re-run the script
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -66,7 +69,8 @@ def test_run_save_cache():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert result.returncode == 0
+    assert result.returncode == 1
+    assert "Did not find blob hash" in result.stderr.decode()
 
     # try to get the the source code via command line
     result = subprocess.run(
