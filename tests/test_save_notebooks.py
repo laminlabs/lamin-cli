@@ -114,15 +114,7 @@ def test_save_consecutive():
     write_notebook(nb, notebook_path)
 
     # try re-running - it fails
-    result = subprocess.run(
-        f"jupyter nbconvert --to html --execute {notebook_path}",
-        shell=True,
-        capture_output=True,
-        env=env,
-    )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
-    assert result.returncode == 1
+    nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
     assert (
         "Call ln.track() and copy/paste the output into the notebook"
         in result.stderr.decode()
