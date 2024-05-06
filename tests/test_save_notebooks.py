@@ -125,7 +125,7 @@ def test_save_consecutive():
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
 
-    # now, the source code should be overwritten
+    # now, the source code is overwritten with the edits, reflected in a new hash
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
     assert transform.latest_report.path.exists()
