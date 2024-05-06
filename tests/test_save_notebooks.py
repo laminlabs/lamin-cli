@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 import nbproject_test
 import pytest
+from nbproject.dev import read_notebook, write_notebook
 from nbclient.exceptions import CellExecutionError
 import lamindb as ln
 
@@ -99,23 +100,26 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
-    print(transform.source_code.path.read_text())
     assert transform.source_code.hash == "5nc_HMjPvT9n26OWrjq6uQ"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
-    # now, assume the user modifies the notebook and saves
-    # it without changing stem uid or version
-    # outside of tests, this triggers a dialogue
-    # within tests, it automatically overwrites the source
-    from nbproject.dev import read_notebook, write_notebook
-
+    # now, assume the user modifies the notebook
     nb = read_notebook(notebook_path)
     # simulate editing the notebook (here, duplicate last cell)
     new_cell = nb.cells[-1].copy()
     new_cell["execution_count"] += 1
     nb.cells.append(new_cell)
     write_notebook(nb, notebook_path)
+
+    # try re-running - it fails
+    with pytest.raises(CellExecutionError) as error:
+        nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
+    print(error.exconly())
+    assert "UpdateTransformSettings" in error.exconly()
+
+    # try re-saving - it works but will issue an interactive warning dialogue
+    # that clarifies that the user is about to re-save the notebook
     result = subprocess.run(
         f"lamin save {notebook_path}",
         shell=True,
@@ -124,10 +128,8 @@ def test_save_consecutive():
     )
     assert result.returncode == 0
     assert "saved transform" in result.stdout.decode()
-
-    # now, the source code should be overwritten
-    transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
-    assert transform is not None
+    # the source code is overwritten with the edits, reflected in a new hash
+    transform = ln.Transform.get("hlsFXswrJjtt5zKv")
     assert transform.latest_report.path.exists()
     assert transform.latest_run.report.path == transform.latest_report.path
     assert transform.source_code.hash == "ocLybD0Hv_L3NhhXgTyQcw"
