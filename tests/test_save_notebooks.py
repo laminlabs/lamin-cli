@@ -115,6 +115,7 @@ def test_save_consecutive():
     # try re-running - it fails
     with pytest.raises(CellExecutionError) as error:
         nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
+    print(error.exconly())
     assert (
         "UpdateTransformSettings: Please update your transform settings as follows"
         in error.exconly()
