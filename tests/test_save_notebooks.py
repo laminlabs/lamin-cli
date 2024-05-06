@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 import nbproject_test
 import pytest
+from nbproject.dev import read_notebook, write_notebook
 from nbclient.exceptions import CellExecutionError
 import lamindb as ln
 
@@ -104,18 +105,30 @@ def test_save_consecutive():
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
-    # now, assume the user modifies the notebook and saves
-    # it without changing stem uid or version
-    # outside of tests, this triggers a dialogue
-    # within tests, it automatically overwrites the source
-    from nbproject.dev import read_notebook, write_notebook
-
+    # now, assume the user modifies the notebook
     nb = read_notebook(notebook_path)
     # simulate editing the notebook (here, duplicate last cell)
     new_cell = nb.cells[-1].copy()
     new_cell["execution_count"] += 1
     nb.cells.append(new_cell)
     write_notebook(nb, notebook_path)
+
+    # try re-running - it fails
+    result = subprocess.run(
+        f"jupyter nbconvert --to html --execute {notebook_path}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 1
+    assert (
+        "Call ln.track() and copy/paste the output into the notebook"
+        in result.stderr.decode()
+    )
+
+    # try re-saving
     result = subprocess.run(
         f"lamin save {notebook_path}",
         shell=True,

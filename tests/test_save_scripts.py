@@ -33,7 +33,7 @@ def test_run_save_cache():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert "saved: Transform" in result.stdout.decode()
+    assert 'saved: Transform(uid="m5uCHTTpJnjQ5zKv")' in result.stdout.decode()
     assert "saved: Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
@@ -42,6 +42,22 @@ def test_run_save_cache():
     assert transform.source_code.path.exists()
 
     # you can rerun the same script
+    result = subprocess.run(
+        f"python {filepath}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+    assert 'loaded: Transform(uid="m5uCHTTpJnjQ5zKv")' in result.stdout.decode()
+    assert "loaded: Run" in result.stdout.decode()
+
+    # edit the script and try to run it
+    content = filepath.read_text() + "\n # edited"
+    filepath.write_text(content)
+
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
