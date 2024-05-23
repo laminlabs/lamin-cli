@@ -24,7 +24,7 @@ def test_get_transform():
 def test_get_artifact():
     result = subprocess.run(
         "lamin get"
-        " 'https://lamin.ai/laminlabs/lamindb-dev-datasets/artifact/c3MdAYmlMj7FT39KD0KV'",  # noqa
+        " 'https://lamin.ai/laminlabs/lamindata/artifact/BWL7PYFvsZ8jA8YJOCz6'",  # noqa
         shell=True,
         capture_output=True,
     )
