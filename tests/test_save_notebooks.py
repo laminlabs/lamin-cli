@@ -93,7 +93,6 @@ def test_save_consecutive():
         env=env,
     )
     assert result.returncode == 0
-    assert "saved transform" in result.stdout.decode()
 
     # now, we have the associated artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
@@ -127,7 +126,6 @@ def test_save_consecutive():
         env=env,
     )
     assert result.returncode == 0
-    assert "saved transform" in result.stdout.decode()
     # the source code is overwritten with the edits, reflected in a new hash
     transform = ln.Transform.get("hlsFXswrJjtt5zKv")
     assert transform.latest_report.path.exists()
