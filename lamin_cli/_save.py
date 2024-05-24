@@ -100,4 +100,5 @@ def save_from_filepath_cli(
             transform=transform,
             filepath=filepath,
             transform_family=transform_family,
+            from_cli=True,
         )
