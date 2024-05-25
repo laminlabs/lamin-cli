@@ -54,6 +54,20 @@ def test_run_save_cache():
     assert "loaded: Transform" in result.stdout.decode()
     assert "m5uCHTTpJnjQ5zKv" in result.stdout.decode()
     assert "loaded: Run" in result.stdout.decode()
+    assert "source code is already saved" in result.stdout.decode()
+
+    # you can re-save the script
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+    assert "source code is already saved" in result.stdout.decode()
+    assert "run.environment is already saved" in result.stdout.decode()
 
     # edit the script
     content = filepath.read_text() + "\n # edited"
