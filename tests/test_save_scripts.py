@@ -37,7 +37,7 @@ def test_run_save_cache():
     assert "saved: Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform.source_code.hash == "-QN2dVdC8T3xWG8vBl-wew"
+    assert transform.source_code.hash == "T1zmmTJyeEpBxjaHcHcZdg"
     assert transform.latest_run.environment.path.exists()
     assert transform.source_code.path.exists()
 
