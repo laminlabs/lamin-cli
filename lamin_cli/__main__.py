@@ -106,7 +106,7 @@ def delete(instance: str, force: bool = False):
 @main.command(name="set")
 @click.argument(
     "setting",
-    type=click.Choice(["auto-connect", "prune-django-api"], case_sensitive=False),
+    type=click.Choice(["auto-connect", "private-django-api"], case_sensitive=False),
 )
 @click.argument("value", type=click.BOOL)
 def set_(setting: str, value: bool):
@@ -115,8 +115,8 @@ def set_(setting: str, value: bool):
 
     if setting == "auto-connect":
         settings.auto_connect = value
-    if setting == "prune-django-api":
-        settings.prune_django_api = value
+    if setting == "private-django-api":
+        settings.private_django_api = value
 
 
 @main.command()
