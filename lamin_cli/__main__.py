@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import sys
+import inspect
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
 
@@ -32,7 +33,7 @@ def main():
 
 @main.command()
 def info():
-    """Show user & instance info."""
+    """Show user, settings & instance info."""
     import lamindb_setup
 
     print(lamindb_setup.settings)
@@ -57,7 +58,10 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 @click.option("--key", type=str, default=None, help="API key")
 @click.option("--password", type=str, default=None, help="legacy password")
 def login(user: str, key: Optional[str], password: Optional[str]):
-    """Login using an email or user handle."""
+    """Login using a user email address or handle.
+
+    Examples: `lamin login marge` or `lamin login marge@acme.com`
+    """
     from lamindb_setup._setup_user import login
 
     return login(user, key=key, password=password)
@@ -78,12 +82,10 @@ def logout():
 @click.option("--storage", type=str, default=None, help="Update storage while loading.")
 # fmt: on
 def load(identifier: str, db: Optional[str], storage: Optional[str]):
-    """Auto-connect to a lamindb instance.
+    """Load an instance for auto-connection.
 
-    Identifier can be slug (account_handle/instance_name) or url
-    (https://lamin.ai/account_handle/instance_name).
-
-    If the owner is the current user the instance_name suffices.
+    `IDENTIFIER` is either a slug (`account/instance`) or a `URL`
+    (`https://lamin.ai/account/instance`).
     """
     from lamindb_setup import settings, connect
 
@@ -97,7 +99,7 @@ def load(identifier: str, db: Optional[str], storage: Optional[str]):
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
 # fmt: on
 def delete(instance: str, force: bool = False):
-    """Delete instance."""
+    """Delete an instance."""
     from lamindb_setup._delete import delete
 
     return delete(instance, force=force)
@@ -110,7 +112,11 @@ def delete(instance: str, force: bool = False):
 )
 @click.argument("value", type=click.BOOL)
 def set_(setting: str, value: bool):
-    """Update settings."""
+    """Update settings.
+
+    - `auto-connect` → {attr}`~lamindb.setup.core.SetupSettings.auto_connect`
+    - `private-django-api` → {attr}`~lamindb.setup.core.SetupSettings.private_django_api`
+    """
     from lamindb_setup import settings
 
     if setting == "auto-connect":
@@ -121,7 +127,10 @@ def set_(setting: str, value: bool):
 
 @main.command()
 def close():
-    """Close existing instance."""
+    """Close an existing instance.
+
+    Is the opposite of loading an instance.
+    """
     from lamindb_setup._close import close as close_
 
     return close_()
@@ -173,8 +182,9 @@ main.add_command(migrate)
 
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
+# https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
 def _generate_help():
-    out: dict[str, str] = {}
+    out: dict[str, dict[str, str | None]] = {}
 
     def recursive_help(
         cmd: Command, parent: Optional[Context] = None, name: tuple[str, ...] = ()
@@ -182,7 +192,16 @@ def _generate_help():
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
         assert cmd.name
         name = (*name, cmd.name)
-        out[" ".join(name)] = cmd.get_help(ctx)
+        command_name = " ".join(name)
+
+        docstring = inspect.getdoc(cmd.callback)
+        usage = cmd.get_help(ctx).split("\n")[0]
+        options = cmd.get_help(ctx).split("Options:")[1]
+        out[command_name] = {
+            "help": usage + "\n\nOptions:" + options,
+            "docstring": docstring,
+        }
+
         for sub in getattr(cmd, "commands", {}).values():
             recursive_help(sub, ctx, name=name)
 
