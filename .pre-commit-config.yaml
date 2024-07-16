@@ -23,7 +23,7 @@ repos:
           - flake8-typing-imports==1.10.0
         language_version: python3
         args:
-          - --max-line-length=88
+          - --max-line-length=120
           - --ignore=E203,W503,BLK100,TYP001
         exclude: |
           (?x)(
