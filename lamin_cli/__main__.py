@@ -11,6 +11,27 @@ if os.environ.get("NO_RICH"):
     import click as click
 else:
     import rich_click as click
+    
+    COMMAND_GROUPS = {
+        "lamin": [
+            {
+                "name": "Main commands",
+                "commands": ["login", "init", "load", "info", "close", "delete", "logout"],
+            },
+            {
+                "name": "Data commands",
+                "commands": ["get", "save"],
+            },
+            {
+                "name": "Configuration commands",
+                "commands": ["register", "cache", "set"],
+            },
+            {
+                "name": "Schema commands",
+                "commands": ["migrate", "schema"],
+            },
+        ]
+    }
 
 from click import Command, Context
 from lamindb_setup._silence_loggers import silence_loggers
@@ -23,7 +44,9 @@ try:
 except PackageNotFoundError:
     lamindb_version = "lamindb installation not found"
 
-
+@click.rich_config(
+    help_config=click.RichHelpConfiguration(command_groups=COMMAND_GROUPS, style_commands_table_column_width_ratio= (1, 13)),
+)
 @click.group()
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
