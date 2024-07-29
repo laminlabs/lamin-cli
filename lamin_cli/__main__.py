@@ -13,6 +13,7 @@ if os.environ.get("NO_RICH"):
 
     class OrderedGroup(click.Group):
         """Overwrites list_commands to return commands in order of definition."""
+
         def __init__(
             self,
             name: Optional[str] = None,
@@ -78,11 +79,13 @@ try:
 except PackageNotFoundError:
     lamindb_version = "lamindb installation not found"
 
+
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
     """Configure LaminDB and perform simple actions."""
     silence_loggers()
+
 
 @main.command()
 @click.argument("user", type=str)
@@ -110,29 +113,6 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
     from lamindb_setup._init_instance import init as init_
 
     return init_(storage=storage, db=db, schema=schema, name=name)
-
-
-@main.command()
-@click.argument("url", type=str)
-def get(url: str):
-    """Get an object from a lamin.ai URL."""
-    from lamin_cli._get import get
-
-    return get(url)
-
-
-@main.command()
-@click.argument(
-    "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
-)
-@click.option("--key", type=str, default=None)
-@click.option("--description", type=str, default=None)
-def save(filepath: str, key: str, description: str):
-    """Save file or folder."""
-    from lamin_cli._save import save_from_filepath_cli
-
-    if save_from_filepath_cli(filepath, key, description) is not None:
-        sys.exit(1)
 
 
 # fmt: off
@@ -190,6 +170,29 @@ def logout():
     from lamindb_setup._setup_user import logout
 
     return logout()
+
+
+@main.command()
+@click.argument("url", type=str)
+def get(url: str):
+    """Get an object from a lamin.ai URL."""
+    from lamin_cli._get import get
+
+    return get(url)
+
+
+@main.command()
+@click.argument(
+    "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
+)
+@click.option("--key", type=str, default=None)
+@click.option("--description", type=str, default=None)
+def save(filepath: str, key: str, description: str):
+    """Save file or folder."""
+    from lamin_cli._save import save_from_filepath_cli
+
+    if save_from_filepath_cli(filepath, key, description) is not None:
+        sys.exit(1)
 
 
 @main.command()
