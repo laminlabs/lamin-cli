@@ -6,11 +6,6 @@ import inspect
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional, Mapping
 
-try:
-    lamindb_version = version("lamindb")
-except PackageNotFoundError:
-    lamindb_version = "lamindb installation not found"
-
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
@@ -30,7 +25,7 @@ if os.environ.get("NO_RICH"):
         def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
             return self.commands
 
-    group_decorator = click.group(cls=OrderedGroup)
+    lamin_group_decorator = click.group(cls=OrderedGroup)
 
 else:
     import rich_click as click
@@ -64,7 +59,7 @@ else:
         ]
     }
 
-    group_decorator = click.rich_config(
+    lamin_group_decorator = click.rich_config(
         help_config=click.RichHelpConfiguration(
             command_groups=COMMAND_GROUPS,
             style_commands_table_column_width_ratio=(1, 13),
@@ -78,7 +73,12 @@ from lamindb_setup._silence_loggers import silence_loggers
 from lamin_cli._cache import cache
 from lamin_cli._migration import migrate
 
-@group_decorator
+try:
+    lamindb_version = version("lamindb")
+except PackageNotFoundError:
+    lamindb_version = "lamindb installation not found"
+
+@lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
     """Configure LaminDB and perform simple actions."""
