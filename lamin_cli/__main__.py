@@ -1,22 +1,53 @@
 from __future__ import annotations
 import os
 import sys
+from collections import OrderedDict
 import inspect
 from importlib.metadata import PackageNotFoundError, version
-from typing import Optional
+from typing import Optional, Mapping
+
+try:
+    lamindb_version = version("lamindb")
+except PackageNotFoundError:
+    lamindb_version = "lamindb installation not found"
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
     import click as click
+
+    class OrderedGroup(click.Group):
+        """Overwrites list_commands to return commands in order of definition."""
+        def __init__(
+            self,
+            name: Optional[str] = None,
+            commands: Optional[Mapping[str, click.Command]] = None,
+            **kwargs,
+        ):
+            super(OrderedGroup, self).__init__(name, commands, **kwargs)
+            self.commands = commands or OrderedDict()
+
+        def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
+            return self.commands
+
+    group_decorator = click.group(cls=OrderedGroup)
+
 else:
     import rich_click as click
-    
+
     COMMAND_GROUPS = {
         "lamin": [
             {
                 "name": "Main commands",
-                "commands": ["login", "init", "load", "info", "close", "delete", "logout"],
+                "commands": [
+                    "login",
+                    "init",
+                    "load",
+                    "info",
+                    "close",
+                    "delete",
+                    "logout",
+                ],
             },
             {
                 "name": "Data commands",
@@ -33,33 +64,38 @@ else:
         ]
     }
 
+    group_decorator = click.rich_config(
+        help_config=click.RichHelpConfiguration(
+            command_groups=COMMAND_GROUPS,
+            style_commands_table_column_width_ratio=(1, 13),
+        )
+    )(click.group())
+
+
 from click import Command, Context
 from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._cache import cache
 from lamin_cli._migration import migrate
 
-try:
-    lamindb_version = version("lamindb")
-except PackageNotFoundError:
-    lamindb_version = "lamindb installation not found"
-
-@click.rich_config(
-    help_config=click.RichHelpConfiguration(command_groups=COMMAND_GROUPS, style_commands_table_column_width_ratio= (1, 13)),
-)
-@click.group()
+@group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
     """Configure LaminDB and perform simple actions."""
     silence_loggers()
 
-
 @main.command()
-def info():
-    """Show user, settings & instance info."""
-    import lamindb_setup
+@click.argument("user", type=str)
+@click.option("--key", type=str, default=None, help="API key")
+@click.option("--password", type=str, default=None, help="legacy password")
+def login(user: str, key: Optional[str], password: Optional[str]):
+    """Login using a user email address or handle.
 
-    print(lamindb_setup.settings)
+    Examples: `lamin login marge` or `lamin login marge@acme.com`
+    """
+    from lamindb_setup._setup_user import login
+
+    return login(user, key=key, password=password)
 
 
 # fmt: off
@@ -77,25 +113,26 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 
 
 @main.command()
-@click.argument("user", type=str)
-@click.option("--key", type=str, default=None, help="API key")
-@click.option("--password", type=str, default=None, help="legacy password")
-def login(user: str, key: Optional[str], password: Optional[str]):
-    """Login using a user email address or handle.
+@click.argument("url", type=str)
+def get(url: str):
+    """Get an object from a lamin.ai URL."""
+    from lamin_cli._get import get
 
-    Examples: `lamin login marge` or `lamin login marge@acme.com`
-    """
-    from lamindb_setup._setup_user import login
-
-    return login(user, key=key, password=password)
+    return get(url)
 
 
 @main.command()
-def logout():
-    """Logout."""
-    from lamindb_setup._setup_user import logout
+@click.argument(
+    "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
+)
+@click.option("--key", type=str, default=None)
+@click.option("--description", type=str, default=None)
+def save(filepath: str, key: str, description: str):
+    """Save file or folder."""
+    from lamin_cli._save import save_from_filepath_cli
 
-    return logout()
+    if save_from_filepath_cli(filepath, key, description) is not None:
+        sys.exit(1)
 
 
 # fmt: off
@@ -116,6 +153,25 @@ def load(identifier: str, db: Optional[str], storage: Optional[str]):
     return connect(slug=identifier, db=db, storage=storage)
 
 
+@main.command()
+def info():
+    """Show user, settings & instance info."""
+    import lamindb_setup
+
+    print(lamindb_setup.settings)
+
+
+@main.command()
+def close():
+    """Close an existing instance.
+
+    Is the opposite of loading an instance.
+    """
+    from lamindb_setup._close import close as close_
+
+    return close_()
+
+
 # fmt: off
 @main.command()
 @click.argument("instance", type=str, default=None)
@@ -126,6 +182,25 @@ def delete(instance: str, force: bool = False):
     from lamindb_setup._delete import delete
 
     return delete(instance, force=force)
+
+
+@main.command()
+def logout():
+    """Logout."""
+    from lamindb_setup._setup_user import logout
+
+    return logout()
+
+
+@main.command()
+def register():
+    """Register an instance on the hub."""
+    from lamindb_setup._register_instance import register as register_
+
+    return register_()
+
+
+main.add_command(cache)
 
 
 @main.command(name="set")
@@ -148,23 +223,7 @@ def set_(setting: str, value: bool):
         settings.private_django_api = value
 
 
-@main.command()
-def close():
-    """Close an existing instance.
-
-    Is the opposite of loading an instance.
-    """
-    from lamindb_setup._close import close as close_
-
-    return close_()
-
-
-@main.command()
-def register():
-    """Register an instance on the hub."""
-    from lamindb_setup._register_instance import register as register_
-
-    return register_()
+main.add_command(migrate)
 
 
 @main.command()
@@ -175,33 +234,6 @@ def schema(action: str):
 
     if action == "view":
         return view()
-
-
-@main.command()
-@click.argument(
-    "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
-)
-@click.option("--key", type=str, default=None)
-@click.option("--description", type=str, default=None)
-def save(filepath: str, key: str, description: str):
-    """Save file or folder."""
-    from lamin_cli._save import save_from_filepath_cli
-
-    if save_from_filepath_cli(filepath, key, description) is not None:
-        sys.exit(1)
-
-
-@main.command()
-@click.argument("url", type=str)
-def get(url: str):
-    """Get an object from a lamin.ai URL."""
-    from lamin_cli._get import get
-
-    return get(url)
-
-
-main.add_command(cache)
-main.add_command(migrate)
 
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
