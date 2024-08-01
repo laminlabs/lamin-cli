@@ -82,7 +82,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is not None
     assert transform.latest_run.report is None
-    assert transform.source_code is None
+    assert transform._source_code_artifact is None
     assert transform.latest_run.environment is None
 
     # and save again
@@ -99,9 +99,9 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.source_code.hash == "5nc_HMjPvT9n26OWrjq6uQ"
+    assert transform._source_code_artifact.hash == "5nc_HMjPvT9n26OWrjq6uQ"
     assert transform.latest_run.environment.path.exists()
-    assert transform.source_code.path.exists()
+    assert transform._source_code_artifact.path.exists()
 
     # now, assume the user modifies the notebook
     nb = read_notebook(notebook_path)
@@ -130,9 +130,9 @@ def test_save_consecutive():
     transform = ln.Transform.get("hlsFXswrJjtt5zKv")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.source_code.hash == "ocLybD0Hv_L3NhhXgTyQcw"
+    assert transform._source_code_artifact.hash == "ocLybD0Hv_L3NhhXgTyQcw"
     assert transform.latest_run.environment.path.exists()
-    assert transform.source_code.path.exists()
+    assert transform._source_code_artifact.path.exists()
 
     # get the the source code via command line
     result = subprocess.run(

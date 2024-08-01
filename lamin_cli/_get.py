@@ -32,10 +32,10 @@ def get(url: str):
 
     if entity == "transform":
         transform = ln.Transform.get(uid)
-        filepath_cache = transform.source_code.cache()
+        filepath_cache = transform._source_code_artifact.cache()
         target_filename = transform.key
-        if not target_filename.endswith(transform.source_code.suffix):
-            target_filename += transform.source_code.suffix
+        if not target_filename.endswith(transform._source_code_artifact.suffix):
+            target_filename += transform._source_code_artifact.suffix
         filepath_cache.rename(target_filename)
         logger.success(f"cached source code of transform {uid} as {target_filename}")
     elif entity == "artifact":
