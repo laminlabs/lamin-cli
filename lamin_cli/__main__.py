@@ -5,6 +5,7 @@ from collections import OrderedDict
 import inspect
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional, Mapping
+from functools import wraps
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
@@ -60,12 +61,18 @@ else:
         ]
     }
 
-    lamin_group_decorator = click.rich_config(
-        help_config=click.RichHelpConfiguration(
-            command_groups=COMMAND_GROUPS,
-            style_commands_table_column_width_ratio=(1, 13),
+    def lamin_group_decorator(f):
+        @click.rich_config(
+            help_config=click.RichHelpConfiguration(
+                command_groups=COMMAND_GROUPS,
+                style_commands_table_column_width_ratio=(1, 13),
+            )
         )
-    )(click.group())
+        @click.group()
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            return f(*args, **kwargs)
+        return wrapper
 
 
 from click import Command, Context
