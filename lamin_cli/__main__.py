@@ -6,6 +6,7 @@ import inspect
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional, Mapping
 from functools import wraps
+import subprocess
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
@@ -72,6 +73,7 @@ else:
         @wraps(f)
         def wrapper(*args, **kwargs):
             return f(*args, **kwargs)
+
         return wrapper
 
 
@@ -272,6 +274,17 @@ def _generate_help():
 
     recursive_help(main)
     return out
+
+
+# It's not trivial to get the help output as string https://github.com/ewels/rich-click/issues/19
+def _get_help_str() -> str:
+    try:
+        result = subprocess.run(
+            ["lamin", "--help"], capture_output=True, text=True, check=True
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return e.output
 
 
 if __name__ == "__main__":
