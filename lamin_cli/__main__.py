@@ -277,6 +277,7 @@ def _generate_help():
 
 
 # It's not trivial to get the help output as string https://github.com/ewels/rich-click/issues/19
+# Hence we just call 'lamin --help' and capture the output
 def _get_help_str() -> str:
     try:
         result = subprocess.run(
