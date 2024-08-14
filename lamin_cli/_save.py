@@ -37,8 +37,8 @@ def get_stem_uid_and_version_from_file(file_path: Path) -> tuple[str, str]:
     if stem_uid is None or version is None:
         raise SystemExit(
             "ln.settings.transform.stem_uid and ln.settings.transform.version aren't"
-            f" set in {file_path}\nCall ln.track() and copy/paste the output into the"
-            " notebook"
+            f" set in {file_path}\nCall ln.context.track() and copy/paste the output"
+            " into the notebook"
         )
     return stem_uid, version
 
@@ -81,7 +81,7 @@ def save_from_filepath_cli(
         if len(transform_family) == 0:
             logger.error(
                 f"Did not find stem uid '{stem_uid}'"
-                " in Transform registry. Did you run ln.track()?"
+                " in Transform registry. Did you run ln.context.track()?"
             )
             return "not-tracked-in-transform-registry"
         # the specific version
