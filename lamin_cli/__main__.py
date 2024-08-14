@@ -163,12 +163,13 @@ def close():
 @main.command()
 @click.argument("instance", type=str, default=None)
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
+@click.option('--require-empty/--no-require-empty', default=True, help="Whether the instance must be empty for deletion.")
 # fmt: on
-def delete(instance: str, force: bool = False):
+def delete(instance: str, force: bool = False, require_empty=True):
     """Delete an instance."""
     from lamindb_setup._delete import delete
 
-    return delete(instance, force=force)
+    return delete(instance, force=force, require_empty=require_empty)
 
 
 @main.command()
