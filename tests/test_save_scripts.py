@@ -37,7 +37,7 @@ def test_run_save_cache():
     assert "saved: Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform._source_code_artifact.hash == "T1zmmTJyeEpBxjaHcHcZdg"
+    assert transform._source_code_artifact.hash == "krXP_1qK4lMEahJj8qWXBQ"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact.path.exists()
 

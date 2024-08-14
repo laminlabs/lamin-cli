@@ -99,7 +99,7 @@ def test_save_consecutive():
     assert transform is not None
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform._source_code_artifact.hash == "5nc_HMjPvT9n26OWrjq6uQ"
+    assert transform._source_code_artifact.hash == "l4Vrflo03UMkh6HnBUl1_w"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact.path.exists()
 
