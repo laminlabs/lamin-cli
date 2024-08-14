@@ -21,7 +21,7 @@ def test_save_not_initialized():
     )
     assert result.returncode == 1
     assert (
-        "Call ln.track() and copy/paste the output into the notebook"
+        "Call ln.context.track() and copy/paste the output into the notebook"
         in result.stderr.decode()
     )
 
@@ -65,7 +65,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt5zKv").one_or_none()
     assert transform is None
 
-    # let's try to save a notebook for which `ln.track()` was never run
+    # let's try to save a notebook for which `ln.context.track()` was never run
     result = subprocess.run(
         f"lamin save {notebook_path}",
         shell=True,
@@ -75,7 +75,7 @@ def test_save_consecutive():
     assert result.returncode == 1
     assert "Did not find stem uid 'hlsFXswrJjtt'" in result.stdout.decode()
 
-    # now, let's re-run this notebook so that ln.track() is actually run
+    # now, let's re-run this notebook so that ln.context.track() is actually run
     nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
 
     # now, there is a transform record, but we're missing all artifacts
