@@ -130,7 +130,7 @@ def test_save_consecutive():
     transform = ln.Transform.get("hlsFXswrJjtt5zKv")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform._source_code_artifact.hash == "ocLybD0Hv_L3NhhXgTyQcw"
+    assert transform._source_code_artifact.hash == "lLWQlUcD0RHJPi40TNjyyg"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact.path.exists()
 
