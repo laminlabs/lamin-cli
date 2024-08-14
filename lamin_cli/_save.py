@@ -55,7 +55,7 @@ def save_from_filepath_cli(
     ln_setup.settings.auto_connect = True
 
     import lamindb as ln
-    from lamindb._finish import save_run_context_core
+    from lamindb._finish import save_context_core
 
     ln_setup.settings.auto_connect = auto_connect_state
 
@@ -95,7 +95,7 @@ def save_from_filepath_cli(
             )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
-        return save_run_context_core(
+        return save_context_core(
             run=run,
             transform=transform,
             filepath=filepath,
