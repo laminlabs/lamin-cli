@@ -115,7 +115,7 @@ def test_save_consecutive():
     with pytest.raises(CellExecutionError) as error:
         nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
     print(error.exconly())
-    assert "UpdateTransformSettings" in error.exconly()
+    assert "UpdateContext" in error.exconly()
 
     # try re-saving - it works but will issue an interactive warning dialogue
     # that clarifies that the user is about to re-save the notebook
