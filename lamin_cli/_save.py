@@ -6,17 +6,21 @@ from lamin_utils import logger
 import re
 
 
-def get_stem_uid_and_version_from_file(file_path: Path) -> tuple[str, str]:
+def get_stem_uid_and_version_from_file(
+    file_path: Path,
+) -> tuple[str | None, str | None, str | None]:
     # line-by-line matching might be faster, but let's go with this for now
     with open(file_path) as file:
         content = file.read()
 
     if file_path.suffix == ".py":
+        uid_pattern = re.compile(r'\.context\.uid\s*=\s*["\']([^"\']+)["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*["\']([^"\']+)["\']'
         )
         version_pattern = re.compile(r'\.transform\.version\s*=\s*["\']([^"\']+)["\']')
     elif file_path.suffix == ".ipynb":
+        uid_pattern = re.compile(r'\.context\.uid\s*=\s*\\["\']([^"\']+)\\["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*\\["\']([^"\']+)\\["\']'
         )
@@ -27,20 +31,22 @@ def get_stem_uid_and_version_from_file(file_path: Path) -> tuple[str, str]:
         raise ValueError("Only .py and .ipynb files are supported.")
 
     # Search for matches in the entire file content
+    uid_match = uid_pattern.search(content)
     stem_uid_match = stem_uid_pattern.search(content)
     version_match = version_pattern.search(content)
 
     # Extract values if matches are found
+    uid = uid_match.group(1) if uid_match else None
     stem_uid = stem_uid_match.group(1) if stem_uid_match else None
     version = version_match.group(1) if version_match else None
 
-    if stem_uid is None or version is None:
+    if uid is None and (stem_uid is None or version is None):
         raise SystemExit(
-            "ln.settings.transform.stem_uid and ln.settings.transform.version aren't"
+            "ln.context.uid isn't"
             f" set in {file_path}\nCall ln.context.track() and copy/paste the output"
             " into the notebook"
         )
-    return stem_uid, version
+    return uid, stem_uid, version
 
 
 def save_from_filepath_cli(
@@ -75,17 +81,22 @@ def save_from_filepath_cli(
         return None
     else:
         # consider notebooks & scripts a transform
-        stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
-        # the corresponding transform family in the transform table
-        transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
-        if len(transform_family) == 0:
-            logger.error(
-                f"Did not find stem uid '{stem_uid}'"
-                " in Transform registry. Did you run ln.context.track()?"
-            )
-            return "not-tracked-in-transform-registry"
-        # the specific version
-        transform = transform_family.filter(version=transform_version).one()
+        uid, stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
+        if uid is not None:
+            transform = ln.Transform.filter(uid=uid).one_or_none()
+            if transform is None:
+                logger.error(
+                    f"Did not find uid '{uid}'"
+                    " in Transform registry. Did you run ln.context.track()?"
+                )
+                return "not-tracked-in-transform-registry"
+            # refactor this, save_context_core should not depend on transform_family
+            transform_family = transform.versions
+        else:
+            # the corresponding transform family in the transform table
+            transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
+            # the specific version
+            transform = transform_family.filter(version=transform_version).one()
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run.created_by.id != ln_setup.settings.user.id:

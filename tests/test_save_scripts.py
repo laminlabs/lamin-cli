@@ -19,9 +19,9 @@ def test_run_save_cache():
         shell=True,
         capture_output=True,
     )
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
     assert result.returncode == 1
-    assert "Did you run ln.context.track()" in result.stdout.decode()
+    assert "Did you run ln.context.track()?" in result.stdout.decode()
 
     # run the script
     result = subprocess.run(
@@ -29,15 +29,15 @@ def test_run_save_cache():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 0
-    assert "saved: Transform" in result.stdout.decode()
-    assert "m5uCHTTpJnjQ5zKv" in result.stdout.decode()
-    assert "saved: Run" in result.stdout.decode()
+    assert "created Transform" in result.stdout.decode()
+    assert "m5uCHTTpJnjQ0000" in result.stdout.decode()
+    assert "created Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform._source_code_artifact.hash == "krXP_1qK4lMEahJj8qWXBQ"
+    assert transform._source_code_artifact.hash == "Cwk0OPOyUH5nzTiU2ISlDQ"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact.path.exists()
 
@@ -48,12 +48,12 @@ def test_run_save_cache():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 0
-    assert "loaded: Transform" in result.stdout.decode()
-    assert "m5uCHTTpJnjQ5zKv" in result.stdout.decode()
-    assert "loaded: Run" in result.stdout.decode()
+    assert "loaded Transform" in result.stdout.decode()
+    assert "m5uCHTTpJnjQ0000" in result.stdout.decode()
+    assert "loaded Run" in result.stdout.decode()
     assert "source code is already saved" in result.stdout.decode()
 
     # you can re-save the script
@@ -63,8 +63,8 @@ def test_run_save_cache():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 0
     assert "source code is already saved" in result.stdout.decode()
     assert "run.environment is already saved" in result.stdout.decode()
@@ -73,7 +73,7 @@ def test_run_save_cache():
     content = filepath.read_text() + "\n # edited"
     filepath.write_text(content)
 
-    # re-run the script
+    # re-run the script without commiting
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -104,7 +104,7 @@ def test_run_save_cache():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Please update your transform settings as follows" in result.stderr.decode()
+    assert "Source code changed, bump version by setting" in result.stderr.decode()
 
     # try to get the the source code via command line
     result = subprocess.run(
