@@ -153,6 +153,4 @@ def test_save_consecutive():
         nbproject_test.execute_notebooks(new_path, print_outputs=True)
 
     print(error.exconly())
-    assert (
-        "Notebook filename changed, create new transform by setting:" in error.exconly()
-    )
+    assert "Notebook filename changed." in error.exconly()
