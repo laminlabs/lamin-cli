@@ -80,8 +80,8 @@ def test_run_save_cache():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 1
     assert "Did not find blob hash" in result.stderr.decode()
 
@@ -101,15 +101,15 @@ def test_run_save_cache():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 1
     assert "Source code changed, bump version by setting" in result.stderr.decode()
 
     # try to get the the source code via command line
     result = subprocess.run(
         "lamin get"
-        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ5zKv",  # noqa
+        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",  # noqa
         shell=True,
         capture_output=True,
     )
