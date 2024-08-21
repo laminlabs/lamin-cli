@@ -96,7 +96,7 @@ def save_from_filepath_cli(
             # the corresponding transform family in the transform table
             transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
             # the specific version
-            transform = transform_family.filter(version=transform_version).one()
+            transform = transform_family.get(version=transform_version)
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run.created_by.id != ln_setup.settings.user.id:
