@@ -52,7 +52,7 @@ else:
             },
             {
                 "name": "Configuration commands",
-                "commands": ["register", "cache", "set"],
+                "commands": ["cache", "set"],
             },
             {
                 "name": "Schema commands",
@@ -72,6 +72,7 @@ else:
         @wraps(f)
         def wrapper(*args, **kwargs):
             return f(*args, **kwargs)
+
         return wrapper
 
 
@@ -97,11 +98,16 @@ def main():
 @main.command()
 @click.argument("user", type=str)
 @click.option("--key", type=str, default=None, help="API key")
-@click.option("--password", type=str, default=None, help="legacy password")
 def login(user: str, key: Optional[str], password: Optional[str]):
-    """Login using a user email address or handle.
+    """Log into LaminHub.
 
-    Examples: `lamin login marge` or `lamin login marge@acme.com`
+    Upon logging in the first time, you need to pass your API key via
+
+    ```
+    lamin login myemail@acme.com --key YOUR_API_KEY
+    ```
+
+    After this, you can either use `lamin login myhandle` or `lamin login myemail@acme.com`
     """
     from lamindb_setup._setup_user import login
 
@@ -200,14 +206,6 @@ def save(filepath: str, key: str, description: str):
 
     if save_from_filepath_cli(filepath, key, description) is not None:
         sys.exit(1)
-
-
-@main.command()
-def register():
-    """Register an instance on the hub."""
-    from lamindb_setup._register_instance import register as register_
-
-    return register_()
 
 
 main.add_command(cache)
