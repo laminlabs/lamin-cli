@@ -98,7 +98,7 @@ def main():
 @main.command()
 @click.argument("user", type=str)
 @click.option("--key", type=str, default=None, help="API key")
-def login(user: str, key: Optional[str], password: Optional[str]):
+def login(user: str, key: Optional[str]):
     """Log into LaminHub.
 
     Upon logging in the first time, you need to pass your API key via
@@ -107,11 +107,13 @@ def login(user: str, key: Optional[str], password: Optional[str]):
     lamin login myemail@acme.com --key YOUR_API_KEY
     ```
 
+    You'll find your API key in the top right corner under "Settings".
+
     After this, you can either use `lamin login myhandle` or `lamin login myemail@acme.com`
     """
     from lamindb_setup._setup_user import login
 
-    return login(user, key=key, password=password)
+    return login(user, key=key)
 
 
 # fmt: off
