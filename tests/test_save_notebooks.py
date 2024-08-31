@@ -148,7 +148,7 @@ print("my consecutive cell")
     transform = ln.Transform.get("hlsFXswrJjtt0000")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.hash == "DMVEHVQqmY3ektOg2KtKKA"
+    assert transform.hash == "8F6i1zHA3Rv55JBHH05ZmQ"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
 
