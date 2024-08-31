@@ -37,9 +37,9 @@ def test_run_save_cache():
     assert "created Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform._source_code_artifact.hash == "Cwk0OPOyUH5nzTiU2ISlDQ"
+    assert transform.hash == "Cwk0OPOyUH5nzTiU2ISlDQ"
     assert transform.latest_run.environment.path.exists()
-    assert transform._source_code_artifact.path.exists()
+    assert transform._source_code_artifact is None
 
     # you can rerun the same script
     result = subprocess.run(
