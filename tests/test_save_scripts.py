@@ -104,7 +104,7 @@ def test_run_save_cache():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Source code changed, bump version by setting" in result.stderr.decode()
+    assert "Source code changed, bump revision by setting" in result.stderr.decode()
 
     # try to get the the source code via command line
     result = subprocess.run(
