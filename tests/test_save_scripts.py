@@ -73,7 +73,7 @@ def test_run_save_cache():
     content = filepath.read_text() + "\n # edited"
     filepath.write_text(content)
 
-    # re-run the script without commiting
+    # re-run the script without committing
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -101,8 +101,8 @@ def test_run_save_cache():
         capture_output=True,
         env=env,
     )
-    # print(result.stdout.decode())
-    # print(result.stderr.decode())
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 1
     assert "Source code changed, bump version by setting" in result.stderr.decode()
 
