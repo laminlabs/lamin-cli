@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
 import lamindb_setup as ln_setup
+from pathlib import Path
 
 
 def decompose_url(url: str) -> Tuple[str, str, str]:
@@ -44,7 +45,7 @@ def get(url: str):
             if transform.key.endswith(".ipynb"):
                 script_to_notebook(transform, target_filename)
             else:
-                transform.source_code.write_text(target_filename)
+                Path(target_filename).write_text(transform.source_code)
         else:
             raise ValueError("No source code available for this transform.")
         logger.success(
