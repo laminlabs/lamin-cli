@@ -117,7 +117,6 @@ print("my consecutive cell")
 """
     )
     assert transform.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
-    print(transform.latest_run.report.path.read_text())
     with open(transform.latest_run.report.path, "r") as f:
         json_notebook = json.load(f)
     # test that title is stripped from notebook
@@ -162,6 +161,7 @@ print("my consecutive cell")
     assert transform._source_code_artifact is None
 
     # get the the source code via command line
+    assert not Path("./with-title-and-initialized-consecutive.ipynb").exists()
     result = subprocess.run(
         "lamin get"
         f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0000",  # noqa
@@ -169,6 +169,15 @@ print("my consecutive cell")
         capture_output=True,
     )
     # print(result.stderr.decode())
+    assert Path("./with-title-and-initialized-consecutive.ipynb").exists()
+    with open("./with-title-and-initialized-consecutive.ipynb", "r") as f:
+        json_notebook = json.load(f)
+    print(json_notebook["cells"][0])
+    assert json_notebook["cells"][0] == {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": ["# Consecutive"],
+    }
     assert result.returncode == 0
 
     # now, assume the user renames the notebook
