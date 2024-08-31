@@ -63,6 +63,8 @@ def test_save_consecutive():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
 
+    assert not Path("./with-title-and-initialized-consecutive.ipynb").exists()
+
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
     assert transform is None
 
@@ -161,7 +163,6 @@ print("my consecutive cell")
     assert transform._source_code_artifact is None
 
     # get the the source code via command line
-    # assert not Path("./with-title-and-initialized-consecutive.ipynb").exists()
     result = subprocess.run(
         "lamin get"
         f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0000",  # noqa
