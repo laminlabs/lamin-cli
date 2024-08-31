@@ -116,8 +116,81 @@ print("my consecutive cell")
 """
     )
     assert transform.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
-    assert transform.latest_run.report.path.exists()
-    assert transform.latest_run.report.path == transform.latest_run.report.path
+    assert transform.latest_run.report.path.read_text().startswith(
+        """{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "💡 connected lamindb: falexwolf/laminci-unit-tests\n"
+     ]
+    }
+   ],
+   "source": [
+    "import lamindb as ln"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "💡 notebook imports: lamindb==0.76.0\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "💡 created Transform('hlsFXswrJjtt0000') & created Run('2024-08-31 22:14:44.171781+00:00')\n"
+     ]
+    }
+   ],
+   "source": [
+    "ln.context.uid = \"hlsFXswrJjtt0000\"\n",
+    "ln.context.track()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "my consecutive cell\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"my consecutive cell\")"
+   ]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
+"""
+    )
+    assert transform.latest_run.report.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
 
