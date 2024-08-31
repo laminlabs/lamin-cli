@@ -92,6 +92,8 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
 
     # now, we have the associated artifacts
