@@ -5,6 +5,7 @@ import nbproject_test
 import pytest
 from nbproject.dev import read_notebook, write_notebook
 from nbclient.exceptions import CellExecutionError
+import json
 import lamindb as ln
 
 notebook_dir = "./sub/lamin-cli/tests/notebooks/"
@@ -116,81 +117,16 @@ print("my consecutive cell")
 """
     )
     assert transform.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
-    assert transform.latest_run.report.path.read_text().startswith(
-        """{
- "cells": [
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": []
-  },
-  {
-   "cell_type": "code",
-   "execution_count": 1,
-   "metadata": {},
-   "outputs": [
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "💡 connected lamindb: falexwolf/laminci-unit-tests\n"
-     ]
+    print(transform.latest_run.report.path.read_text())
+    with open(transform.latest_run.report.path, "r") as f:
+        json_notebook = json.load(f)
+    # test that title is stripped from notebook
+    assert json_notebook["cells"][0] == {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [],
     }
-   ],
-   "source": [
-    "import lamindb as ln"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": 2,
-   "metadata": {},
-   "outputs": [
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "💡 notebook imports: lamindb==0.76.0\n"
-     ]
-    },
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "💡 created Transform('hlsFXswrJjtt0000') & created Run('2024-08-31 22:14:44.171781+00:00')\n"
-     ]
-    }
-   ],
-   "source": [
-    "ln.context.uid = \"hlsFXswrJjtt0000\"\n",
-    "ln.context.track()"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": 3,
-   "metadata": {},
-   "outputs": [
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "my consecutive cell\n"
-     ]
-    }
-   ],
-   "source": [
-    "print(\"my consecutive cell\")"
-   ]
-  }
- ],
- "metadata": {},
- "nbformat": 4,
- "nbformat_minor": 2
-}
-"""
-    )
-    assert transform.latest_run.report.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
+    # testing for the hash of the report makes no sense because it contains timestamps
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
 
