@@ -37,4 +37,4 @@ def get_cache():
     """Get the cache directory."""
     from lamindb_setup._cache import get_cache_dir
 
-    click.echo(f"The cache directory is {get_cache_dir()}.")
+    click.echo(f"The cache directory is {get_cache_dir()}")
