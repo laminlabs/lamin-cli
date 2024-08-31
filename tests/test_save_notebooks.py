@@ -99,8 +99,23 @@ def test_save_consecutive():
     # now, we have the associated artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
     assert transform is not None
-    print(transform.source_code)
-    assert transform.hash == "gZe9KuAYIrTM6fZupX0FpA"
+    assert (
+        transform.source_code
+        == """# %% [markdown]
+# # Transform.name
+
+# %%
+import lamindb as ln
+
+# %%
+ln.context.uid = "hlsFXswrJjtt0000"
+ln.context.track()
+
+# %%
+print("my consecutive cell")
+"""
+    )
+    assert transform.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
     assert transform.latest_run.environment.path.exists()
