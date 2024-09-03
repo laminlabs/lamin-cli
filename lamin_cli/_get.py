@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
 import lamindb_setup as ln_setup
+from pathlib import Path
 
 
 def decompose_url(url: str) -> Tuple[str, str, str]:
@@ -25,6 +26,7 @@ def get(url: str):
     ln_setup.settings.auto_connect = False
 
     import lamindb as ln
+    from lamindb._finish import script_to_notebook
 
     ln_setup.settings.auto_connect = auto_connect
     ln.connect(instance_slug)
@@ -32,12 +34,23 @@ def get(url: str):
 
     if entity == "transform":
         transform = ln.Transform.get(uid)
-        filepath_cache = transform._source_code_artifact.cache()
         target_filename = transform.key
-        if not target_filename.endswith(transform._source_code_artifact.suffix):
-            target_filename += transform._source_code_artifact.suffix
-        filepath_cache.rename(target_filename)
-        logger.success(f"cached source code of transform {uid} as {target_filename}")
+        if transform._source_code_artifact_id is not None:
+            # backward compat
+            filepath_cache = transform._source_code_artifact.cache()
+            if not target_filename.endswith(transform._source_code_artifact.suffix):
+                target_filename += transform._source_code_artifact.suffix
+            filepath_cache.rename(target_filename)
+        elif transform.source_code is not None:
+            if transform.key.endswith(".ipynb"):
+                script_to_notebook(transform, target_filename)
+            else:
+                Path(target_filename).write_text(transform.source_code)
+        else:
+            raise ValueError("No source code available for this transform.")
+        logger.success(
+            f"downloaded source code of transform {uid} as {target_filename}"
+        )
     elif entity == "artifact":
         artifact = ln.Artifact.get(uid)
         cache_path = artifact.cache()

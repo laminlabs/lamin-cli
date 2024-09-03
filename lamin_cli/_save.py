@@ -90,13 +90,10 @@ def save_from_filepath_cli(
                     " in Transform registry. Did you run ln.context.track()?"
                 )
                 return "not-tracked-in-transform-registry"
-            # refactor this, save_context_core should not depend on transform_family
-            transform_family = transform.versions
         else:
-            # the corresponding transform family in the transform table
-            transform_family = ln.Transform.filter(uid__startswith=stem_uid).all()
-            # the specific version
-            transform = transform_family.get(version=transform_version)
+            transform = ln.Transform.get(
+                uid__startswith=stem_uid, version=transform_version
+            )
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run.created_by.id != ln_setup.settings.user.id:
@@ -106,10 +103,10 @@ def save_from_filepath_cli(
             )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
+        print("saving", run, transform)
         return save_context_core(
             run=run,
             transform=transform,
             filepath=filepath,
-            transform_family=transform_family,
             from_cli=True,
         )
