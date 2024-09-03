@@ -119,14 +119,17 @@ print("my consecutive cell")
 """
     )
     assert transform.hash == "T1oAJS3rgPXkPoqzsJcWuQ"
-    with open(transform.latest_run.report.path, "r") as f:
-        json_notebook = json.load(f)
-    # test that title is stripped from notebook
-    assert json_notebook["cells"][0] == {
-        "cell_type": "markdown",
-        "metadata": {},
-        "source": [],
-    }
+    # below is the test that we can use if store the run repot as `.ipynb`
+    # and not as html as we do right now
+    assert transform.latest_run.report.suffix == ".html"
+    # with open(transform.latest_run.report.path, "r") as f:
+    #     json_notebook = json.load(f)
+    # # test that title is stripped from notebook
+    # assert json_notebook["cells"][0] == {
+    #     "cell_type": "markdown",
+    #     "metadata": {},
+    #     "source": [],
+    # }
     # testing for the hash of the report makes no sense because it contains timestamps
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
