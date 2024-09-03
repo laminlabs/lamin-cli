@@ -103,7 +103,6 @@ def save_from_filepath_cli(
             )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
-        print("saving", run, transform)
         return save_context_core(
             run=run,
             transform=transform,
