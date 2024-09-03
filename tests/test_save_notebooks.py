@@ -105,7 +105,7 @@ def test_save_consecutive():
     assert (
         transform.source_code
         == """# %% [markdown]
-# # Transform.name
+# # transform.name
 
 # %%
 import lamindb as ln
