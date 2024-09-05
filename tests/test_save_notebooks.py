@@ -40,20 +40,22 @@ def test_save_non_consecutive():
         version="1",
         name="My test notebook (non-consecutive)",
         type="notebook",
-    )
-    transform.save()
-    run = ln.Run(transform=transform)
-    run.save()
-    result = subprocess.run(
-        f"lamin save {notebook_path}",  # noqa
+    ).save()
+    ln.Run(transform=transform).save()
+
+    process = subprocess.Popen(
+        f"lamin save {notebook_path}",
         shell=True,
-        capture_output=True,
         env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
-    assert result.returncode == 1
-    assert "were not run consecutively" in result.stdout.decode()
+    stdout, stderr = process.communicate("n")
+    assert "were not run consecutively" in stdout
+    assert "Do you still want to proceed with finishing?" in stdout
+    assert process.returncode == 1
 
 
 def test_save_consecutive():
