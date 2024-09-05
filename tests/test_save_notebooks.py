@@ -159,10 +159,11 @@ print("my consecutive cell")
         stderr=subprocess.PIPE,
         text=True,
     )
-    stdout, stderr = process.communicate("y")
+    stdout, stderr = process.communicate("y\ny")
     print(stdout)
     print(stderr)
     assert "You are about to overwrite existing source code" in stdout
+    assert "You are about to overwrite an existing report" in stdout
     assert process.returncode == 0
     # the source code is overwritten with the edits, reflected in a new hash
     transform = ln.Transform.get("hlsFXswrJjtt0000")
