@@ -134,22 +134,21 @@ print("my consecutive cell")
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
 
-    # now, assume the user modifies the notebook
+    # edit the notebook
     nb = read_notebook(notebook_path)
-    # simulate editing the notebook (here, duplicate last cell)
     new_cell = nb.cells[-1].copy()
     new_cell["execution_count"] += 1
-    nb.cells.append(new_cell)
+    nb.cells.append(new_cell)  # duplicate last cell
     write_notebook(nb, notebook_path)
 
-    # try re-running - it fails
+    # attempt re-running - it fails
     with pytest.raises(CellExecutionError) as error:
         nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
     # print(error.exconly())
     assert "UpdateContext" in error.exconly()
 
-    # try re-saving - it works but will issue an interactive warning dialogue
-    # that clarifies that the user is about to re-save the notebook
+    # attempt re-saving - it works but the user needs to confirm overwriting
+    # source code and run report
     process = subprocess.Popen(
         f"lamin save {notebook_path}",
         shell=True,
@@ -160,8 +159,6 @@ print("my consecutive cell")
         text=True,
     )
     stdout, stderr = process.communicate("y\ny")
-    print(stdout)
-    print(stderr)
     assert "You are about to overwrite existing source code" in stdout
     assert "You are about to overwrite an existing report" in stdout
     assert process.returncode == 0
