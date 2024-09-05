@@ -96,7 +96,7 @@ def main():
 
 
 @main.command()
-@click.argument("user", type=str)
+@click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="API key")
 def login(user: str, key: Optional[str]):
     """Log into LaminHub.
@@ -110,10 +110,26 @@ def login(user: str, key: Optional[str]):
     You'll find your API key in the top right corner under "Settings".
 
     After this, you can either use `lamin login myhandle` or `lamin login myemail@acme.com`
+
+    You can also use
+
+    ```
+    lamin login
+    ```
+
+    and type your beta API key in the terminal
     """
     from lamindb_setup._setup_user import login
 
-    return login(user, key=key)
+    if user is None:
+        if "LAMIN_API_KEY" in os.environ:
+            api_key = os.environ["LAMIN_API_KEY"]
+        else:
+            api_key = input("Your API key: ")
+    else:
+        api_key = None
+
+    return login(user, key=key, api_key=api_key)
 
 
 # fmt: off
