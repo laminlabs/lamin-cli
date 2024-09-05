@@ -77,6 +77,7 @@ else:
 
 
 from click import Command, Context
+from lamindb_setup._entry_points import call_registered_entry_points
 from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._cache import cache
@@ -93,6 +94,7 @@ except PackageNotFoundError:
 def main():
     """Configure LaminDB and perform simple actions."""
     silence_loggers()
+    call_registered_entry_points("lamin-cli.setup", module_globals=globals())
 
 
 @main.command()
