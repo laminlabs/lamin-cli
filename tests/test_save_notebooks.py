@@ -150,13 +150,17 @@ print("my consecutive cell")
 
     # try re-saving - it works but will issue an interactive warning dialogue
     # that clarifies that the user is about to re-save the notebook
-    result = subprocess.run(
+    process = subprocess.Popen(
         f"lamin save {notebook_path}",
         shell=True,
-        capture_output=True,
         env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    assert result.returncode == 0
+    assert process.returncode == 0
+    stdout, stderr = process.communicate("y")
+    assert "You are about to overwrite existing source code" in stdout
     # the source code is overwritten with the edits, reflected in a new hash
     transform = ln.Transform.get("hlsFXswrJjtt0000")
     assert transform.latest_run.report.path.exists()
