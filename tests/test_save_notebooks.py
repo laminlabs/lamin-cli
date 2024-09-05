@@ -157,6 +157,7 @@ print("my consecutive cell")
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        text=True,
     )
     stdout, stderr = process.communicate("y")
     print(stdout)
