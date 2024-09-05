@@ -110,6 +110,14 @@ def login(user: str, key: Optional[str]):
     You'll find your API key in the top right corner under "Settings".
 
     After this, you can either use `lamin login myhandle` or `lamin login myemail@acme.com`
+
+    You can also use
+
+    ```
+    lamin login
+    ```
+
+    and type your beta API key in the terminal
     """
     from lamindb_setup._setup_user import login
 
