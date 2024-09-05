@@ -28,6 +28,9 @@ def test_cli_login_api_key():
         }
     )
 
+    exit_status = os.system("lamin login")
+    assert exit_status == 0
+
     os.environ["LAMIN_API_KEY"] = api_key
     exit_status = os.system("lamin login")
     assert exit_status == 0
