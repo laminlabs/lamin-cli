@@ -101,23 +101,23 @@ def main():
 def login(user: str, key: Optional[str]):
     """Log into LaminHub.
 
-    Upon logging in the first time, you need to pass your API key via
+    Upon logging in the first time, you need to pass your API key via:
 
     ```
     lamin login myemail@acme.com --key YOUR_API_KEY
     ```
 
-    You'll find your API key in the top right corner under "Settings".
+    You'll find your API key on LaminHub in the top right corner under "Settings".
 
     After this, you can either use `lamin login myhandle` or `lamin login myemail@acme.com`
 
-    You can also use
+    You can also call this without arguments:
 
     ```
     lamin login
     ```
 
-    and type your beta API key in the terminal
+    You will be prompted for your Beta API key unless you set an environment variable `LAMIN_API_KEY`.
     """
     from lamindb_setup._setup_user import login
 
@@ -140,7 +140,7 @@ def login(user: str, key: Optional[str]):
 @click.option("--name", type=str, default=None, help="The instance name.")
 # fmt: on
 def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
-    """Init a lamindb instance."""
+    """Init a LaminDB instance."""
     from lamindb_setup._init_instance import init as init_
 
     return init_(storage=storage, db=db, schema=schema, name=name)
