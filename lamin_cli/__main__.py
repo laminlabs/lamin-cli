@@ -204,11 +204,22 @@ def logout():
 
 
 @main.command()
-@click.argument("entity", type=str, help="A lamin.ai URL or 'artifact' or 'transform'.")
+@click.argument("entity", type=str)
 @click.option("--uid", help="Filter by creator")
 @click.option("--key", help="The key for the entity")
 def get(entity: str, uid: str = None, key: str = None):
-    """Query an entity."""
+    """Query an entity.
+
+    Pass a lamin.ai URL, 'artifact', or 'transform', for example:
+
+    ```
+    lamin get https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin get artifact --key mydatasets/mytable.parquet
+    lamin get artifact --uid e2G7k9EVul4JbfsEYAy5
+    lamin get transform --key analysis.ipynb
+    lamin get transform --uid Vul4JbfsEYAy5
+    ```
+    """
     from lamin_cli._get import get
 
     return get(entity, uid, key)
