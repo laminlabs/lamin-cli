@@ -15,25 +15,36 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
     return instance_slug, entity, uid
 
 
-def get(url: str):
-    if url.startswith("https://lamin.ai"):
+def get(entity: str, uid: str = None, key: str = None):
+    if entity.startswith("https://lamin.ai"):
+        url = entity
         instance_slug, entity, uid = decompose_url(url)
+    elif entity not in {"artifact", "transform"}:
+        raise ValueError(
+            "entity has to be a URL starting with https://lamin.ai or 'artifact' or"
+            " 'transform'"
+        )
     else:
-        raise ValueError("url has to start with https://lamin.ai")
+        instance_slug = None
 
-    auto_connect = ln_setup.settings.auto_connect
-    # we don't want to auto-connect when importing lamindb
-    ln_setup.settings.auto_connect = False
+    if instance_slug is not None:
+        auto_connect = ln_setup.settings.auto_connect
+        # we don't want to auto-connect when importing lamindb
+        ln_setup.settings.auto_connect = False
 
-    import lamindb as ln
-    from lamindb._finish import script_to_notebook
+        import lamindb as ln
+        from lamindb._finish import script_to_notebook
 
-    ln_setup.settings.auto_connect = auto_connect
-    ln.connect(instance_slug)
-    ln.settings.verbosity = "success"
+        ln_setup.settings.auto_connect = auto_connect
+        ln.connect(instance_slug)
+    else:
+        import lamindb as ln
+        from lamindb._finish import script_to_notebook
 
     if entity == "transform":
-        transform = ln.Transform.get(uid)
+        transform = (
+            ln.Transform.get(uid) if uid is not None else ln.Transform.get(key=key)
+        )
         target_filename = transform.key
         if transform._source_code_artifact_id is not None:
             # backward compat
@@ -48,10 +59,8 @@ def get(url: str):
                 Path(target_filename).write_text(transform.source_code)
         else:
             raise ValueError("No source code available for this transform.")
-        logger.success(
-            f"downloaded source code of transform {uid} as {target_filename}"
-        )
+        logger.important(target_filename)
     elif entity == "artifact":
-        artifact = ln.Artifact.get(uid)
+        artifact = ln.Artifact.get(uid) if uid is not None else ln.Artifact.get(key=key)
         cache_path = artifact.cache()
-        logger.success(f"cached artifact {artifact} here:\n{cache_path}")
+        logger.important(cache_path)

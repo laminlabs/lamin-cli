@@ -97,27 +97,27 @@ def main():
 
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
-@click.option("--key", type=str, default=None, help="API key")
+@click.option("--key", type=str, default=None, help="The API key.")
 def login(user: str, key: Optional[str]):
     """Log into LaminHub.
 
-    Upon logging in the first time, you need to pass your API key via
+    Upon logging in the first time, you need to pass your API key via:
 
     ```
     lamin login myemail@acme.com --key YOUR_API_KEY
     ```
 
-    You'll find your API key in the top right corner under "Settings".
+    You'll find your API key on LaminHub in the top right corner under "Settings".
 
     After this, you can either use `lamin login myhandle` or `lamin login myemail@acme.com`
 
-    You can also use
+    You can also call this without arguments:
 
     ```
     lamin login
     ```
 
-    and type your beta API key in the terminal
+    You will be prompted for your Beta API key unless you set an environment variable `LAMIN_API_KEY`.
     """
     from lamindb_setup._setup_user import login
 
@@ -134,13 +134,13 @@ def login(user: str, key: Optional[str]):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, help="local dir, s3://bucket_name, gs://bucket_name")  # noqa: E501
-@click.option("--db", type=str, default=None, help="postgres database connection URL, do not pass for SQLite")  # noqa: E501
-@click.option("--schema", type=str, default=None, help="comma-separated string of schema modules")  # noqa: E501
-@click.option("--name", type=str, default=None, help="instance name")
+@click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")  # noqa: E501
+@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")  # noqa: E501
+@click.option("--schema", type=str, default=None, help="Comma-separated string of schema modules.")  # noqa: E501
+@click.option("--name", type=str, default=None, help="The instance name.")
 # fmt: on
 def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
-    """Init a lamindb instance."""
+    """Init a LaminDB instance."""
     from lamindb_setup._init_instance import init as init_
 
     return init_(storage=storage, db=db, schema=schema, name=name)
@@ -204,12 +204,14 @@ def logout():
 
 
 @main.command()
-@click.argument("url", type=str)
-def get(url: str):
-    """Get an object from a lamin.ai URL."""
+@click.argument("entity", type=str, help="A lamin.ai URL or 'artifact' or 'transform'.")
+@click.option("--uid", help="Filter by creator")
+@click.option("--key", help="The key for the entity")
+def get(entity: str, uid: str = None, key: str = None):
+    """Query an entity."""
     from lamin_cli._get import get
 
-    return get(url)
+    return get(entity, uid, key)
 
 
 @main.command()
