@@ -204,7 +204,7 @@ def logout():
 
 
 @main.command()
-@click.argument("entity", type=str)
+@click.argument("entity", type=str, help="A lamin.ai URL or 'artifact' or 'transform'.")
 @click.option("--uid", help="Filter by creator")
 @click.option("--key", help="The key for the entity")
 def get(entity: str, uid: str = None, key: str = None):
