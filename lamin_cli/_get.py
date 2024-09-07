@@ -26,7 +26,6 @@ def get(entity: str, uid: str = None, key: str = None):
         )
     else:
         instance_slug = None
-        uid = None
 
     if instance_slug is not None:
         auto_connect = ln_setup.settings.auto_connect

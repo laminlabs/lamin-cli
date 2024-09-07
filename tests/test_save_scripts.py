@@ -123,3 +123,11 @@ def test_run_save_cache():
     )
     print(result.stderr.decode())
     assert result.returncode == 0
+
+    result = subprocess.run(
+        f"lamin get transform --uid m5uCHTTpJnjQ0000",  # noqa
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stderr.decode())
+    assert result.returncode == 0
