@@ -204,12 +204,14 @@ def logout():
 
 
 @main.command()
-@click.argument("url", type=str)
-def get(url: str):
-    """Get an object from a lamin.ai URL."""
+@click.argument("entity", type=str)
+@click.option("--uid", help="Filter by creator")
+@click.option("--key", help="The key for the entity")
+def get(entity: str, uid: str = None, key: str = None):
+    """Query an entity."""
     from lamin_cli._get import get
 
-    return get(url)
+    return get(entity, uid, key)
 
 
 @main.command()
