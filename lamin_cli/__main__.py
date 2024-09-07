@@ -97,7 +97,7 @@ def main():
 
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
-@click.option("--key", type=str, default=None, help="API key")
+@click.option("--key", type=str, default=None, help="The API key.")
 def login(user: str, key: Optional[str]):
     """Log into LaminHub.
 
@@ -134,10 +134,10 @@ def login(user: str, key: Optional[str]):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, help="local dir, s3://bucket_name, gs://bucket_name")  # noqa: E501
-@click.option("--db", type=str, default=None, help="postgres database connection URL, do not pass for SQLite")  # noqa: E501
-@click.option("--schema", type=str, default=None, help="comma-separated string of schema modules")  # noqa: E501
-@click.option("--name", type=str, default=None, help="instance name")
+@click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")  # noqa: E501
+@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")  # noqa: E501
+@click.option("--schema", type=str, default=None, help="Comma-separated string of schema modules.")  # noqa: E501
+@click.option("--name", type=str, default=None, help="The instance name.")
 # fmt: on
 def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
     """Init a lamindb instance."""
