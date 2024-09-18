@@ -15,7 +15,7 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
     return instance_slug, entity, uid
 
 
-def get(entity: str, uid: str = None, key: str = None):
+def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     if entity.startswith("https://lamin.ai"):
         url = entity
         instance_slug, entity, uid = decompose_url(url)
@@ -41,6 +41,9 @@ def get(entity: str, uid: str = None, key: str = None):
         import lamindb as ln
         from lamindb._finish import script_to_notebook
 
+    # below is to silence warnings about missing run inputs
+    ln.settings.track_run_inputs = False
+
     if entity == "transform":
         transform = (
             ln.Transform.get(uid) if uid is not None else ln.Transform.get(key=key)
@@ -60,6 +63,17 @@ def get(entity: str, uid: str = None, key: str = None):
         else:
             raise ValueError("No source code available for this transform.")
         logger.important(target_filename)
+        if with_env:
+            if (
+                transform.latest_run is not None
+                and transform.latest_run.environment is not None
+            ):
+                filepath_env_cache = transform.latest_run.environment.cache()
+                target_env_filename = (
+                    ".".join(target_filename.split(".")[:-1]) + "__requirements.txt"
+                )
+                filepath_env_cache.rename(target_env_filename)
+            logger.important(target_env_filename)
     elif entity == "artifact":
         artifact = ln.Artifact.get(uid) if uid is not None else ln.Artifact.get(key=key)
         cache_path = artifact.cache()

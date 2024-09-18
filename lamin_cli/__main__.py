@@ -207,7 +207,10 @@ def logout():
 @click.argument("entity", type=str)
 @click.option("--uid", help="Filter by creator")
 @click.option("--key", help="The key for the entity")
-def get(entity: str, uid: str = None, key: str = None):
+@click.option(
+    "--with-env", is_flag=True, help="Also return the environment for a tranform"
+)
+def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     """Query an entity.
 
     Pass a lamin.ai URL, 'artifact', or 'transform', for example:
@@ -218,11 +221,12 @@ def get(entity: str, uid: str = None, key: str = None):
     lamin get artifact --uid e2G7k9EVul4JbfsEYAy5
     lamin get transform --key analysis.ipynb
     lamin get transform --uid Vul4JbfsEYAy5
+    lamin get transform --uid Vul4JbfsEYAy5 --with-env
     ```
     """
     from lamin_cli._get import get
 
-    return get(entity, uid, key)
+    return get(entity, uid=uid, key=key, with_env=with_env)
 
 
 @main.command()

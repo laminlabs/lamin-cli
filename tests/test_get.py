@@ -14,7 +14,8 @@ def test_decompose_url():
 def test_get_transform():
     result = subprocess.run(
         "lamin get"
-        " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'",  # noqa
+        " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
+        " --with-env",  # noqa
         shell=True,
         capture_output=True,
     )
