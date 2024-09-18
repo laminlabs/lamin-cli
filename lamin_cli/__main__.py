@@ -180,16 +180,6 @@ def info(schema: bool):
 
 
 @main.command()
-@click.argument("action", type=click.Choice(["view"]))
-def schema(action: str):
-    """View schema."""
-    from lamindb_setup._schema import view
-
-    if action == "view":
-        return view()
-
-
-@main.command()
 def close():
     """Close an existing instance.
 
