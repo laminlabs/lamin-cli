@@ -205,10 +205,10 @@ def logout():
 
 @main.command()
 @click.argument("entity", type=str)
-@click.option("--uid", help="Filter by creator")
-@click.option("--key", help="The key for the entity")
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
 @click.option(
-    "--with-env", is_flag=True, help="Also return the environment for a tranform"
+    "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     """Query an entity.
