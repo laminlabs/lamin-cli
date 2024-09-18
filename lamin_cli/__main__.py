@@ -41,9 +41,7 @@ else:
                     "init",
                     "load",
                     "info",
-                    "close",
                     "delete",
-                    "logout",
                 ],
             },
             {
@@ -55,8 +53,8 @@ else:
                 "commands": ["cache", "set"],
             },
             {
-                "name": "Schema commands",
-                "commands": ["migrate", "schema"],
+                "name": "Schema migration",
+                "commands": ["migrate"],
             },
         ]
     }
@@ -98,7 +96,8 @@ def main():
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The API key.")
-def login(user: str, key: Optional[str]):
+@click.option("--logout", is_flag=True, help="Logout instead of logging in.")
+def login(user: str, key: Optional[str], logout: bool = False):
     """Log into LaminHub.
 
     Upon logging in the first time, you need to pass your API key via:
@@ -119,17 +118,22 @@ def login(user: str, key: Optional[str]):
 
     You will be prompted for your Beta API key unless you set an environment variable `LAMIN_API_KEY`.
     """
-    from lamindb_setup._setup_user import login
+    if logout:
+        from lamindb_setup._setup_user import logout as logout_func
 
-    if user is None:
-        if "LAMIN_API_KEY" in os.environ:
-            api_key = os.environ["LAMIN_API_KEY"]
-        else:
-            api_key = input("Your API key: ")
+        return logout_func()
     else:
-        api_key = None
+        from lamindb_setup._setup_user import login
 
-    return login(user, key=key, api_key=api_key)
+        if user is None:
+            if "LAMIN_API_KEY" in os.environ:
+                api_key = os.environ["LAMIN_API_KEY"]
+            else:
+                api_key = input("Your API key: ")
+        else:
+            api_key = None
+
+        return login(user, key=key, api_key=api_key)
 
 
 # fmt: off
@@ -148,39 +152,45 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 
 # fmt: off
 @main.command()
-@click.argument("identifier", type=str, default=None)
+@click.argument("instance", type=str, default=None)
 @click.option("--db", type=str, default=None, help="Update database URL.")  # noqa: E501
 @click.option("--storage", type=str, default=None, help="Update storage while loading.")
+@click.option("--unload", is_flag=True, help="Unload the current instance.")
 # fmt: on
-def load(identifier: str, db: Optional[str], storage: Optional[str]):
+def load(
+    instance: Optional[str], db: Optional[str], storage: Optional[str], unload: bool
+):
     """Load an instance for auto-connection.
 
-    `IDENTIFIER` is either a slug (`account/instance`) or a `URL`
-    (`https://lamin.ai/account/instance`).
+    Pass a slug (`account/name`) or URL
+    (`https://lamin.ai/account/name`).
     """
-    from lamindb_setup import settings, connect
+    if unload:
+        from lamindb_setup._close import close as close_
 
-    settings.auto_connect = True
-    return connect(slug=identifier, db=db, storage=storage)
+        return close_()
+    else:
+        if instance is None:
+            raise click.UsageError("INSTANCE is required when loading an instance.")
+        from lamindb_setup import settings, connect
+
+        settings.auto_connect = True
+        return connect(slug=instance, db=db, storage=storage)
 
 
 @main.command()
-def info():
-    """Show user, settings & instance info."""
-    import lamindb_setup
+@click.option("--schema", is_flag=True, help="View schema.")
+def info(schema: bool):
+    """Show info about current instance."""
+    if schema:
+        from lamindb_setup._schema import view
 
-    print(lamindb_setup.settings)
+        print("Open in browser: http://127.0.0.1:8000/schema/")
+        return view()
+    else:
+        import lamindb_setup
 
-
-@main.command()
-def close():
-    """Close an existing instance.
-
-    Is the opposite of loading an instance.
-    """
-    from lamindb_setup._close import close as close_
-
-    return close_()
+        print(lamindb_setup.settings)
 
 
 # fmt: off
@@ -196,14 +206,6 @@ def delete(instance: str, force: bool = False):
 
 
 @main.command()
-def logout():
-    """Logout."""
-    from lamindb_setup._setup_user import logout
-
-    return logout()
-
-
-@main.command()
 @click.argument("entity", type=str)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
@@ -213,7 +215,7 @@ def logout():
 def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     """Query an entity.
 
-    Pass a lamin.ai URL, 'artifact', or 'transform', for example:
+    Pass a URL, `artifact`, or `transform`. For example:
 
     ```
     lamin get https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
@@ -267,16 +269,6 @@ def set_(setting: str, value: bool):
 
 
 main.add_command(migrate)
-
-
-@main.command()
-@click.argument("action", type=click.Choice(["view"]))
-def schema(action: str):
-    """View schema."""
-    from lamindb_setup._schema import view
-
-    if action == "view":
-        return view()
 
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
