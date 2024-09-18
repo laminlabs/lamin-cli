@@ -215,7 +215,7 @@ def delete(instance: str, force: bool = False):
 def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     """Query an entity.
 
-    Pass a lamin.ai URL, 'artifact', or 'transform', for example:
+    Pass a URL, `artifact`, or `transform`. For example:
 
     ```
     lamin get https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
