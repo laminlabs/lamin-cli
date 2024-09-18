@@ -73,7 +73,9 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                     ".".join(target_filename.split(".")[:-1]) + "__requirements.txt"
                 )
                 filepath_env_cache.rename(target_env_filename)
-            logger.important(target_env_filename)
+                logger.important(target_env_filename)
+            else:
+                logger.warning("latest transform run with environment doesn't exist")
     elif entity == "artifact":
         artifact = ln.Artifact.get(uid) if uid is not None else ln.Artifact.get(key=key)
         cache_path = artifact.cache()
