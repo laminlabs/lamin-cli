@@ -41,9 +41,7 @@ else:
                     "init",
                     "load",
                     "info",
-                    "close",
                     "delete",
-                    "logout",
                 ],
             },
             {
@@ -55,8 +53,8 @@ else:
                 "commands": ["cache", "set"],
             },
             {
-                "name": "Schema commands",
-                "commands": ["migrate", "schema"],
+                "name": "Schema migration",
+                "commands": ["migrate"],
             },
         ]
     }
@@ -98,7 +96,8 @@ def main():
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The API key.")
-def login(user: str, key: Optional[str]):
+@click.option("--logout", is_flag=True, help="Logout instead of logging in.")
+def login(user: str, key: Optional[str], logout: bool = False):
     """Log into LaminHub.
 
     Upon logging in the first time, you need to pass your API key via:
@@ -119,17 +118,22 @@ def login(user: str, key: Optional[str]):
 
     You will be prompted for your Beta API key unless you set an environment variable `LAMIN_API_KEY`.
     """
-    from lamindb_setup._setup_user import login
+    if logout:
+        from lamindb_setup._setup_user import logout as logout_func
 
-    if user is None:
-        if "LAMIN_API_KEY" in os.environ:
-            api_key = os.environ["LAMIN_API_KEY"]
-        else:
-            api_key = input("Your API key: ")
+        return logout_func()
     else:
-        api_key = None
+        from lamindb_setup._setup_user import login
 
-    return login(user, key=key, api_key=api_key)
+        if user is None:
+            if "LAMIN_API_KEY" in os.environ:
+                api_key = os.environ["LAMIN_API_KEY"]
+            else:
+                api_key = input("Your API key: ")
+        else:
+            api_key = None
+
+        return login(user, key=key, api_key=api_key)
 
 
 # fmt: off
@@ -199,14 +203,6 @@ def delete(instance: str, force: bool = False):
     from lamindb_setup._delete import delete
 
     return delete(instance, force=force)
-
-
-@main.command()
-def logout():
-    """Logout."""
-    from lamindb_setup._setup_user import logout
-
-    return logout()
 
 
 @main.command()
