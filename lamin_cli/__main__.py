@@ -148,20 +148,30 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 
 # fmt: off
 @main.command()
-@click.argument("identifier", type=str, default=None)
+@click.argument("instance", type=str, default=None)
 @click.option("--db", type=str, default=None, help="Update database URL.")  # noqa: E501
 @click.option("--storage", type=str, default=None, help="Update storage while loading.")
+@click.option("--unload", is_flag=True, help="Unload the current instance.")
 # fmt: on
-def load(identifier: str, db: Optional[str], storage: Optional[str]):
-    """Load an instance for auto-connection.
+def load(
+    instance: Optional[str], db: Optional[str], storage: Optional[str], unload: bool
+):
+    """Load an instance for auto-connection or close an existing instance.
 
-    `IDENTIFIER` is either a slug (`account/instance`) or a `URL`
-    (`https://lamin.ai/account/instance`).
+    Pass a slug (`account/name`) or URL
+    (`https://lamin.ai/account/name`).
     """
-    from lamindb_setup import settings, connect
+    if unload:
+        from lamindb_setup._close import close as close_
 
-    settings.auto_connect = True
-    return connect(slug=identifier, db=db, storage=storage)
+        return close_()
+    else:
+        if instance is None:
+            raise click.UsageError("INSTANCE is required when loading an instance.")
+        from lamindb_setup import settings, connect
+
+        settings.auto_connect = True
+        return connect(slug=instance, db=db, storage=storage)
 
 
 @main.command()
@@ -177,17 +187,6 @@ def info(schema: bool):
         import lamindb_setup
 
         print(lamindb_setup.settings)
-
-
-@main.command()
-def close():
-    """Close an existing instance.
-
-    Is the opposite of loading an instance.
-    """
-    from lamindb_setup._close import close as close_
-
-    return close_()
 
 
 # fmt: off
