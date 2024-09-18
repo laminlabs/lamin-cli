@@ -165,11 +165,28 @@ def load(identifier: str, db: Optional[str], storage: Optional[str]):
 
 
 @main.command()
-def info():
-    """Show user, settings & instance info."""
-    import lamindb_setup
+@click.option("--schema", is_flag=True, help="View schema.")
+def info(schema: bool):
+    """Show info about current instance."""
+    if schema:
+        from lamindb_setup._schema import view
 
-    print(lamindb_setup.settings)
+        print("Open in browser: http://127.0.0.1:8000/schema/")
+        return view()
+    else:
+        import lamindb_setup
+
+        print(lamindb_setup.settings)
+
+
+@main.command()
+@click.argument("action", type=click.Choice(["view"]))
+def schema(action: str):
+    """View schema."""
+    from lamindb_setup._schema import view
+
+    if action == "view":
+        return view()
 
 
 @main.command()
@@ -267,16 +284,6 @@ def set_(setting: str, value: bool):
 
 
 main.add_command(migrate)
-
-
-@main.command()
-@click.argument("action", type=click.Choice(["view"]))
-def schema(action: str):
-    """View schema."""
-    from lamindb_setup._schema import view
-
-    if action == "view":
-        return view()
 
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
