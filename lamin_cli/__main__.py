@@ -160,7 +160,7 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 def load(
     instance: Optional[str], db: Optional[str], storage: Optional[str], unload: bool
 ):
-    """Load an instance for auto-connection or close an existing instance.
+    """Load an instance for auto-connection.
 
     Pass a slug (`account/name`) or URL
     (`https://lamin.ai/account/name`).
