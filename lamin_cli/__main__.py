@@ -153,8 +153,6 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 # fmt: off
 @main.command()
 @click.argument("instance", type=str, default=None, required=False)
-@click.option("--db", type=str, default=None, help="Update database URL.")  # noqa: E501
-@click.option("--storage", type=str, default=None, help="Update storage while loading.")
 @click.option("--unload", is_flag=True, help="Unload the current instance.")
 # fmt: on
 def load(
@@ -175,7 +173,7 @@ def load(
         from lamindb_setup import settings, connect
 
         settings.auto_connect = True
-        return connect(slug=instance, db=db, storage=storage)
+        return connect(slug=instance)
 
 
 @main.command()
