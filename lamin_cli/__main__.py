@@ -155,9 +155,7 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 @click.argument("instance", type=str, default=None, required=False)
 @click.option("--unload", is_flag=True, help="Unload the current instance.")
 # fmt: on
-def load(
-    instance: Optional[str], db: Optional[str], storage: Optional[str], unload: bool
-):
+def load(instance: Optional[str], unload: bool):
     """Load an instance for auto-connection.
 
     Pass a slug (`account/name`) or URL
