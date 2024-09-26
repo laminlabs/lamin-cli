@@ -77,12 +77,12 @@ def save_from_filepath_cli(
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
         artifact = ln.Artifact(filepath, key=key, description=description).save()
-        slug = ln_setup.settings.instance.slug
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if ln_setup.settings.storage.type == "s3":
             logger.important(f"storage url: {artifact.path.to_url()}")
         if ln_setup.settings.instance.is_remote:
+            slug = ln_setup.settings.instance.slug
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
     elif registry == "transform":
