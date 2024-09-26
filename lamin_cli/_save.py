@@ -116,4 +116,4 @@ def save_from_filepath_cli(
             from_cli=True,
         )
     else:
-        raise SystemExit("Allowed value for '--registry' are: 'artifact', 'transform'")
+        raise SystemExit("Allowed values for '--registry' are: 'artifact', 'transform'")

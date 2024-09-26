@@ -44,3 +44,17 @@ def test_save_file():
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
     assert result.returncode == 0
+
+    # test invalid registry param
+    result = subprocess.run(
+        f"lamin save {filepath} --key mytest --registry invalid",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert (
+        "Allowed values for '--registry' are: 'artifact', 'transform'"
+        in result.stderr.decode()
+    )
+    assert result.returncode == 1
