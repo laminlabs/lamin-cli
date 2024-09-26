@@ -72,18 +72,18 @@ def save_from_filepath_cli(
         registry = "transform" if filepath.suffix in {".py", ".ipynb"} else "artifact"
 
     if registry == "artifact":
+        ln.settings.creation.artifact_silence_missing_run_warning = True
         if key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
-        artifact = ln.Artifact(filepath, key=key, description=description)
-        artifact.save()
+        artifact = ln.Artifact(filepath, key=key, description=description).save()
         slug = ln_setup.settings.instance.slug
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
-        if ln_setup.settings.instance.is_remote:
-            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         if ln_setup.settings.storage.type == "s3":
             logger.important(f"storage url: {artifact.path.to_url()}")
+        if ln_setup.settings.instance.is_remote:
+            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
     elif registry == "transform":
         # consider notebooks & scripts a transform
