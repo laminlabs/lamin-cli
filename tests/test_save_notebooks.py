@@ -196,4 +196,4 @@ print("my consecutive cell")
         nbproject_test.execute_notebooks(new_path, print_outputs=True)
 
     print(error.exconly())
-    assert "Notebook filename changed." in error.exconly()
+    assert "clashes with the existing key" in error.exconly()
