@@ -233,11 +233,12 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 )
 @click.option("--key", type=str, default=None)
 @click.option("--description", type=str, default=None)
-def save(filepath: str, key: str, description: str):
+@click.option("--registry", type=str, default=None)
+def save(filepath: str, key: str, description: str, registry: str):
     """Save file or folder."""
     from lamin_cli._save import save_from_filepath_cli
 
-    if save_from_filepath_cli(filepath, key, description) is not None:
+    if save_from_filepath_cli(filepath, key, description, registry) is not None:
         sys.exit(1)
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 import lamindb_setup as ln_setup
 from lamin_utils import logger
 import re
@@ -50,8 +50,11 @@ def get_stem_uid_and_version_from_file(
 
 
 def save_from_filepath_cli(
-    filepath: Union[str, Path], key: Optional[str], description: Optional[str]
-) -> Optional[str]:
+    filepath: Union[str, Path],
+    key: str | None,
+    description: str | None,
+    registry: str | None,
+) -> str | None:
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
 
@@ -65,21 +68,24 @@ def save_from_filepath_cli(
 
     ln_setup.settings.auto_connect = auto_connect_state
 
-    if filepath.suffix not in {".py", ".ipynb"}:
+    if registry is None:
+        registry = "transform" if filepath.suffix in {".py", ".ipynb"} else "artifact"
+
+    if registry == "artifact":
+        ln.settings.creation.artifact_silence_missing_run_warning = True
         if key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
-        artifact = ln.Artifact(filepath, key=key, description=description)
-        artifact.save()
-        slug = ln_setup.settings.instance.slug
+        artifact = ln.Artifact(filepath, key=key, description=description).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
-        if ln_setup.settings.instance.is_remote:
-            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         if ln_setup.settings.storage.type == "s3":
             logger.important(f"storage url: {artifact.path.to_url()}")
+        if ln_setup.settings.instance.is_remote:
+            slug = ln_setup.settings.instance.slug
+            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
-    else:
+    elif registry == "transform":
         # consider notebooks & scripts a transform
         uid, stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
         if uid is not None:
@@ -109,3 +115,5 @@ def save_from_filepath_cli(
             filepath=filepath,
             from_cli=True,
         )
+    else:
+        raise SystemExit("Allowed values for '--registry' are: 'artifact', 'transform'")
