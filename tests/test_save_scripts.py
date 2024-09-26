@@ -21,7 +21,7 @@ def test_run_save_cache():
     )
     # print(result.stdout.decode())
     assert result.returncode == 1
-    assert "Did you run ln.context.track()?" in result.stdout.decode()
+    assert "Did you run ?" in result.stdout.decode()
 
     # run the script
     result = subprocess.run(

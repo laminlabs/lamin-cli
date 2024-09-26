@@ -22,7 +22,7 @@ def test_save_not_initialized():
     )
     assert result.returncode == 1
     assert (
-        "Call ln.context.track() and copy/paste the output into the notebook"
+        "Call `ln.track()` and copy/paste the output into the notebook"
         in result.stderr.decode()
     )
 
@@ -70,7 +70,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
     assert transform is None
 
-    # let's try to save a notebook for which `ln.context.track()` was never run
+    # let's try to save a notebook for which `ln.track()` was never run
     result = subprocess.run(
         f"lamin save {notebook_path}",
         shell=True,
@@ -80,7 +80,7 @@ def test_save_consecutive():
     assert result.returncode == 1
     assert "Did not find uid 'hlsFXswrJjtt0000'" in result.stdout.decode()
 
-    # now, let's re-run this notebook so that ln.context.track() is actually run
+    # now, let's re-run this notebook so that `ln.track()` is actually run
     nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
 
     # now, there is a transform record, but we're missing all artifacts
@@ -113,8 +113,8 @@ def test_save_consecutive():
 import lamindb as ln
 
 # %%
-ln.context.uid = "hlsFXswrJjtt0000"
-ln.context.track()
+ln.track("hlsFXswrJjtt0000")
+
 
 # %%
 print("my consecutive cell")
