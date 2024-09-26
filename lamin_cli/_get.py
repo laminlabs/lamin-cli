@@ -11,19 +11,16 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
         if entity in url:
             break
     uid = url.split(f"{entity}/")[1]
-    instance_slug = "/".join(url.replace("https://lamin.ai/", "").split("/")[:2])
+    instance_slug = "/".join(url.split("/")[3:5])
     return instance_slug, entity, uid
 
 
 def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
-    if entity.startswith("https://lamin.ai"):
+    if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance_slug, entity, uid = decompose_url(url)
     elif entity not in {"artifact", "transform"}:
-        raise ValueError(
-            "entity has to be a URL starting with https://lamin.ai or 'artifact' or"
-            " 'transform'"
-        )
+        raise SystemExit("Entity has to be a laminhub URL or 'artifact' or 'transform'")
     else:
         instance_slug = None
 
