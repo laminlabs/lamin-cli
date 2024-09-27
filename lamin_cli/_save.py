@@ -14,12 +14,16 @@ def get_stem_uid_and_version_from_file(
         content = file.read()
 
     if file_path.suffix == ".py":
+        track_pattern = re.compile(r'ln\.track\(\s*(?:uid\s*=\s*)?["\']([^"\']+)["\']')
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*["\']([^"\']+)["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*["\']([^"\']+)["\']'
         )
         version_pattern = re.compile(r'\.transform\.version\s*=\s*["\']([^"\']+)["\']')
     elif file_path.suffix == ".ipynb":
+        track_pattern = re.compile(
+            r'ln\.track\(\s*(?:uid\s*=\s*)?\\["\']([^"\']+)\\["\']'
+        )
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*\\["\']([^"\']+)\\["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*\\["\']([^"\']+)\\["\']'
@@ -31,7 +35,10 @@ def get_stem_uid_and_version_from_file(
         raise ValueError("Only .py and .ipynb files are supported.")
 
     # Search for matches in the entire file content
-    uid_match = uid_pattern.search(content)
+    uid_match = track_pattern.search(content)
+    uid = uid_match.group(1) if uid_match else None
+    if uid is None:
+        uid_match = uid_pattern.search(content)
     stem_uid_match = stem_uid_pattern.search(content)
     version_match = version_pattern.search(content)
 
@@ -42,8 +49,8 @@ def get_stem_uid_and_version_from_file(
 
     if uid is None and (stem_uid is None or version is None):
         raise SystemExit(
-            "ln.context.uid isn't"
-            f" set in {file_path}\nCall ln.context.track() and copy/paste the output"
+            f"Cannot infer transform uid of {file_path}"
+            "\nCall `ln.track()` and copy/paste the output"
             " into the notebook"
         )
     return uid, stem_uid, version
@@ -93,7 +100,7 @@ def save_from_filepath_cli(
             if transform is None:
                 logger.error(
                     f"Did not find uid '{uid}'"
-                    " in Transform registry. Did you run ln.context.track()?"
+                    " in Transform registry. Did you run `ln.track()`?"
                 )
                 return "not-tracked-in-transform-registry"
         else:
