@@ -1,4 +1,4 @@
-from lamin_cli._get import decompose_url
+from lamin_cli._load import decompose_url
 import subprocess
 
 

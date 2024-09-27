@@ -8,15 +8,17 @@ else:
 
 
 @click.group(invoke_without_command=True)
-def settings():
+@click.pass_context
+def settings(ctx):
     """Manage settings.
 
     Call without subcommands and options to show settings.
     """
-    from lamindb_setup import settings as settings_
+    if ctx.invoked_subcommand is None:
+        from lamindb_setup import settings as settings_
 
-    click.echo("Configure: see `lamin settings --help`")
-    click.echo(settings_)
+        click.echo("Configure: see `lamin settings --help`")
+        click.echo(settings_)
 
 
 @settings.command("set")
