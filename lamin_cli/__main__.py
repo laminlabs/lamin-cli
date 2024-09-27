@@ -192,13 +192,13 @@ def info(schema: bool):
 # fmt: off
 @main.command()
 @click.argument("instance", type=str, default=None)
-@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
+@click.option("--confirm/--no-confirm", default=True, help="Whether to ask for confirmation.")  # noqa: E501
 # fmt: on
-def delete(instance: str, force: bool = False):
+def delete(instance: str, confirm: bool = True):
     """Delete an instance."""
     from lamindb_setup._delete import delete
 
-    return delete(instance, force=force)
+    return delete(instance, force=not confirm)
 
 
 @main.command()
