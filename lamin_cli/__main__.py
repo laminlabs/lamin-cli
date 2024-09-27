@@ -165,17 +165,10 @@ def connect(instance: str):
     Pass a slug (`account/name`) or URL
     (`https://lamin.ai/account/name`).
     """
-    if disconnect:
-        from lamindb_setup import close
+    from lamindb_setup import settings as settings_, connect as connect_
 
-        return close()
-    else:
-        if instance is None:
-            raise click.UsageError("INSTANCE is required when loading an instance.")
-        from lamindb_setup import settings as settings_, connect as connect_
-
-        settings_.auto_connect = True
-        return connect_(slug=instance)
+    settings_.auto_connect = True
+    return connect_(slug=instance)
 
 
 @main.command()
