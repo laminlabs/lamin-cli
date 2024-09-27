@@ -230,12 +230,12 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     Pass a URL, `artifact`, or `transform`. For example:
 
     ```
-    lamin get https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin get artifact --key mydatasets/mytable.parquet
-    lamin get artifact --uid e2G7k9EVul4JbfsEYAy5
-    lamin get transform --key analysis.ipynb
-    lamin get transform --uid Vul4JbfsEYAy5
-    lamin get transform --uid Vul4JbfsEYAy5 --with-env
+    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin load artifact --key mydatasets/mytable.parquet
+    lamin load artifact --uid e2G7k9EVul4JbfsEYAy5
+    lamin load transform --key analysis.ipynb
+    lamin load transform --uid Vul4JbfsEYAy5
+    lamin load transform --uid Vul4JbfsEYAy5 --with-env
     ```
     """
     is_slug = entity.count("/") == 1
