@@ -21,6 +21,9 @@ def get_stem_uid_and_version_from_file(
         )
         version_pattern = re.compile(r'\.transform\.version\s*=\s*["\']([^"\']+)["\']')
     elif file_path.suffix == ".ipynb":
+        track_pattern = re.compile(
+            r'ln\.track\(\s*(?:uid\s*=\s*)?\\["\']([^"\']+)\\["\']'
+        )
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*\\["\']([^"\']+)\\["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*\\["\']([^"\']+)\\["\']'

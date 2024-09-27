@@ -21,7 +21,7 @@ def test_run_save_cache():
     )
     # print(result.stdout.decode())
     assert result.returncode == 1
-    assert "Did you run ?" in result.stdout.decode()
+    assert "Did you run `ln.track()`?" in result.stdout.decode()
 
     # run the script
     result = subprocess.run(
@@ -29,8 +29,8 @@ def test_run_save_cache():
         shell=True,
         capture_output=True,
     )
-    # print(result.stdout.decode())
-    # print(result.stderr.decode())
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "m5uCHTTpJnjQ0000" in result.stdout.decode()
