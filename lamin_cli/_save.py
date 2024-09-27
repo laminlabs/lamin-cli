@@ -53,6 +53,7 @@ def get_stem_uid_and_version_from_file(
             "\nCall `ln.track()` and copy/paste the output"
             " into the notebook"
         )
+    logger.important(f"mapped '{file_path}' on uid '{uid}'")
     return uid, stem_uid, version
 
 
