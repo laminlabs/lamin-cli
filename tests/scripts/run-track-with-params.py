@@ -11,19 +11,10 @@ ln.Param(name="split", dtype="str").save()
 
 def main():
     parser = argparse.ArgumentParser(description="A demo script.")
-    parser.add_argument(
-        "--dataset-key",
-        type=str,
-    )
+    parser.add_argument("--dataset-key", type=str)
     parser.add_argument("--downsample", action="store_true", help="Downsample")
-    parser.add_argument(
-        "--split",
-        choices=["train", "test", "validation"],
-    )
-    parser.add_argument(
-        "--learning-rate",
-        type=float,
-    )
+    parser.add_argument("--split", choices=["train", "test", "validation"])
+    parser.add_argument("--learning-rate", type=float)
     args = parser.parse_args()
 
     params = {
