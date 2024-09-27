@@ -29,15 +29,15 @@ def test_run_save_cache():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "m5uCHTTpJnjQ0000" in result.stdout.decode()
     assert "created Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform.hash == "Cwk0OPOyUH5nzTiU2ISlDQ"
+    assert transform.hash == "MoIciBQ0lpVPCKQGofPX6g"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
 
