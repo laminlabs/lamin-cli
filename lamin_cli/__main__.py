@@ -248,6 +248,20 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
 
 @main.command()
+@click.argument("entity", type=str)
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
+@click.option(
+    "--with-env", is_flag=True, help="Also return the environment for a tranform."
+)
+def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+    """Deprecated, please use `lamin load`."""
+    from lamin_cli._load import load as load_
+
+    return load_(entity, uid=uid, key=key, with_env=with_env)
+
+
+@main.command()
 @click.argument(
     "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
 )
