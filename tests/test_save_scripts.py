@@ -131,3 +131,37 @@ def test_run_save_cache():
     )
     print(result.stderr.decode())
     assert result.returncode == 0
+
+
+def test_run_save_with_params():
+    env = os.environ
+    env["LAMIN_TESTING"] = "true"
+    filepath = scripts_dir / "run-track-with-params.py"
+
+    # run the script
+    result = subprocess.run(
+        f"python {filepath} --dataset-key mydata --learning-rate 0.01 --split train",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+    assert "created Transform" in result.stdout.decode()
+    assert "JjRF4mACd9m00000" in result.stdout.decode()
+    assert "created Run" in result.stdout.decode()
+
+    # you can re-save the script
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+    assert "source code is already saved" in result.stdout.decode()
+    assert (
+        "run-track-with-params.py' on uid 'JjRF4mACd9m00000'" in result.stdout.decode()
+    )
