@@ -115,12 +115,11 @@ import lamindb as ln
 # %%
 ln.track("hlsFXswrJjtt0000")
 
-
 # %%
 print("my consecutive cell")
 """
     )
-    assert transform.hash == "fHpHnC_pScmOl3ZR8x5cTQ"
+    assert transform.hash == "OwVL-0-_gmk8heR3zV7BkA"
     # below is the test that we can use if store the run repot as `.ipynb`
     # and not as html as we do right now
     assert transform.latest_run.report.suffix == ".html"
@@ -168,7 +167,7 @@ print("my consecutive cell")
     transform = ln.Transform.get("hlsFXswrJjtt0000")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.hash == "b63gPnGqNWBE0G4G3pOghw"
+    assert transform.hash == "BhQpym0JfeypqhVMPlQ0ng"
     assert transform.latest_run.environment.path.exists()
     assert transform._source_code_artifact is None
 
