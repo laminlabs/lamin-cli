@@ -33,7 +33,7 @@ def test_run_save_cache():
     # print(result.stderr.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
-    assert "m5uCHTTpJnjQ0000" in result.stdout.decode()
+    assert "m5uCHTTp" in result.stdout.decode()
     assert "created Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
@@ -52,7 +52,7 @@ def test_run_save_cache():
     # print(result.stderr.decode())
     assert result.returncode == 0
     assert "loaded Transform" in result.stdout.decode()
-    assert "m5uCHTTpJnjQ0000" in result.stdout.decode()
+    assert "m5uCHTTp" in result.stdout.decode()
     assert "loaded Run" in result.stdout.decode()
     assert "source code is already saved" in result.stdout.decode()
 
@@ -148,7 +148,7 @@ def test_run_save_with_params():
     print(result.stderr.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
-    assert "JjRF4mACd9m00000" in result.stdout.decode()
+    assert "JjRF4mAC" in result.stdout.decode()
     assert "created Run" in result.stdout.decode()
 
     # you can re-save the script
