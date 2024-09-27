@@ -162,8 +162,7 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 def connect(instance: str):
     """Load an instance for auto-connection.
 
-    Pass a slug (`account/name`) or URL
-    (`https://lamin.ai/account/name`).
+    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
     """
     from lamindb_setup import settings as settings_, connect as connect_
 
