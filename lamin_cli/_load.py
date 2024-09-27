@@ -15,7 +15,7 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
     return instance_slug, entity, uid
 
 
-def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance_slug, entity, uid = decompose_url(url)
