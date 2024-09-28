@@ -6,21 +6,17 @@ from lamin_utils import logger
 import re
 
 
-def get_stem_uid_and_version_from_file(
-    file_path: Path,
+def parse_uid_from_code(
+    content: str, suffix: str
 ) -> tuple[str | None, str | None, str | None]:
-    # line-by-line matching might be faster, but let's go with this for now
-    with open(file_path) as file:
-        content = file.read()
-
-    if file_path.suffix == ".py":
+    if suffix == ".py":
         track_pattern = re.compile(r'ln\.track\(\s*(?:uid\s*=\s*)?["\']([^"\']+)["\']')
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*["\']([^"\']+)["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*["\']([^"\']+)["\']'
         )
         version_pattern = re.compile(r'\.transform\.version\s*=\s*["\']([^"\']+)["\']')
-    elif file_path.suffix == ".ipynb":
+    elif suffix == ".ipynb":
         track_pattern = re.compile(
             r'ln\.track\(\s*(?:uid\s*=\s*)?\\["\']([^"\']+)\\["\']'
         )
@@ -49,11 +45,10 @@ def get_stem_uid_and_version_from_file(
 
     if uid is None and (stem_uid is None or version is None):
         raise SystemExit(
-            f"Cannot infer transform uid of {file_path}"
+            "Cannot infer transform uid."
             "\nCall `ln.track()` and copy/paste the output"
             " into the notebook"
         )
-    logger.important(f"mapped '{file_path}' on uid '{uid}'")
     return uid, stem_uid, version
 
 
@@ -94,8 +89,10 @@ def save_from_filepath_cli(
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
     elif registry == "transform":
-        # consider notebooks & scripts a transform
-        uid, stem_uid, transform_version = get_stem_uid_and_version_from_file(filepath)
+        with open(filepath) as file:
+            content = file.read()
+        uid, stem_uid, version = parse_uid_from_code(content, filepath.suffix)
+        logger.important(f"mapped '{filepath}' on uid '{uid}'")
         if uid is not None:
             transform = ln.Transform.filter(uid=uid).one_or_none()
             if transform is None:
@@ -105,9 +102,7 @@ def save_from_filepath_cli(
                 )
                 return "not-tracked-in-transform-registry"
         else:
-            transform = ln.Transform.get(
-                uid__startswith=stem_uid, version=transform_version
-            )
+            transform = ln.Transform.get(uid__startswith=stem_uid, version=version)
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run.created_by.id != ln_setup.settings.user.id:
