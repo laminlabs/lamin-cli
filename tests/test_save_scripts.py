@@ -145,8 +145,7 @@ def test_run_save_with_params():
 
     # run the script
     result = subprocess.run(
-        f"python {filepath} --dataset-key mydata --learning-rate 0.01 --downsample"
-        " true",
+        f"python {filepath} --dataset-key mydata --learning-rate 0.01 --downsample",
         shell=True,
         capture_output=True,
     )
@@ -155,7 +154,7 @@ def test_run_save_with_params():
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "JjRF4mAC" in result.stdout.decode()
-    assert "created Run" in result.stdout.decode()
+    assert "started new Run" in result.stdout.decode()
 
     # you can re-save the script
     result = subprocess.run(
