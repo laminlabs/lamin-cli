@@ -177,7 +177,6 @@ def disconnect():
 @click.option("--schema", is_flag=True, help="View schema.")
 def info(schema: bool):
     """Show info about current instance."""
-    click.echo("`lamin info` is deprecated, please use `lamin settings`")
     if schema:
         from lamindb_setup._schema import view
 
