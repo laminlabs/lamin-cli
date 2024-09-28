@@ -35,19 +35,12 @@ else:
     COMMAND_GROUPS = {
         "lamin": [
             {
-                "name": "Connect an instance",
+                "name": "Connect to an instance",
                 "commands": [
-                    "init",
                     "connect",
                     "disconnect",
                     "info",
-                ],
-            },
-            {
-                "name": "Auth",
-                "commands": [
-                    "login",
-                    "logout",
+                    "init",
                 ],
             },
             {
@@ -56,11 +49,14 @@ else:
             },
             {
                 "name": "Configure",
-                "commands": ["cache", "settings"],
+                "commands": ["cache", "settings", "migrate"],
             },
             {
-                "name": "Schema migration",
-                "commands": ["migrate"],
+                "name": "Auth",
+                "commands": [
+                    "login",
+                    "logout",
+                ],
             },
         ]
     }
@@ -192,7 +188,7 @@ def disconnect():
 @main.command()
 @click.option("--schema", is_flag=True, help="View schema.")
 def info(schema: bool):
-    """Show info."""
+    """Show info about current instance."""
     click.echo("`lamin info` is deprecated, please use `lamin settings`")
     if schema:
         from lamindb_setup._schema import view
