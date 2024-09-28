@@ -241,10 +241,10 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     if is_slug:
         from lamindb_setup import settings as settings_, connect
 
-        click.echo(
-            "In the future `lamin load` will not be used to connect to an instance.\n"
-            "Please use `lamin connect <your-instance>`"
-        )
+        # can decide whether we want to actually deprecate
+        # click.echo(
+        #     f"! please use: lamin connect {entity}"
+        # )
         settings_.auto_connect = True
         return connect(slug=entity)
     else:
@@ -267,6 +267,7 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     """
     from lamin_cli._load import load as load_
 
+    click.echo(f"! to load a file or folder, please use: lamin load {entity}")
     return load_(entity, uid=uid, key=key, with_env=with_env)
 
 
