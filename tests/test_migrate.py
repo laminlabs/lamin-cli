@@ -15,7 +15,9 @@ def test_migrate_deploy():
     import lamindb as ln
 
     instance_slug = ln.setup.settings.instance.slug
-    exit_status = os.system("lamin load testuser1/static-test-instance-private-sqlite")
+    exit_status = os.system(
+        "lamin connect testuser1/static-test-instance-private-sqlite"
+    )
     assert exit_status == 0
     exit_status = os.system("lamin migrate deploy")
     assert exit_status == 0
@@ -27,7 +29,7 @@ def test_migrate_deploy():
     # )
     # import lamindb
     # assert instance["lamindb_version"] == lamindb.__version__
-    exit_status = os.system(f"lamin load {instance_slug}")
+    exit_status = os.system(f"lamin connect {instance_slug}")
     assert exit_status == 0
 
 

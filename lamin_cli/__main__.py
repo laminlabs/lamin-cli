@@ -35,26 +35,28 @@ else:
     COMMAND_GROUPS = {
         "lamin": [
             {
-                "name": "Main commands",
+                "name": "Connect to an instance",
                 "commands": [
-                    "login",
-                    "init",
-                    "load",
+                    "connect",
+                    "disconnect",
                     "info",
-                    "delete",
+                    "init",
                 ],
             },
             {
-                "name": "Data commands",
-                "commands": ["get", "save"],
+                "name": "Read & write data",
+                "commands": ["load", "save", "get", "delete"],
             },
             {
-                "name": "Configuration commands",
-                "commands": ["cache", "set"],
+                "name": "Configure",
+                "commands": ["cache", "settings", "migrate"],
             },
             {
-                "name": "Schema migration",
-                "commands": ["migrate"],
+                "name": "Auth",
+                "commands": [
+                    "login",
+                    "logout",
+                ],
             },
         ]
     }
@@ -63,7 +65,7 @@ else:
         @click.rich_config(
             help_config=click.RichHelpConfiguration(
                 command_groups=COMMAND_GROUPS,
-                style_commands_table_column_width_ratio=(1, 13),
+                style_commands_table_column_width_ratio=(1, 10),
             )
         )
         @click.group()
@@ -77,6 +79,7 @@ else:
 from click import Command, Context
 from lamindb_setup._silence_loggers import silence_loggers
 
+from lamin_cli._settings import settings
 from lamin_cli._cache import cache
 from lamin_cli._migration import migrate
 
@@ -96,8 +99,7 @@ def main():
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The API key.")
-@click.option("--logout", is_flag=True, help="Logout instead of logging in.")
-def login(user: str, key: Optional[str], logout: bool = False):
+def login(user: str, key: Optional[str]):
     """Log into LaminHub.
 
     Upon logging in the first time, you need to pass your API key via:
@@ -118,22 +120,25 @@ def login(user: str, key: Optional[str], logout: bool = False):
 
     You will be prompted for your Beta API key unless you set an environment variable `LAMIN_API_KEY`.
     """
-    if logout:
-        from lamindb_setup._setup_user import logout as logout_func
+    from lamindb_setup._setup_user import login as login_
 
-        return logout_func()
-    else:
-        from lamindb_setup._setup_user import login
-
-        if user is None:
-            if "LAMIN_API_KEY" in os.environ:
-                api_key = os.environ["LAMIN_API_KEY"]
-            else:
-                api_key = input("Your API key: ")
+    if user is None:
+        if "LAMIN_API_KEY" in os.environ:
+            api_key = os.environ["LAMIN_API_KEY"]
         else:
-            api_key = None
+            api_key = input("Your API key: ")
+    else:
+        api_key = None
 
-        return login(user, key=key, api_key=api_key)
+    return login_(user, key=key, api_key=api_key)
+
+
+@main.command()
+def logout():
+    """Log out of LaminHub."""
+    from lamindb_setup import logout as logout_
+
+    return logout_()
 
 
 # fmt: off
@@ -144,7 +149,7 @@ def login(user: str, key: Optional[str], logout: bool = False):
 @click.option("--name", type=str, default=None, help="The instance name.")
 # fmt: on
 def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
-    """Init a LaminDB instance."""
+    """Init an instance."""
     from lamindb_setup._init_instance import init as init_
 
     return init_(storage=storage, db=db, schema=schema, name=name)
@@ -152,41 +157,48 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 
 # fmt: off
 @main.command()
-@click.argument("instance", type=str, default=None, required=False)
-@click.option("--unload", is_flag=True, help="Unload the current instance.")
+@click.argument("instance", type=str)
 # fmt: on
-def load(instance: Optional[str], unload: bool):
-    """Load an instance for auto-connection.
+def connect(instance: str):
+    """Connect to an instance.
 
-    Pass a slug (`account/name`) or URL
-    (`https://lamin.ai/account/name`).
+    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
+
+    `lamin connect` switches
+    {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
+    auto-connect in a Python session upon importing `lamindb`.
     """
-    if unload:
-        from lamindb_setup._close import close as close_
+    from lamindb_setup import settings as settings_, connect as connect_
 
-        return close_()
-    else:
-        if instance is None:
-            raise click.UsageError("INSTANCE is required when loading an instance.")
-        from lamindb_setup import settings, connect
+    settings_.auto_connect = True
+    return connect_(slug=instance)
 
-        settings.auto_connect = True
-        return connect(slug=instance)
+
+@main.command()
+def disconnect():
+    """Disconnect from an instance.
+
+    Is the opposite of connecting to an instance.
+    """
+    from lamindb_setup import close as close_
+
+    return close_()
 
 
 @main.command()
 @click.option("--schema", is_flag=True, help="View schema.")
 def info(schema: bool):
     """Show info about current instance."""
+    click.echo("`lamin info` is deprecated, please use `lamin settings`")
     if schema:
         from lamindb_setup._schema import view
 
-        print("Open in browser: http://127.0.0.1:8000/schema/")
+        click.echo("Open in browser: http://127.0.0.1:8000/schema/")
         return view()
     else:
-        import lamindb_setup
+        from lamindb_setup import settings as settings_
 
-        print(lamindb_setup.settings)
+        click.echo(settings_)
 
 
 # fmt: off
@@ -195,7 +207,10 @@ def info(schema: bool):
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
 # fmt: on
 def delete(instance: str, force: bool = False):
-    """Delete an instance."""
+    """Delete an entity.
+
+    Currently only supports instance deletion.
+    """
     from lamindb_setup._delete import delete
 
     return delete(instance, force=force)
@@ -208,23 +223,52 @@ def delete(instance: str, force: bool = False):
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
-    """Query an entity.
+def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+    """Load a file or folder.
 
     Pass a URL, `artifact`, or `transform`. For example:
 
     ```
-    lamin get https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin get artifact --key mydatasets/mytable.parquet
-    lamin get artifact --uid e2G7k9EVul4JbfsEYAy5
-    lamin get transform --key analysis.ipynb
-    lamin get transform --uid Vul4JbfsEYAy5
-    lamin get transform --uid Vul4JbfsEYAy5 --with-env
+    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin load artifact --key mydatasets/mytable.parquet
+    lamin load artifact --uid e2G7k9EVul4JbfsEYAy5
+    lamin load transform --key analysis.ipynb
+    lamin load transform --uid Vul4JbfsEYAy5
+    lamin load transform --uid Vul4JbfsEYAy5 --with-env
     ```
     """
-    from lamin_cli._get import get
+    is_slug = entity.count("/") == 1
+    if is_slug:
+        from lamindb_setup import settings as settings_, connect
 
-    return get(entity, uid=uid, key=key, with_env=with_env)
+        # can decide whether we want to actually deprecate
+        # click.echo(
+        #     f"! please use: lamin connect {entity}"
+        # )
+        settings_.auto_connect = True
+        return connect(slug=entity)
+    else:
+        from lamin_cli._load import load as load_
+
+        return load_(entity, uid=uid, key=key, with_env=with_env)
+
+
+@main.command()
+@click.argument("entity", type=str)
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
+@click.option(
+    "--with-env", is_flag=True, help="Also return the environment for a tranform."
+)
+def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+    """Query metadata about an entity.
+
+    Currently only works for artifact & transform and behaves like `lamin load`.
+    """
+    from lamin_cli._load import load as load_
+
+    click.echo(f"! to load a file or folder, please use: lamin load {entity}")
+    return load_(entity, uid=uid, key=key, with_env=with_env)
 
 
 @main.command()
@@ -235,36 +279,22 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 @click.option("--description", type=str, default=None)
 @click.option("--registry", type=str, default=None)
 def save(filepath: str, key: str, description: str, registry: str):
-    """Save file or folder."""
+    """Save a file or folder.
+
+    Defaults to saving `.py` and `.ipynb` as :class:`~lamindb.Transform` and
+    other file types and folders as :class:`~lamindb.Artifact`.
+
+    You can save a `.py` or `.ipynb` file as an :class:`~lamindb.Artifact` by
+    passing `--registry artifact`.
+    """
     from lamin_cli._save import save_from_filepath_cli
 
     if save_from_filepath_cli(filepath, key, description, registry) is not None:
         sys.exit(1)
 
 
+main.add_command(settings)
 main.add_command(cache)
-
-
-@main.command(name="set")
-@click.argument(
-    "setting",
-    type=click.Choice(["auto-connect", "private-django-api"], case_sensitive=False),
-)
-@click.argument("value", type=click.BOOL)
-def set_(setting: str, value: bool):
-    """Update settings.
-
-    - `auto-connect` → {attr}`~lamindb.setup.core.SetupSettings.auto_connect`
-    - `private-django-api` → {attr}`~lamindb.setup.core.SetupSettings.private_django_api`
-    """
-    from lamindb_setup import settings
-
-    if setting == "auto-connect":
-        settings.auto_connect = value
-    if setting == "private-django-api":
-        settings.private_django_api = value
-
-
 main.add_command(migrate)
 
 

@@ -1,4 +1,4 @@
-from lamin_cli._get import decompose_url
+from lamin_cli._load import decompose_url
 import subprocess
 
 
@@ -17,7 +17,7 @@ def test_decompose_url():
 
 def test_get_transform():
     result = subprocess.run(
-        "lamin get"
+        "lamin load"
         " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
         " --with-env",  # noqa
         shell=True,
@@ -28,7 +28,7 @@ def test_get_transform():
 
 def test_get_artifact():
     result = subprocess.run(
-        "lamin get"
+        "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",  # noqa
         shell=True,
         capture_output=True,

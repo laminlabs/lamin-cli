@@ -108,7 +108,7 @@ def test_run_save_cache():
 
     # try to get the the source code via command line
     result = subprocess.run(
-        "lamin get"
+        "lamin load"
         f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",  # noqa
         shell=True,
         capture_output=True,
@@ -117,7 +117,7 @@ def test_run_save_cache():
     assert result.returncode == 0
 
     result = subprocess.run(
-        f"lamin get transform --key {filepath.name}",  # noqa
+        f"lamin load transform --key {filepath.name}",  # noqa
         shell=True,
         capture_output=True,
     )
@@ -125,7 +125,7 @@ def test_run_save_cache():
     assert result.returncode == 0
 
     result = subprocess.run(
-        f"lamin get transform --uid m5uCHTTpJnjQ0000",  # noqa
+        f"lamin load transform --uid m5uCHTTpJnjQ0000",  # noqa
         shell=True,
         capture_output=True,
     )
