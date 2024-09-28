@@ -35,23 +35,27 @@ else:
     COMMAND_GROUPS = {
         "lamin": [
             {
-                "name": "Main commands",
+                "name": "Connect an instance",
                 "commands": [
-                    "login",
-                    "logout",
                     "init",
                     "connect",
                     "disconnect",
                     "info",
-                    "delete",
                 ],
             },
             {
-                "name": "Data commands",
-                "commands": ["load", "save"],
+                "name": "Auth",
+                "commands": [
+                    "login",
+                    "logout",
+                ],
             },
             {
-                "name": "Configuration commands",
+                "name": "Read & write data",
+                "commands": ["load", "save", "get", "delete"],
+            },
+            {
+                "name": "Configure",
                 "commands": ["cache", "settings"],
             },
             {
@@ -135,7 +139,7 @@ def login(user: str, key: Optional[str]):
 
 @main.command()
 def logout():
-    """Logout."""
+    """Log out of LaminHub."""
     from lamindb_setup import logout as logout_
 
     return logout_()
@@ -149,7 +153,7 @@ def logout():
 @click.option("--name", type=str, default=None, help="The instance name.")
 # fmt: on
 def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
-    """Init a LaminDB instance."""
+    """Init an instance."""
     from lamindb_setup._init_instance import init as init_
 
     return init_(storage=storage, db=db, schema=schema, name=name)
@@ -160,9 +164,13 @@ def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[
 @click.argument("instance", type=str)
 # fmt: on
 def connect(instance: str):
-    """Load an instance for auto-connection.
+    """Connect to an instance.
 
     Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
+
+    `lamin connect` switches
+    {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
+    auto-connect in a Python session upon importing `lamindb`.
     """
     from lamindb_setup import settings as settings_, connect as connect_
 
@@ -172,7 +180,7 @@ def connect(instance: str):
 
 @main.command()
 def disconnect():
-    """Disconnect from an existing instance.
+    """Disconnect from an instance.
 
     Is the opposite of connecting to an instance.
     """
@@ -184,7 +192,7 @@ def disconnect():
 @main.command()
 @click.option("--schema", is_flag=True, help="View schema.")
 def info(schema: bool):
-    """Show info about current instance."""
+    """Show info."""
     click.echo("`lamin info` is deprecated, please use `lamin settings`")
     if schema:
         from lamindb_setup._schema import view
@@ -203,7 +211,10 @@ def info(schema: bool):
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
 # fmt: on
 def delete(instance: str, force: bool = False):
-    """Delete an instance."""
+    """Delete an entity.
+
+    Currently only supports instance deletion.
+    """
     from lamindb_setup._delete import delete
 
     return delete(instance, force=force)
@@ -217,7 +228,7 @@ def delete(instance: str, force: bool = False):
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
-    """Query an entity.
+    """Load a file or folder.
 
     Pass a URL, `artifact`, or `transform`. For example:
 
@@ -254,7 +265,10 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
-    """Deprecated, please use `lamin load`."""
+    """Query metadata about an entity.
+
+    Currently only works for artifact & transform and behaves like `lamin load`.
+    """
     from lamin_cli._load import load as load_
 
     return load_(entity, uid=uid, key=key, with_env=with_env)
@@ -268,7 +282,14 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 @click.option("--description", type=str, default=None)
 @click.option("--registry", type=str, default=None)
 def save(filepath: str, key: str, description: str, registry: str):
-    """Save file or folder."""
+    """Save a file or folder.
+
+    Defaults to saving `.py` and `.ipynb` as :class:`~lamindb.Transform` and
+    other file types and folders as :class:`~lamindb.Artifact`.
+
+    You can save a `.py` or `.ipynb` file as an :class:`~lamindb.Artifact` by
+    passing `--registry artifact`.
+    """
     from lamin_cli._save import save_from_filepath_cli
 
     if save_from_filepath_cli(filepath, key, description, registry) is not None:
