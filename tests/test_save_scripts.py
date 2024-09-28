@@ -34,7 +34,7 @@ def test_run_save_cache():
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
-    assert "created Run" in result.stdout.decode()
+    assert "started new Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
     assert transform.hash == "MoIciBQ0lpVPCKQGofPX6g"
@@ -53,7 +53,7 @@ def test_run_save_cache():
     assert result.returncode == 0
     assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
-    assert "loaded Run" in result.stdout.decode()
+    assert "started Run" in result.stdout.decode()
     assert "source code is already saved" in result.stdout.decode()
 
     # you can re-save the script
@@ -138,9 +138,14 @@ def test_run_save_with_params():
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-with-params.py"
 
+    # define params
+    ln.Param(name="dataset_key", dtype="str").save()
+    ln.Param(name="learning_rate", dtype="float").save()
+    ln.Param(name="downsample", dtype="bool").save()
+
     # run the script
     result = subprocess.run(
-        f"python {filepath} --dataset-key mydata --learning-rate 0.01 --split train",
+        f"python {filepath} --dataset-key mydata --learning-rate 0.01 --downsample",
         shell=True,
         capture_output=True,
     )
@@ -149,7 +154,7 @@ def test_run_save_with_params():
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "JjRF4mAC" in result.stdout.decode()
-    assert "created Run" in result.stdout.decode()
+    assert "started new Run" in result.stdout.decode()
 
     # you can re-save the script
     result = subprocess.run(
