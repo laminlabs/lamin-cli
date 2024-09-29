@@ -43,9 +43,19 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
     if entity == "transform":
         transform = (
-            ln.Transform.get(uid) if uid is not None else ln.Transform.get(key=key)
+            ln.Transform.get(uid)
+            if uid is not None
+            # if below, we take is_latest=True as the criterion, we might get draft notebooks
+            # hence, we use source_code__isnull=False and order by created_at instead
+            else ln.Transform.filter(key=key, source_code__isnull=False)
+            .order_by("-created_at")
+            .first()
         )
         target_filename = transform.key
+        if Path(target_filename).exists():
+            response = input(f"! {target_filename} exists: replace? (y/n)")
+            if response != "y":
+                raise SystemExit("Aborted.")
         if transform._source_code_artifact_id is not None:
             # backward compat
             filepath_cache = transform._source_code_artifact.cache()
@@ -54,12 +64,12 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             filepath_cache.rename(target_filename)
         elif transform.source_code is not None:
             if transform.key.endswith(".ipynb"):
-                script_to_notebook(transform, target_filename)
+                script_to_notebook(transform, target_filename, bump_revision=True)
             else:
                 Path(target_filename).write_text(transform.source_code)
         else:
-            raise ValueError("No source code available for this transform.")
-        logger.important(target_filename)
+            raise SystemExit("No source code available for this transform.")
+        logger.important(f"{transform.type} is here: {target_filename}")
         if with_env:
             if (
                 transform.latest_run is not None
@@ -73,7 +83,9 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 logger.important(target_env_filename)
             else:
                 logger.warning("latest transform run with environment doesn't exist")
+        return target_filename
     elif entity == "artifact":
         artifact = ln.Artifact.get(uid) if uid is not None else ln.Artifact.get(key=key)
         cache_path = artifact.cache()
-        logger.important(cache_path)
+        logger.important(f"artifact is here: {cache_path}")
+        return cache_path
