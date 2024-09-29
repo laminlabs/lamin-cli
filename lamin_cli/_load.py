@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
-import lamindb_setup as ln_setup
 from pathlib import Path
 from line_profiler import profile
 
@@ -18,38 +17,43 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
 
 @profile
 def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+    import lamindb_setup as ln_setup
+
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
-        instance_slug, entity, uid = decompose_url(url)
+        instance, entity, uid = decompose_url(url)
     elif entity not in {"artifact", "transform"}:
         raise SystemExit("Entity has to be a laminhub URL or 'artifact' or 'transform'")
     else:
-        instance_slug = None
+        instance = ln_setup.settings.instance.slug
 
-    if instance_slug is not None:
-        auto_connect = ln_setup.settings.auto_connect
-        # we don't want to auto-connect when importing lamindb
-        ln_setup.settings.auto_connect = False
+    ln_setup.connect(instance)
+    from lnschema_core import models as ln
 
-        import lamindb as ln
-        from lamindb._finish import script_to_notebook
+    def script_to_notebook(
+        transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
+    ) -> None:
+        import jupytext
+        from lamin_utils._base62 import increment_base62
 
-        ln_setup.settings.auto_connect = auto_connect
-        ln.connect(instance_slug)
-    else:
-        import lamindb as ln
-        from lamindb._finish import script_to_notebook
-
-    # below is to silence warnings about missing run inputs
-    ln.settings.track_run_inputs = False
+        py_content = transform.source_code.replace(
+            "# # transform.name", f"# # {transform.name}"
+        )
+        if bump_revision:
+            uid = transform.uid
+            new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
+            py_content = py_content.replace(uid, new_uid)
+            logger.important(f"updated uid: {uid} → {new_uid}")
+        notebook = jupytext.reads(py_content, fmt="py:percent")
+        jupytext.write(notebook, notebook_path)
 
     if entity == "transform":
         transform = (
-            ln.Transform.get(uid)
+            ln.Transform.objects.get(uid=uid)
             if uid is not None
             # if below, we take is_latest=True as the criterion, we might get draft notebooks
             # hence, we use source_code__isnull=False and order by created_at instead
-            else ln.Transform.filter(key=key, source_code__isnull=False)
+            else ln.Transform.objects.filter(key=key, source_code__isnull=False)
             .order_by("-created_at")
             .first()
         )
@@ -58,8 +62,11 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         #     response = input(f"! {target_filename} exists: replace? (y/n)")
         #     if response != "y":
         #         raise SystemExit("Aborted.")
-        if transform._source_code_artifact_id is not None:
-            # backward compat
+        if transform._source_code_artifact_id is not None:  # backward compat
+            # need lamindb here to have .cache() available
+            import lamindb as ln
+
+            ln.settings.track_run_inputs = False
             filepath_cache = transform._source_code_artifact.cache()
             if not target_filename.endswith(transform._source_code_artifact.suffix):
                 target_filename += transform._source_code_artifact.suffix
@@ -73,6 +80,9 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             raise SystemExit("No source code available for this transform.")
         logger.important(f"{transform.type} is here: {target_filename}")
         if with_env:
+            import lamindb as ln
+
+            ln.settings.track_run_inputs = False
             if (
                 transform.latest_run is not None
                 and transform.latest_run.environment is not None
@@ -87,7 +97,16 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 logger.warning("latest transform run with environment doesn't exist")
         return target_filename
     elif entity == "artifact":
-        artifact = ln.Artifact.get(uid) if uid is not None else ln.Artifact.get(key=key)
+        import lamindb as ln
+
+        ln.settings.track_run_inputs = False
+        artifact = (
+            ln.Artifact.get(uid)
+            if uid is not None
+            else ln.Artifact.filter(key=key, source_code__isnull=False)
+            .order_by("-created_at")
+            .first()
+        )
         cache_path = artifact.cache()
         logger.important(f"artifact is here: {cache_path}")
         return cache_path
