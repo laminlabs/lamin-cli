@@ -43,7 +43,9 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
     if entity == "transform":
         transform = (
-            ln.Transform.get(uid) if uid is not None else ln.Transform.get(key=key)
+            ln.Transform.get(uid)
+            if uid is not None
+            else ln.Transform.get(key=key, is_latest=True)
         )
         target_filename = transform.key
         if Path(target_filename).exists():

@@ -85,12 +85,13 @@ def test_run_save_cache():
     assert result.returncode == 1
     assert "Did not find blob hash" in result.stderr.decode()
 
-    # edit the script to remove the git integration
+    # edit the script to remove the git integration & ln.finish
     content = filepath.read_text()
     content_lines = content.split("\n")
     content_lines.remove(
         'ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"'
     )
+    content_lines.remove("    ln.finish()")
     content = "\n".join(content_lines)
     filepath.write_text(content)
 
@@ -101,10 +102,47 @@ def test_run_save_cache():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 1
     assert "Source code changed, bump revision by setting" in result.stderr.decode()
+
+    # update the uid
+    content = filepath.read_text()
+    filepath.write_text(content.replace("m5uCHTTpJnjQ0000", "m5uCHTTpJnjQ0001"))
+
+    # re-run the script that lacks ln.finish(), hence doesn't yet save source code
+    result = subprocess.run(
+        f"python {filepath}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
+    assert result.returncode == 0
+    assert "created Transform(" in result.stdout.decode()
+    assert "started new Run(" in result.stdout.decode()
+
+    # login a different user
+    assert ln.setup.settings.user.handle != "testuser2"
+    result = subprocess.run(
+        "lamin login testuser2",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    # re-run the script through the second user
+    result = subprocess.run(
+        f"python {filepath}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
+    assert result.returncode == 1
+    assert "already works on this draft" in result.stderr.decode()
 
     # try to get the the source code via command line
     result = subprocess.run(
