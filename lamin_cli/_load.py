@@ -45,7 +45,11 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         transform = (
             ln.Transform.get(uid)
             if uid is not None
-            else ln.Transform.get(key=key, is_latest=True)
+            # if below, we take is_latest=True as the criterion, we might get draft notebooks
+            # hence, we use source_code__isnull=False and order by created_at instead
+            else ln.Transform.filter(key=key, source_code__isnull=False)
+            .order_by("-created_at")
+            .first()
         )
         target_filename = transform.key
         if Path(target_filename).exists():
@@ -64,7 +68,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             else:
                 Path(target_filename).write_text(transform.source_code)
         else:
-            raise ValueError("No source code available for this transform.")
+            raise SystemExit("No source code available for this transform.")
         logger.important(f"{transform.type} is here: {target_filename}")
         if with_env:
             if (
