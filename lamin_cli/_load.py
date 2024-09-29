@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
 from pathlib import Path
-from line_profiler import profile
 
 
 def decompose_url(url: str) -> Tuple[str, str, str]:
@@ -15,7 +14,6 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
     return instance_slug, entity, uid
 
 
-@profile
 def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     import lamindb_setup as ln_setup
 
