@@ -3,6 +3,7 @@ from typing import Tuple
 from lamin_utils import logger
 import lamindb_setup as ln_setup
 from pathlib import Path
+from line_profiler import profile
 
 
 def decompose_url(url: str) -> Tuple[str, str, str]:
@@ -15,6 +16,7 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
     return instance_slug, entity, uid
 
 
+@profile
 def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
@@ -52,10 +54,10 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             .first()
         )
         target_filename = transform.key
-        if Path(target_filename).exists():
-            response = input(f"! {target_filename} exists: replace? (y/n)")
-            if response != "y":
-                raise SystemExit("Aborted.")
+        # if Path(target_filename).exists():
+        #     response = input(f"! {target_filename} exists: replace? (y/n)")
+        #     if response != "y":
+        #         raise SystemExit("Aborted.")
         if transform._source_code_artifact_id is not None:
             # backward compat
             filepath_cache = transform._source_code_artifact.cache()
