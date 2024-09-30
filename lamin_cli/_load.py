@@ -56,10 +56,10 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             .first()
         )
         target_filename = transform.key
-        # if Path(target_filename).exists():
-        #     response = input(f"! {target_filename} exists: replace? (y/n)")
-        #     if response != "y":
-        #         raise SystemExit("Aborted.")
+        if Path(target_filename).exists():
+            response = input(f"! {target_filename} exists: replace? (y/n)")
+            if response != "y":
+                raise SystemExit("Aborted.")
         if transform._source_code_artifact_id is not None:  # backward compat
             # need lamindb here to have .cache() available
             import lamindb as ln
