@@ -15,7 +15,7 @@ def cache():
 @cache.command("set")
 @click.argument(
     "cache_dir",
-    type=click.Path(exists=True, dir_okay=True, file_okay=False),
+    type=click.Path(dir_okay=True, file_okay=False),
 )
 def set_cache(cache_dir: str):
     """Set the cache directory."""
