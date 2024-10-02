@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
+import shutil
 from pathlib import Path
 
 
@@ -68,7 +69,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             filepath_cache = transform._source_code_artifact.cache()
             if not target_filename.endswith(transform._source_code_artifact.suffix):
                 target_filename += transform._source_code_artifact.suffix
-            filepath_cache.rename(target_filename)
+            shutil.move(filepath_cache, target_filename)
         elif transform.source_code is not None:
             if transform.key.endswith(".ipynb"):
                 script_to_notebook(transform, target_filename, bump_revision=True)
@@ -89,8 +90,8 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 target_env_filename = (
                     ".".join(target_filename.split(".")[:-1]) + "__requirements.txt"
                 )
-                filepath_env_cache.rename(target_env_filename)
-                logger.important(target_env_filename)
+                shutil.move(filepath_env_cache, target_env_filename)
+                logger.important(f"environment is here: {target_env_filename}")
             else:
                 logger.warning("latest transform run with environment doesn't exist")
         return target_filename
