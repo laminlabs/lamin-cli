@@ -8,7 +8,8 @@ authors = [{name = "Lamin Labs", email = "open-source@lamin.ai"}]
 readme = "README.md"
 dynamic = ["version", "description"]
 dependencies = [
-    "rich-click>=1.7"
+    "rich-click>=1.7",
+    "lamindb_setup",
 ]
 
 [project.urls]
