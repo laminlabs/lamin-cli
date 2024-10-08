@@ -268,10 +268,10 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 def save(filepath: str, key: str, description: str, registry: str):
     """Save a file or folder.
 
-    Defaults to saving `.py` and `.ipynb` as :class:`~lamindb.Transform` and
-    other file types and folders as :class:`~lamindb.Artifact`.
+    Defaults to saving `.py` and `.ipynb` as {class}`~lamindb.Transform` and
+    other file types and folders as {class}`~lamindb.Artifact`.
 
-    You can save a `.py` or `.ipynb` file as an :class:`~lamindb.Artifact` by
+    You can save a `.py` or `.ipynb` file as an {class}`~lamindb.Artifact` by
     passing `--registry artifact`.
     """
     from lamin_cli._save import save_from_filepath_cli
