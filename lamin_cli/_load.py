@@ -52,23 +52,25 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         if query_by_uid:
             # we don't use .get here because DoesNotExist is hard to catch
             # due to private django API
-            transforms = ln.Transform.objects.filter(
-                uid__startswith=uid, is_latest=True
-            )
+            # here full uid is not expected anymore as before
+            # via ln.Transform.objects.get(uid=uid)
+            transforms = ln.Transform.objects.filter(uid__startswith=uid)
         else:
             # if below, we take is_latest=True as the criterion, we might get draft notebooks
             # hence, we use source_code__isnull=False and order by created_at instead
             transforms = ln.Transform.objects.filter(key=key, source_code__isnull=False)
 
-        if len(transforms) == 0:
-            err_msg = f"uid={uid}" if query_by_uid else f"key={key} and source_code"
+        if (n_transforms := len(transforms)) == 0:
+            err_msg = (
+                f"uid strating with {uid}"
+                if query_by_uid
+                else f"key={key} and source_code"
+            )
             raise SystemExit(f"Transform with {err_msg} does not exist.")
 
-        transform = (
-            transforms.one()
-            if query_by_uid
-            else transforms.order_by("-created_at").first()
-        )
+        if n_transforms > 1:
+            transforms = transforms.order_by("-created_at")
+        transform = transforms.first()
 
         target_filename = transform.key
         if Path(target_filename).exists():
@@ -117,19 +119,17 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         if query_by_uid:
             # we don't use .get here because DoesNotExist is hard to catch
             # due to private django API
-            artifacts = ln.Artifact.filter(uid__startswith=uid, is_latest=True)
+            artifacts = ln.Artifact.filter(uid__startswith=uid)
         else:
             artifacts = ln.Artifact.filter(key=key)
 
-        if len(artifacts) == 0:
-            err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
+        if (n_artifacts := len(artifacts)) == 0:
+            err_msg = f"uid strating with {uid}" if query_by_uid else f"key={key}"
             raise SystemExit(f"Artifact with {err_msg} does not exist.")
 
-        artifact = (
-            artifacts.one()
-            if query_by_uid
-            else artifacts.order_by("-created_at").first()
-        )
+        if n_artifacts > 1:
+            artifacts = artifacts.order_by("-created_at")
+        artifact = artifacts.first()
 
         cache_path = artifact.cache()
         logger.important(f"artifact is here: {cache_path}")
