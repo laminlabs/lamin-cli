@@ -46,16 +46,32 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         notebook = jupytext.reads(py_content, fmt="py:percent")
         jupytext.write(notebook, notebook_path)
 
+    query_by_uid = uid is not None
+
     if entity == "transform":
-        transform = (
-            ln.Transform.objects.get(uid=uid)
-            if uid is not None
+        if query_by_uid:
+            # we don't use .get here because DoesNotExist is hard to catch
+            # due to private django API
+            # here full uid is not expected anymore as before
+            # via ln.Transform.objects.get(uid=uid)
+            transforms = ln.Transform.objects.filter(uid__startswith=uid)
+        else:
             # if below, we take is_latest=True as the criterion, we might get draft notebooks
             # hence, we use source_code__isnull=False and order by created_at instead
-            else ln.Transform.objects.filter(key=key, source_code__isnull=False)
-            .order_by("-created_at")
-            .first()
-        )
+            transforms = ln.Transform.objects.filter(key=key, source_code__isnull=False)
+
+        if (n_transforms := len(transforms)) == 0:
+            err_msg = (
+                f"uid strating with {uid}"
+                if query_by_uid
+                else f"key={key} and source_code"
+            )
+            raise SystemExit(f"Transform with {err_msg} does not exist.")
+
+        if n_transforms > 1:
+            transforms = transforms.order_by("-created_at")
+        transform = transforms.first()
+
         target_filename = transform.key
         if Path(target_filename).exists():
             response = input(f"! {target_filename} exists: replace? (y/n)")
@@ -99,13 +115,22 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         import lamindb as ln
 
         ln.settings.track_run_inputs = False
-        artifact = (
-            ln.Artifact.get(uid)
-            if uid is not None
-            else ln.Artifact.filter(key=key, source_code__isnull=False)
-            .order_by("-created_at")
-            .first()
-        )
+
+        if query_by_uid:
+            # we don't use .get here because DoesNotExist is hard to catch
+            # due to private django API
+            artifacts = ln.Artifact.filter(uid__startswith=uid)
+        else:
+            artifacts = ln.Artifact.filter(key=key)
+
+        if (n_artifacts := len(artifacts)) == 0:
+            err_msg = f"uid strating with {uid}" if query_by_uid else f"key={key}"
+            raise SystemExit(f"Artifact with {err_msg} does not exist.")
+
+        if n_artifacts > 1:
+            artifacts = artifacts.order_by("-created_at")
+        artifact = artifacts.first()
+
         cache_path = artifact.cache()
         logger.important(f"artifact is here: {cache_path}")
         return cache_path
