@@ -102,9 +102,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         artifact = (
             ln.Artifact.get(uid)
             if uid is not None
-            else ln.Artifact.filter(key=key, source_code__isnull=False)
-            .order_by("-created_at")
-            .first()
+            else ln.Artifact.filter(key=key).order_by("-created_at").first()
         )
         cache_path = artifact.cache()
         logger.important(f"artifact is here: {cache_path}")
