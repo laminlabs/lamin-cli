@@ -45,7 +45,7 @@ def test_get_artifact():
 
     # partial uid
     result = subprocess.run(
-        "lamin load artifact --uid e2G7k9EVul4JbfsEYA'",
+        "lamin load artifact --uid e2G7k9EVul4JbfsEYA",
         shell=True,
         capture_output=True,
     )
