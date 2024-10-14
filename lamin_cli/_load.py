@@ -46,16 +46,30 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         notebook = jupytext.reads(py_content, fmt="py:percent")
         jupytext.write(notebook, notebook_path)
 
+    query_by_uid = uid is not None
+
     if entity == "transform":
-        transform = (
-            ln.Transform.objects.get(uid=uid)
-            if uid is not None
+        if query_by_uid:
+            # we don't use .get here because DoesNotExist is hard to catch
+            # due to private django API
+            transforms = ln.Transform.objects.filter(
+                uid__startswith=uid, is_latest=True
+            )
+        else:
             # if below, we take is_latest=True as the criterion, we might get draft notebooks
             # hence, we use source_code__isnull=False and order by created_at instead
-            else ln.Transform.objects.filter(key=key, source_code__isnull=False)
-            .order_by("-created_at")
-            .first()
+            transforms = ln.Transform.objects.filter(key=key, source_code__isnull=False)
+
+        if len(transforms) == 0:
+            err_msg = f"uid={uid}" if query_by_uid else f"key={key} and source_code"
+            raise SystemExit(f"Transform with {err_msg} does not exist.")
+
+        transform = (
+            transforms.one()
+            if query_by_uid
+            else transforms.order_by("-created_at").first()
         )
+
         target_filename = transform.key
         if Path(target_filename).exists():
             response = input(f"! {target_filename} exists: replace? (y/n)")
@@ -99,11 +113,24 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         import lamindb as ln
 
         ln.settings.track_run_inputs = False
+
+        if query_by_uid:
+            # we don't use .get here because DoesNotExist is hard to catch
+            # due to private django API
+            artifacts = ln.Artifact.filter(uid__startswith=uid, is_latest=True)
+        else:
+            artifacts = ln.Artifact.filter(key=key)
+
+        if len(artifacts) == 0:
+            err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
+            raise SystemExit(f"Artifact with {err_msg} does not exist.")
+
         artifact = (
-            ln.Artifact.get(uid)
-            if uid is not None
-            else ln.Artifact.filter(key=key).order_by("-created_at").first()
+            artifacts.one()
+            if query_by_uid
+            else artifacts.order_by("-created_at").first()
         )
+
         cache_path = artifact.cache()
         logger.important(f"artifact is here: {cache_path}")
         return cache_path
