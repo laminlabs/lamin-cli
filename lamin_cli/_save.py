@@ -44,11 +44,12 @@ def parse_uid_from_code(
     version = version_match.group(1) if version_match else None
 
     if uid is None and (stem_uid is None or version is None):
+        target = "script" if suffix == ".py" else "notebook"
         raise SystemExit(
             "Cannot infer transform uid."
-            "\nCall `ln.track()` and copy/paste the output"
-            " into the notebook"
+            f"\nCall `ln.track()` and copy/paste the output into the {target}."
         )
+
     return uid, stem_uid, version
 
 
