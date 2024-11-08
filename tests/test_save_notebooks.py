@@ -36,7 +36,7 @@ def test_save_non_consecutive():
 
     # here, we're mimicking a non-consecutive run
     transform = ln.Transform(
-        uid="HDMGkxN9rgFA",
+        uid="HDMGkxN9rgFA0000",
         version="1",
         name="My test notebook (non-consecutive)",
         type="notebook",
