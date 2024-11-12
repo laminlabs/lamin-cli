@@ -72,8 +72,18 @@ def save_from_filepath_cli(
 
     ln_setup.settings.auto_connect = auto_connect_state
 
+    suffixes_transform = {
+        "py": set([".py", ".ipynb"]),
+        "R": set([".R", ".qmd", ".Rmd"]),
+    }
+
     if registry is None:
-        registry = "transform" if filepath.suffix in {".py", ".ipynb"} else "artifact"
+        registry = (
+            "transform"
+            if filepath.suffix
+            in suffixes_transform["py"].union(suffixes_transform["R"])
+            else "artifact"
+        )
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
@@ -92,32 +102,39 @@ def save_from_filepath_cli(
     elif registry == "transform":
         with open(filepath) as file:
             content = file.read()
-        uid, stem_uid, version = parse_uid_from_code(content, filepath.suffix)
-        logger.important(f"mapped '{filepath}' on uid '{uid}'")
-        if uid is not None:
-            transform = ln.Transform.filter(uid=uid).one_or_none()
-            if transform is None:
-                logger.error(
-                    f"Did not find uid '{uid}'"
-                    " in Transform registry. Did you run `ln.track()`?"
+        # python code
+        if filepath.suffix in suffixes_transform[".py"]:
+            uid, stem_uid, version = parse_uid_from_code(content, filepath.suffix)
+            logger.important(f"mapped '{filepath}' on uid '{uid}'")
+            if uid is not None:
+                transform = ln.Transform.filter(uid=uid).one_or_none()
+                if transform is None:
+                    logger.error(
+                        f"Did not find uid '{uid}'"
+                        " in Transform registry. Did you run `ln.track()`?"
+                    )
+                    return "not-tracked-in-transform-registry"
+            else:
+                transform = ln.Transform.get(uid__startswith=stem_uid, version=version)
+            # latest run of this transform by user
+            run = ln.Run.filter(transform=transform).order_by("-started_at").first()
+            if run.created_by.id != ln_setup.settings.user.id:
+                response = input(
+                    "You are trying to save a transform created by another user: Source"
+                    " and report files will be tagged with *your* user id. Proceed?"
+                    " (y/n)"
                 )
-                return "not-tracked-in-transform-registry"
-        else:
-            transform = ln.Transform.get(uid__startswith=stem_uid, version=version)
-        # latest run of this transform by user
-        run = ln.Run.filter(transform=transform).order_by("-started_at").first()
-        if run.created_by.id != ln_setup.settings.user.id:
-            response = input(
-                "You are trying to save a transform created by another user: Source and"
-                " report files will be tagged with *your* user id. Proceed? (y/n)"
+                if response != "y":
+                    return "aborted-save-notebook-created-by-different-user"
+            return save_context_core(
+                run=run,
+                transform=transform,
+                filepath=filepath,
+                from_cli=True,
             )
-            if response != "y":
-                return "aborted-save-notebook-created-by-different-user"
-        return save_context_core(
-            run=run,
-            transform=transform,
-            filepath=filepath,
-            from_cli=True,
-        )
+        # R code
+        else:
+            transform = ln.Transform.filter(key=filepath.name).one_or_none()
+            return "hello"
     else:
         raise SystemExit("Allowed values for '--registry' are: 'artifact', 'transform'")
