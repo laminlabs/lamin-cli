@@ -10,7 +10,10 @@ def parse_uid_from_code(
     content: str, suffix: str
 ) -> tuple[str | None, str | None, str | None]:
     if suffix == ".py":
-        track_pattern = re.compile(r'ln\.track\(\s*(?:uid\s*=\s*)?["\']([^"\']+)["\']')
+        track_pattern = re.compile(
+            r'ln\.track\(\s*(?:transform\s*=\s*)?(["\'])([a-zA-Z0-9]{16})\1'
+        )
+        # backward compat
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*["\']([^"\']+)["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*["\']([^"\']+)["\']'
@@ -18,8 +21,9 @@ def parse_uid_from_code(
         version_pattern = re.compile(r'\.transform\.version\s*=\s*["\']([^"\']+)["\']')
     elif suffix == ".ipynb":
         track_pattern = re.compile(
-            r'ln\.track\(\s*(?:uid\s*=\s*)?\\["\']([^"\']+)\\["\']'
+            r'ln\.track\(\s*(?:transform\s*=\s*)?(?:\\"|\')([a-zA-Z0-9]{16})(?:\\"|\')'
         )
+        # backward compat
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*\\["\']([^"\']+)\\["\']')
         stem_uid_pattern = re.compile(
             r'\.transform\.stem_uid\s*=\s*\\["\']([^"\']+)\\["\']'
@@ -28,7 +32,9 @@ def parse_uid_from_code(
             r'\.transform\.version\s*=\s*\\["\']([^"\']+)\\["\']'
         )
     elif suffix in {".R", ".qmd", ".Rmd"}:
-        track_pattern = re.compile(r'track\(\s*[\'"]([a-zA-Z0-9]{16})[\'"]')
+        track_pattern = re.compile(
+            r'track\(\s*(?:transform\s*=\s*)?([\'"])([a-zA-Z0-9]{16})\1'
+        )
         uid_pattern = None
         stem_uid_pattern = None
         version_pattern = None
@@ -40,7 +46,8 @@ def parse_uid_from_code(
 
     # Search for matches in the entire file content
     uid_match = track_pattern.search(content)
-    uid = uid_match.group(1) if uid_match else None
+    group_index = 1 if suffix == ".ipynb" else 2
+    uid = uid_match.group(group_index) if uid_match else None
     stem_uid = None
     version = None
 
@@ -55,10 +62,9 @@ def parse_uid_from_code(
         version = version_match.group(1) if version_match else None
 
     if uid is None and (stem_uid is None or version is None):
-        target = "script" if suffix == ".py" else "notebook"
+        target = "script" if suffix in {".py", ".R"} else "notebook"
         raise SystemExit(
-            "Cannot infer transform uid."
-            f"\nCall `ln.track()` and copy/paste the output into the {target}."
+            f"Cannot infer transform uid. Did you run `ln.track()` in your {target}?"
         )
 
     return uid, stem_uid, version
