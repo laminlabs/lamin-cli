@@ -22,7 +22,7 @@ def test_save_not_initialized():
     )
     assert result.returncode == 1
     assert (
-        "Call `ln.track()` and copy/paste the output into the notebook"
+        "Cannot infer transform uid. Did you run `ln.track()` in your notebook?"
         in result.stderr.decode()
     )
 
