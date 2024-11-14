@@ -27,21 +27,32 @@ def parse_uid_from_code(
         version_pattern = re.compile(
             r'\.transform\.version\s*=\s*\\["\']([^"\']+)\\["\']'
         )
+    elif suffix in {".R", ".qmd", ".Rmd"}:
+        track_pattern = re.compile(r'track\(\s*[\'"]([a-zA-Z0-9]{16})[\'"]')
+        uid_pattern = None
+        stem_uid_pattern = None
+        version_pattern = None
     else:
-        raise ValueError("Only .py and .ipynb files are supported.")
+        raise SystemExit(
+            "Only .py, .ipynb, .R, .qmd, .Rmd files are supported for saving"
+            " transforms."
+        )
 
     # Search for matches in the entire file content
     uid_match = track_pattern.search(content)
     uid = uid_match.group(1) if uid_match else None
-    if uid is None:
-        uid_match = uid_pattern.search(content)
-    stem_uid_match = stem_uid_pattern.search(content)
-    version_match = version_pattern.search(content)
+    stem_uid = None
+    version = None
 
-    # Extract values if matches are found
-    uid = uid_match.group(1) if uid_match else None
-    stem_uid = stem_uid_match.group(1) if stem_uid_match else None
-    version = version_match.group(1) if version_match else None
+    if uid_pattern is not None and uid is None:
+        uid_match = uid_pattern.search(content)
+        uid = uid_match.group(1) if uid_match else None
+    if stem_uid_pattern is not None:
+        stem_uid_match = stem_uid_pattern.search(content)
+        stem_uid = stem_uid_match.group(1) if stem_uid_match else None
+    if version_pattern is not None:
+        version_match = version_pattern.search(content)
+        version = version_match.group(1) if version_match else None
 
     if uid is None and (stem_uid is None or version is None):
         target = "script" if suffix == ".py" else "notebook"
@@ -72,8 +83,27 @@ def save_from_filepath_cli(
 
     ln_setup.settings.auto_connect = auto_connect_state
 
+    suffixes_transform = {
+        "py": set([".py", ".ipynb"]),
+        "R": set([".R", ".qmd", ".Rmd"]),
+    }
+
+    if (
+        filepath.suffix in {".qmd", ".Rmd"}
+        and not filepath.with_suffix(".html").exists()
+    ):
+        raise SystemExit(
+            f"Please export your {filepath.suffix} file as an html file here"
+            f" {filepath.with_suffix('.html')}"
+        )
+
     if registry is None:
-        registry = "transform" if filepath.suffix in {".py", ".ipynb"} else "artifact"
+        registry = (
+            "transform"
+            if filepath.suffix
+            in suffixes_transform["py"].union(suffixes_transform["R"])
+            else "artifact"
+        )
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
@@ -108,16 +138,28 @@ def save_from_filepath_cli(
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run.created_by.id != ln_setup.settings.user.id:
             response = input(
-                "You are trying to save a transform created by another user: Source and"
-                " report files will be tagged with *your* user id. Proceed? (y/n)"
+                "You are trying to save a transform created by another user: Source"
+                " and report files will be tagged with *your* user id. Proceed?"
+                " (y/n)"
             )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
-        return save_context_core(
+        return_code = save_context_core(
             run=run,
             transform=transform,
             filepath=filepath,
             from_cli=True,
         )
+        if filepath.suffix in {".qmd", ".Rmd"}:
+            report_file = ln.Artifact(
+                filepath.with_suffix(".html"),  # validated at the top that this exists
+                description=f"Report of run {run.uid}",
+                visibility=0,  # hidden file
+                run=False,
+            )
+            report_file.save(upload=True, print_progress=False)
+            run.report = report_file
+            run.save()
+        return return_code
     else:
         raise SystemExit("Allowed values for '--registry' are: 'artifact', 'transform'")
