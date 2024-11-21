@@ -30,6 +30,7 @@ def test_run_save_cache():
 
     transform = ln.Transform.get("EPnfDtJz8qbE0000")
     assert transform.source_code is not None
+    assert transform.type == "script"
 
     # now test a .qmd file (.Rmd adheres to same principles)
     filepath = scripts_dir / "run-track.qmd"
@@ -69,5 +70,6 @@ def test_run_save_cache():
     transform = ln.Transform.get("HPnfDtJz8qbE0000")
     assert transform.source_code is not None
     assert transform.latest_run.report is not None
+    assert transform.type == "notebook"
 
     filepath.with_suffix(".html").unlink()
