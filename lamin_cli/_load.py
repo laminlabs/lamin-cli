@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
 import shutil
+import re
 from pathlib import Path
 
 
@@ -35,16 +36,39 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         import jupytext
         from lamin_utils._base62 import increment_base62
 
-        py_content = transform.source_code.replace(
-            "# # transform.name", f"# # {transform.name}"
-        )
+        if notebook_path.suffix == ".ipynb":
+            new_content = transform.source_code.replace(
+                "# # transform.name", f"# # {transform.name}"
+            )
+        else:  # R notebook
+            # Pattern to match title only within YAML header section
+            title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
+            title_match = re.search(
+                title_pattern, transform.source_code, flags=re.DOTALL | re.MULTILINE
+            )
+            new_content = transform.source_code
+            if title_match:
+                current_title = title_match.group(1)
+                if current_title != transform.name:
+                    pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
+                    replacement = f'\\1"{transform.name}"\\3'
+                    new_content = re.sub(
+                        pattern,
+                        replacement,
+                        new_content,
+                        flags=re.DOTALL | re.MULTILINE,
+                    )
+                    logger.important(f"fixed title: {current_title} → {transform.name}")
         if bump_revision:
             uid = transform.uid
             new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
-            py_content = py_content.replace(uid, new_uid)
+            new_content = new_content.replace(uid, new_uid)
             logger.important(f"updated uid: {uid} → {new_uid}")
-        notebook = jupytext.reads(py_content, fmt="py:percent")
-        jupytext.write(notebook, notebook_path)
+        if notebook_path.suffix == ".ipynb":
+            notebook = jupytext.reads(new_content, fmt="py:percent")
+            jupytext.write(notebook, notebook_path)
+        else:
+            notebook_path.write_text(new_content)
 
     query_by_uid = uid is not None
 
@@ -61,11 +85,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             transforms = ln.Transform.objects.filter(key=key, source_code__isnull=False)
 
         if (n_transforms := len(transforms)) == 0:
-            err_msg = (
-                f"uid strating with {uid}"
-                if query_by_uid
-                else f"key={key} and source_code"
-            )
+            err_msg = f"uid {uid}" if query_by_uid else f"key={key} and source_code"
             raise SystemExit(f"Transform with {err_msg} does not exist.")
 
         if n_transforms > 1:
@@ -87,8 +107,8 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 target_filename += transform._source_code_artifact.suffix
             shutil.move(filepath_cache, target_filename)
         elif transform.source_code is not None:
-            if transform.key.endswith(".ipynb"):
-                script_to_notebook(transform, target_filename, bump_revision=True)
+            if transform.key.endswith((".ipynb", ".Rmd", ".qmd")):
+                script_to_notebook(transform, Path(target_filename), bump_revision=True)
             else:
                 Path(target_filename).write_text(transform.source_code)
         else:
