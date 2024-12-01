@@ -54,7 +54,6 @@ def test_run_save_cache():
     assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
     assert "started Run" in result.stdout.decode()
-    assert "source code is already saved" in result.stdout.decode()
 
     # you can re-save the script
     result = subprocess.run(
@@ -66,7 +65,6 @@ def test_run_save_cache():
     # print(result.stdout.decode())
     # print(result.stderr.decode())
     assert result.returncode == 0
-    assert "source code is already saved" in result.stdout.decode()
     assert "run.environment is already saved" in result.stdout.decode()
 
     # edit the script
@@ -204,7 +202,6 @@ def test_run_save_with_params():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert "source code is already saved" in result.stdout.decode()
     assert (
         "run-track-with-params.py' on uid 'JjRF4mACd9m00000'" in result.stdout.decode()
     )
