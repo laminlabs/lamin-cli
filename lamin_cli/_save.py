@@ -94,14 +94,23 @@ def save_from_filepath_cli(
         "R": set([".R", ".qmd", ".Rmd"]),
     }
 
-    if (
-        filepath.suffix in {".qmd", ".Rmd"}
-        and not filepath.with_suffix(".html").exists()
-    ):
-        raise SystemExit(
-            f"Please export your {filepath.suffix} file as an html file here"
-            f" {filepath.with_suffix('.html')}"
-        )
+    if filepath.suffix in {".qmd", ".Rmd"}:
+        if not (
+            filepath.with_suffix(".html").exists()
+            or filepath.with_suffix(".nb.html").exists()
+        ):
+            raise SystemExit(
+                f"Please export your {filepath.suffix} file as an html file here"
+                f" {filepath.with_suffix('.html')}"
+            )
+        if (
+            filepath.with_suffix(".html").exists()
+            and filepath.with_suffix(".nb.html").exists()
+        ):
+            raise SystemExit(
+                f'Please delete one of\n - {filepath.with_suffix(".html")}\n -'
+                f' {filepath.with_suffix(".nb.html")}'
+            )
 
     if registry is None:
         registry = (
@@ -156,16 +165,6 @@ def save_from_filepath_cli(
             filepath=filepath,
             from_cli=True,
         )
-        if filepath.suffix in {".qmd", ".Rmd"}:
-            report_file = ln.Artifact(
-                filepath.with_suffix(".html"),  # validated at the top that this exists
-                description=f"Report of run {run.uid}",
-                visibility=0,  # hidden file
-                run=False,
-            )
-            report_file.save(upload=True, print_progress=False)
-            run.report = report_file
-            run.save()
         return return_code
     else:
         raise SystemExit("Allowed values for '--registry' are: 'artifact', 'transform'")
