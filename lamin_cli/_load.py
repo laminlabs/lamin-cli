@@ -135,8 +135,8 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 and transform.latest_run.environment is not None
             ):
                 filepath_env_cache = transform.latest_run.environment.cache()
-                target_env_filename = target_relpath.with_suffix("").with_suffix(
-                    "__requirements.txt"
+                target_env_filename = (
+                    target_relpath.parent / f"{target_relpath.stem}__requirements.txt"
                 )
                 shutil.move(filepath_env_cache, target_env_filename)
                 logger.important(f"environment is here: {target_env_filename}")
