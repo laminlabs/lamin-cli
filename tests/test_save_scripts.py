@@ -20,7 +20,7 @@ def test_run_save_cache():
         capture_output=True,
     )
     # print(result.stdout.decode())
-    assert result.returncode == 1
+    assert result.returncode == 0
     assert "Did you run `ln.track()`?" in result.stdout.decode()
 
     # run the script
