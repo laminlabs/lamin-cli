@@ -109,17 +109,27 @@ def save_from_filepath_cli(
         with open(filepath) as file:
             content = file.read()
         uid = parse_uid_from_code(content, filepath.suffix)
-        logger.important(f"mapped '{filepath}' on uid '{uid}'")
-        transform = ln.Transform.filter(uid=uid).one_or_none()
-        if transform is None:
-            logger.error(
-                f"Did not find uid '{uid}'"
-                " in Transform registry. Did you run `ln.track()`?"
-            )
-            return "not-tracked-in-transform-registry"
+        if uid is not None:
+            logger.important(f"mapped '{filepath}' on uid '{uid}'")
+            transform = ln.Transform.filter(uid=uid).one_or_none()
+            if transform is None:
+                logger.error(
+                    f"Did not find uid '{uid}'"
+                    " in Transform registry. Did you run `ln.track()`?"
+                )
+                return "not-tracked-in-transform-registry"
+        else:
+            transform = ln.Transform.filter(key=filepath.name).one_or_none()
+            if transform is None:
+                transform = ln.Transform(
+                    name=filepath.name,
+                    key=filepath.name,
+                    type="script" if filepath.suffix in {".R", ".py"} else "notebook",
+                ).save()
+                logger.important(f"created Transform('{transform.uid}')")
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
-        if run.created_by.id != ln_setup.settings.user.id:
+        if run is not None and run.created_by.id != ln_setup.settings.user.id:
             response = input(
                 "You are trying to save a transform created by another user: Source"
                 " and report files will be tagged with *your* user id. Proceed?"
