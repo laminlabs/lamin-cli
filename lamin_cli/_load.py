@@ -92,28 +92,34 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             transforms = transforms.order_by("-created_at")
         transform = transforms.first()
 
-        target_filename = transform.key
-        if Path(target_filename).exists():
-            response = input(f"! {target_filename} exists: replace? (y/n)")
+        target_relpath = Path(transform.key)
+        if target_relpath.exists():
+            response = input(f"! {target_relpath} exists: replace? (y/n)")
             if response != "y":
                 raise SystemExit("Aborted.")
+
         if transform._source_code_artifact_id is not None:  # backward compat
             # need lamindb here to have .cache() available
             import lamindb as ln
 
             ln.settings.track_run_inputs = False
             filepath_cache = transform._source_code_artifact.cache()
-            if not target_filename.endswith(transform._source_code_artifact.suffix):
-                target_filename += transform._source_code_artifact.suffix
-            shutil.move(filepath_cache, target_filename)
+            if not target_relpath.suffix == transform._source_code_artifact.suffix:
+                target_relpath = target_relpath.with_suffix(
+                    transform._source_code_artifact.suffix
+                )
+            shutil.move(filepath_cache, target_relpath)
+
         elif transform.source_code is not None:
-            if transform.key.endswith((".ipynb", ".Rmd", ".qmd")):
-                script_to_notebook(transform, Path(target_filename), bump_revision=True)
+            if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
+                script_to_notebook(transform, target_relpath, bump_revision=True)
             else:
-                Path(target_filename).write_text(transform.source_code)
+                target_relpath.write_text(transform.source_code)
         else:
             raise SystemExit("No source code available for this transform.")
-        logger.important(f"{transform.type} is here: {target_filename}")
+
+        logger.important(f"{transform.type} is here: {target_relpath}")
+
         if with_env:
             import lamindb as ln
 
@@ -123,14 +129,15 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 and transform.latest_run.environment is not None
             ):
                 filepath_env_cache = transform.latest_run.environment.cache()
-                target_env_filename = (
-                    ".".join(target_filename.split(".")[:-1]) + "__requirements.txt"
+                target_env_filename = target_relpath.with_suffix("").with_suffix(
+                    "__requirements.txt"
                 )
                 shutil.move(filepath_env_cache, target_env_filename)
                 logger.important(f"environment is here: {target_env_filename}")
             else:
                 logger.warning("latest transform run with environment doesn't exist")
-        return target_filename
+
+        return target_relpath
     elif entity == "artifact":
         import lamindb as ln
 
@@ -144,7 +151,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             artifacts = ln.Artifact.filter(key=key)
 
         if (n_artifacts := len(artifacts)) == 0:
-            err_msg = f"uid strating with {uid}" if query_by_uid else f"key={key}"
+            err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
             raise SystemExit(f"Artifact with {err_msg} does not exist.")
 
         if n_artifacts > 1:
