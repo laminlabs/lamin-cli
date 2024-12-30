@@ -93,7 +93,12 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         transform = transforms.first()
 
         target_relpath = Path(transform.key)
-        target_relpath.parent.mkdir(parents=True, exist_ok=True)
+        if len(target_relpath.parents) > 1:
+            logger.important(
+                "preserve the folder structure for versioning:"
+                f" {target_relpath.parent}/"
+            )
+            target_relpath.parent.mkdir(parents=True, exist_ok=True)
         if target_relpath.exists():
             response = input(f"! {target_relpath} exists: replace? (y/n)")
             if response != "y":
