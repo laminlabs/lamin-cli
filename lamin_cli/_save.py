@@ -6,38 +6,23 @@ from lamin_utils import logger
 import re
 
 
-def parse_uid_from_code(
-    content: str, suffix: str
-) -> tuple[str | None, str | None, str | None]:
+def parse_uid_from_code(content: str, suffix: str) -> str | None:
     if suffix == ".py":
         track_pattern = re.compile(
             r'ln\.track\(\s*(?:transform\s*=\s*)?(["\'])([a-zA-Z0-9]{16})\1'
         )
-        # backward compat
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*["\']([^"\']+)["\']')
-        stem_uid_pattern = re.compile(
-            r'\.transform\.stem_uid\s*=\s*["\']([^"\']+)["\']'
-        )
-        version_pattern = re.compile(r'\.transform\.version\s*=\s*["\']([^"\']+)["\']')
     elif suffix == ".ipynb":
         track_pattern = re.compile(
             r'ln\.track\(\s*(?:transform\s*=\s*)?(?:\\"|\')([a-zA-Z0-9]{16})(?:\\"|\')'
         )
         # backward compat
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*\\["\']([^"\']+)\\["\']')
-        stem_uid_pattern = re.compile(
-            r'\.transform\.stem_uid\s*=\s*\\["\']([^"\']+)\\["\']'
-        )
-        version_pattern = re.compile(
-            r'\.transform\.version\s*=\s*\\["\']([^"\']+)\\["\']'
-        )
     elif suffix in {".R", ".qmd", ".Rmd"}:
         track_pattern = re.compile(
             r'track\(\s*(?:transform\s*=\s*)?([\'"])([a-zA-Z0-9]{16})\1'
         )
         uid_pattern = None
-        stem_uid_pattern = None
-        version_pattern = None
     else:
         raise SystemExit(
             "Only .py, .ipynb, .R, .qmd, .Rmd files are supported for saving"
@@ -48,26 +33,12 @@ def parse_uid_from_code(
     uid_match = track_pattern.search(content)
     group_index = 1 if suffix == ".ipynb" else 2
     uid = uid_match.group(group_index) if uid_match else None
-    stem_uid = None
-    version = None
 
     if uid_pattern is not None and uid is None:
         uid_match = uid_pattern.search(content)
         uid = uid_match.group(1) if uid_match else None
-    if stem_uid_pattern is not None:
-        stem_uid_match = stem_uid_pattern.search(content)
-        stem_uid = stem_uid_match.group(1) if stem_uid_match else None
-    if version_pattern is not None:
-        version_match = version_pattern.search(content)
-        version = version_match.group(1) if version_match else None
 
-    if uid is None and (stem_uid is None or version is None):
-        target = "script" if suffix in {".py", ".R"} else "notebook"
-        raise SystemExit(
-            f"Cannot infer transform uid. Did you run `ln.track()` in your {target}?"
-        )
-
-    return uid, stem_uid, version
+    return uid
 
 
 def save_from_filepath_cli(
@@ -137,9 +108,9 @@ def save_from_filepath_cli(
     elif registry == "transform":
         with open(filepath) as file:
             content = file.read()
-        uid, stem_uid, version = parse_uid_from_code(content, filepath.suffix)
-        logger.important(f"mapped '{filepath}' on uid '{uid}'")
+        uid = parse_uid_from_code(content, filepath.suffix)
         if uid is not None:
+            logger.important(f"mapped '{filepath}' on uid '{uid}'")
             transform = ln.Transform.filter(uid=uid).one_or_none()
             if transform is None:
                 logger.error(
@@ -148,10 +119,17 @@ def save_from_filepath_cli(
                 )
                 return "not-tracked-in-transform-registry"
         else:
-            transform = ln.Transform.get(uid__startswith=stem_uid, version=version)
+            transform = ln.Transform.filter(key=filepath.name).one_or_none()
+            if transform is None:
+                transform = ln.Transform(
+                    name=filepath.name,
+                    key=filepath.name,
+                    type="script" if filepath.suffix in {".R", ".py"} else "notebook",
+                ).save()
+                logger.important(f"created Transform('{transform.uid}')")
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
-        if run.created_by.id != ln_setup.settings.user.id:
+        if run is not None and run.created_by.id != ln_setup.settings.user.id:
             response = input(
                 "You are trying to save a transform created by another user: Source"
                 " and report files will be tagged with *your* user id. Proceed?"

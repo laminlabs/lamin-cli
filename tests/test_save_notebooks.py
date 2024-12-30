@@ -20,11 +20,7 @@ def test_save_not_initialized():
         capture_output=True,
         env=env,
     )
-    assert result.returncode == 1
-    assert (
-        "Cannot infer transform uid. Did you run `ln.track()` in your notebook?"
-        in result.stderr.decode()
-    )
+    assert result.returncode == 0
 
 
 def test_save_non_consecutive():

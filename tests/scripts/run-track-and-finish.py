@@ -1,7 +1,8 @@
 import lamindb as ln
 
 ln.context.name = "My good script 2"
-ln.track("VFYCIuaw2GsX0000")
+# purposefully do not pass uid
+ln.track()
 
 
 if __name__ == "__main__":

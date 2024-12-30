@@ -1,4 +1,3 @@
-import pytest
 from lamin_cli._save import parse_uid_from_code
 
 
@@ -33,13 +32,12 @@ def test_python_track_pattern():
 
     # Test valid cases
     for content, expected_uid in valid_cases:
-        uid, _, _ = parse_uid_from_code(content, ".py")
+        uid = parse_uid_from_code(content, ".py")
         assert uid == expected_uid, f"Failed for valid content: {content}"
 
     # Test invalid cases
     for content in invalid_cases:
-        with pytest.raises(SystemExit):
-            uid, _, _ = parse_uid_from_code(content, ".py")
+        assert parse_uid_from_code(content, ".py") is None
 
 
 def test_jupyter_track_pattern():
@@ -70,14 +68,12 @@ def test_jupyter_track_pattern():
 
     # Test valid cases
     for content, expected_uid in valid_cases:
-        uid, _, _ = parse_uid_from_code(content, ".ipynb")
+        uid = parse_uid_from_code(content, ".ipynb")
         assert uid == expected_uid, f"Failed for valid content: {content}"
 
     # Test invalid cases
     for content in invalid_cases:
-        print(content)
-        with pytest.raises(SystemExit):
-            uid, _, _ = parse_uid_from_code(content, ".py")
+        assert parse_uid_from_code(content, ".py") is None
 
 
 def test_edge_cases():
@@ -99,8 +95,7 @@ def test_edge_cases():
     ]
 
     for content, expected_uid, suffix in test_cases:
-        print(content)
-        uid, _, _ = parse_uid_from_code(content, suffix)
+        uid = parse_uid_from_code(content, suffix)
         assert uid == expected_uid, f"Failed for content: {content}"
 
 
@@ -116,7 +111,7 @@ def test_r_track_pattern():
     # Test valid cases across all R-related suffixes
     for suffix in suffixes:
         for content, expected_uid in valid_cases:
-            uid, _, _ = parse_uid_from_code(content, suffix)
+            uid = parse_uid_from_code(content, suffix)
             assert (
                 uid == expected_uid
             ), f"Failed for valid content with {suffix}: {content}"
