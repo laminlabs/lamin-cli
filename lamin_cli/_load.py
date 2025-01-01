@@ -28,7 +28,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
-    from lnschema_core import models as ln
+    from lamindb import models as ln
 
     def script_to_notebook(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
