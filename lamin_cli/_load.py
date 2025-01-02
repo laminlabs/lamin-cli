@@ -127,8 +127,6 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         logger.important(f"{transform.type} is here: {target_relpath}")
 
         if with_env:
-            import lamindb as ln
-
             ln.settings.track_run_inputs = False
             if (
                 transform.latest_run is not None
@@ -145,8 +143,6 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
         return target_relpath
     elif entity == "artifact":
-        import lamindb as ln
-
         ln.settings.track_run_inputs = False
 
         if query_by_uid:

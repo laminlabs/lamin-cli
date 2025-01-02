@@ -1,7 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Union
-import lamindb_setup as ln_setup
 from lamin_utils import logger
 import re
 
@@ -47,6 +46,8 @@ def save_from_filepath_cli(
     description: str | None,
     registry: str | None,
 ) -> str | None:
+    import lamindb_setup as ln_setup
+
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
 
