@@ -35,6 +35,6 @@ def test_migrate_deploy():
 
 # def test_migrate_squash():
 #     exit_status = os.system(
-#         "yes | lamin migrate squash --package-name lnschema_core --end-number 0023"
+#         "yes | lamin migrate squash --package-name lamindb --end-number 0023"
 #     )
 #     assert exit_status == 0
