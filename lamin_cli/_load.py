@@ -104,19 +104,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             if response != "y":
                 raise SystemExit("Aborted.")
 
-        if transform._source_code_artifact_id is not None:  # backward compat
-            # need lamindb here to have .cache() available
-            import lamindb as ln
-
-            ln.settings.track_run_inputs = False
-            filepath_cache = transform._source_code_artifact.cache()
-            if not target_relpath.suffix == transform._source_code_artifact.suffix:
-                target_relpath = target_relpath.with_suffix(
-                    transform._source_code_artifact.suffix
-                )
-            shutil.move(filepath_cache, target_relpath)
-
-        elif transform.source_code is not None:
+        if transform.source_code is not None:
             if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
                 script_to_notebook(transform, target_relpath, bump_revision=True)
             else:
