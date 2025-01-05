@@ -38,7 +38,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
         if notebook_path.suffix == ".ipynb":
             new_content = transform.source_code.replace(
-                "# # transform.name", f"# # {transform.name}"
+                "# # transform.description", f"# # {transform.description}"
             )
         else:  # R notebook
             # Pattern to match title only within YAML header section
@@ -49,16 +49,18 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             new_content = transform.source_code
             if title_match:
                 current_title = title_match.group(1)
-                if current_title != transform.name:
+                if current_title != transform.description:
                     pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
-                    replacement = f'\\1"{transform.name}"\\3'
+                    replacement = f'\\1"{transform.description}"\\3'
                     new_content = re.sub(
                         pattern,
                         replacement,
                         new_content,
                         flags=re.DOTALL | re.MULTILINE,
                     )
-                    logger.important(f"fixed title: {current_title} → {transform.name}")
+                    logger.important(
+                        f"fixed title: {current_title} → {transform.description}"
+                    )
         if bump_revision:
             uid = transform.uid
             new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
