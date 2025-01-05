@@ -83,7 +83,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
     assert transform is not None
     assert transform.latest_run.report is None
-    assert transform._source_code_artifact is None
+    assert transform.source_code is None
     assert transform.latest_run.environment is None
 
     # and save again
@@ -129,7 +129,6 @@ print("my consecutive cell")
     # }
     # testing for the hash of the report makes no sense because it contains timestamps
     assert transform.latest_run.environment.path.exists()
-    assert transform._source_code_artifact is None
 
     # edit the notebook
     nb = read_notebook(notebook_path)
@@ -165,7 +164,6 @@ print("my consecutive cell")
     assert transform.latest_run.report.path == transform.latest_run.report.path
     assert transform.hash == "BhQpym0JfeypqhVMPlQ0ng"
     assert transform.latest_run.environment.path.exists()
-    assert transform._source_code_artifact is None
 
     # get the the source code via command line
     result = subprocess.run(

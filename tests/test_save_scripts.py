@@ -55,7 +55,6 @@ def test_run_save_cache_with_git_and_uid():
     transform = ln.Transform.get("m5uCHTTpJnjQ")
     assert transform.hash == "MoIciBQ0lpVPCKQGofPX6g"
     assert transform.latest_run.environment.path.exists()
-    assert transform._source_code_artifact is None
 
     # you can rerun the same script
     result = subprocess.run(
