@@ -118,7 +118,7 @@ def test_run_save_cache_with_git_and_uid():
     # print(result.stdout.decode())
     # print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Source code changed, bump revision by setting" in result.stderr.decode()
+    assert "✗ source code changed, run:" in result.stderr.decode()
 
     # update the uid
     content = filepath.read_text()
