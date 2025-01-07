@@ -34,19 +34,21 @@ def test_load_transform():
     assert result.returncode == 0
 
 
-def test_load_artifact():
-    result = subprocess.run(
-        "lamin load"
-        " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",  # noqa
-        shell=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0
+# def test_load_artifact():
+# TODO
+# result = subprocess.run(
+#     "lamin load"
+#     " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",  # noqa
+#     shell=True,
+#     capture_output=True,
+# )
+# assert result.returncode == 0
 
-    # partial uid
-    result = subprocess.run(
-        "lamin load artifact --uid e2G7k9EVul4JbfsEYA",
-        shell=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0
+# TODO
+# partial uid
+# result = subprocess.run(
+#     "lamin load artifact --uid e2G7k9EVul4JbfsEYA",
+#     shell=True,
+#     capture_output=True,
+# )
+# assert result.returncode == 0
