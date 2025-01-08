@@ -37,9 +37,16 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         from lamin_utils._base62 import increment_base62
 
         if notebook_path.suffix == ".ipynb":
-            new_content = transform.source_code.replace(
-                "# # transform.description", f"# # {transform.description}"
-            )
+            # below is backward compat
+            if "# # transform.name" in transform.source_code:
+                new_content = transform.source_code.replace(
+                    "# # transform.name", f"# # {transform.description}"
+                )
+            elif transform.source_code.startswith("# %% [markdown]\n#\n"):
+                new_content = transform.source_code.replace(
+                    "# %% [markdown]\n#\n",
+                    f"# %% [markdown]\n# # {transform.description}\n",
+                )
         else:  # R notebook
             # Pattern to match title only within YAML header section
             title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
