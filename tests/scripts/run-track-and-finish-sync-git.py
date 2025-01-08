@@ -1,6 +1,7 @@
 import lamindb as ln
 
 ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
+ln.context.name = "My good script"
 ln.track("m5uCHTTpJnjQ0000")
 
 
