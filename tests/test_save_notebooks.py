@@ -115,7 +115,7 @@ ln.track("hlsFXswrJjtt0000")
 print("my consecutive cell")
 """
     )
-    assert transform.hash == "OwVL-0-_gmk8heR3zV7BkA"
+    assert transform.hash == "ik5Dilxs2RmwOGydohFolQ"
     # below is the test that we can use if store the run repot as `.ipynb`
     # and not as html as we do right now
     assert transform.latest_run.report.suffix == ".html"
@@ -162,7 +162,7 @@ print("my consecutive cell")
     transform = ln.Transform.get("hlsFXswrJjtt0000")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.hash == "BhQpym0JfeypqhVMPlQ0ng"
+    assert transform.hash == "Jv0_TrZfzM-0erbp1FGdrQ"
     assert transform.latest_run.environment.path.exists()
 
     # get the the source code via command line
