@@ -15,7 +15,7 @@ def test_decompose_url():
         assert uid == "1GCKs8zLtkc85zKv"
 
 
-def test_get_transform():
+def test_load_transform():
     result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
@@ -34,7 +34,7 @@ def test_get_transform():
     assert result.returncode == 0
 
 
-def test_get_artifact():
+def test_load_artifact():
     result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",  # noqa

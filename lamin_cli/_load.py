@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Tuple
 from lamin_utils import logger
 import shutil
+import re
 from pathlib import Path
 
 
@@ -27,7 +28,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
-    from lnschema_core import models as ln
+    import lamindb as ln
 
     def script_to_notebook(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
@@ -35,16 +36,39 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         import jupytext
         from lamin_utils._base62 import increment_base62
 
-        py_content = transform.source_code.replace(
-            "# # transform.name", f"# # {transform.name}"
-        )
+        if notebook_path.suffix == ".ipynb":
+            new_content = transform.source_code.replace(
+                "# # transform.name", f"# # {transform.name}"
+            )
+        else:  # R notebook
+            # Pattern to match title only within YAML header section
+            title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
+            title_match = re.search(
+                title_pattern, transform.source_code, flags=re.DOTALL | re.MULTILINE
+            )
+            new_content = transform.source_code
+            if title_match:
+                current_title = title_match.group(1)
+                if current_title != transform.name:
+                    pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
+                    replacement = f'\\1"{transform.name}"\\3'
+                    new_content = re.sub(
+                        pattern,
+                        replacement,
+                        new_content,
+                        flags=re.DOTALL | re.MULTILINE,
+                    )
+                    logger.important(f"fixed title: {current_title} → {transform.name}")
         if bump_revision:
             uid = transform.uid
             new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
-            py_content = py_content.replace(uid, new_uid)
+            new_content = new_content.replace(uid, new_uid)
             logger.important(f"updated uid: {uid} → {new_uid}")
-        notebook = jupytext.reads(py_content, fmt="py:percent")
-        jupytext.write(notebook, notebook_path)
+        if notebook_path.suffix == ".ipynb":
+            notebook = jupytext.reads(new_content, fmt="py:percent")
+            jupytext.write(notebook, notebook_path)
+        else:
+            notebook_path.write_text(new_content)
 
     query_by_uid = uid is not None
 
@@ -61,42 +85,48 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             transforms = ln.Transform.objects.filter(key=key, source_code__isnull=False)
 
         if (n_transforms := len(transforms)) == 0:
-            err_msg = (
-                f"uid strating with {uid}"
-                if query_by_uid
-                else f"key={key} and source_code"
-            )
+            err_msg = f"uid {uid}" if query_by_uid else f"key={key} and source_code"
             raise SystemExit(f"Transform with {err_msg} does not exist.")
 
         if n_transforms > 1:
             transforms = transforms.order_by("-created_at")
         transform = transforms.first()
 
-        target_filename = transform.key
-        if Path(target_filename).exists():
-            response = input(f"! {target_filename} exists: replace? (y/n)")
+        target_relpath = Path(transform.key)
+        if len(target_relpath.parents) > 1:
+            logger.important(
+                "preserve the folder structure for versioning:"
+                f" {target_relpath.parent}/"
+            )
+            target_relpath.parent.mkdir(parents=True, exist_ok=True)
+        if target_relpath.exists():
+            response = input(f"! {target_relpath} exists: replace? (y/n)")
             if response != "y":
                 raise SystemExit("Aborted.")
+
         if transform._source_code_artifact_id is not None:  # backward compat
             # need lamindb here to have .cache() available
             import lamindb as ln
 
             ln.settings.track_run_inputs = False
             filepath_cache = transform._source_code_artifact.cache()
-            if not target_filename.endswith(transform._source_code_artifact.suffix):
-                target_filename += transform._source_code_artifact.suffix
-            shutil.move(filepath_cache, target_filename)
+            if not target_relpath.suffix == transform._source_code_artifact.suffix:
+                target_relpath = target_relpath.with_suffix(
+                    transform._source_code_artifact.suffix
+                )
+            shutil.move(filepath_cache, target_relpath)
+
         elif transform.source_code is not None:
-            if transform.key.endswith(".ipynb"):
-                script_to_notebook(transform, target_filename, bump_revision=True)
+            if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
+                script_to_notebook(transform, target_relpath, bump_revision=True)
             else:
-                Path(target_filename).write_text(transform.source_code)
+                target_relpath.write_text(transform.source_code)
         else:
             raise SystemExit("No source code available for this transform.")
-        logger.important(f"{transform.type} is here: {target_filename}")
-        if with_env:
-            import lamindb as ln
 
+        logger.important(f"{transform.type} is here: {target_relpath}")
+
+        if with_env:
             ln.settings.track_run_inputs = False
             if (
                 transform.latest_run is not None
@@ -104,16 +134,15 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             ):
                 filepath_env_cache = transform.latest_run.environment.cache()
                 target_env_filename = (
-                    ".".join(target_filename.split(".")[:-1]) + "__requirements.txt"
+                    target_relpath.parent / f"{target_relpath.stem}__requirements.txt"
                 )
                 shutil.move(filepath_env_cache, target_env_filename)
                 logger.important(f"environment is here: {target_env_filename}")
             else:
                 logger.warning("latest transform run with environment doesn't exist")
-        return target_filename
-    elif entity == "artifact":
-        import lamindb as ln
 
+        return target_relpath
+    elif entity == "artifact":
         ln.settings.track_run_inputs = False
 
         if query_by_uid:
@@ -124,7 +153,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             artifacts = ln.Artifact.filter(key=key)
 
         if (n_artifacts := len(artifacts)) == 0:
-            err_msg = f"uid strating with {uid}" if query_by_uid else f"key={key}"
+            err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
             raise SystemExit(f"Artifact with {err_msg} does not exist.")
 
         if n_artifacts > 1:

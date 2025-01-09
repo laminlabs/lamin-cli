@@ -8,7 +8,23 @@ from lamindb_setup import settings
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
 
-def test_run_save_cache():
+def test_save_without_uid():
+    env = os.environ
+    env["LAMIN_TESTING"] = "true"
+    filepath = scripts_dir / "run-track-and-finish.py"
+
+    # attempt to save the script without it yet being run
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+    )
+    # print(result.stdout.decode())
+    assert result.returncode == 0
+    assert "created Transform" in result.stdout.decode()
+
+
+def test_run_save_cache_with_git_and_uid():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-and-finish-sync-git.py"
@@ -54,7 +70,6 @@ def test_run_save_cache():
     assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
     assert "started Run" in result.stdout.decode()
-    assert "source code is already saved" in result.stdout.decode()
 
     # you can re-save the script
     result = subprocess.run(
@@ -66,7 +81,6 @@ def test_run_save_cache():
     # print(result.stdout.decode())
     # print(result.stderr.decode())
     assert result.returncode == 0
-    assert "source code is already saved" in result.stdout.decode()
     assert "run.environment is already saved" in result.stdout.decode()
 
     # edit the script
@@ -105,7 +119,7 @@ def test_run_save_cache():
     # print(result.stdout.decode())
     # print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Source code changed, bump revision by setting" in result.stderr.decode()
+    assert "✗ source code changed, run:" in result.stderr.decode()
 
     # update the uid
     content = filepath.read_text()
@@ -204,7 +218,6 @@ def test_run_save_with_params():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert "source code is already saved" in result.stdout.decode()
     assert (
         "run-track-with-params.py' on uid 'JjRF4mACd9m00000'" in result.stdout.decode()
     )

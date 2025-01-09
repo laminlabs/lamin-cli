@@ -20,11 +20,7 @@ def test_save_not_initialized():
         capture_output=True,
         env=env,
     )
-    assert result.returncode == 1
-    assert (
-        "Call `ln.track()` and copy/paste the output into the notebook"
-        in result.stderr.decode()
-    )
+    assert result.returncode == 0
 
 
 def test_save_non_consecutive():
@@ -36,7 +32,7 @@ def test_save_non_consecutive():
 
     # here, we're mimicking a non-consecutive run
     transform = ln.Transform(
-        uid="HDMGkxN9rgFA",
+        uid="HDMGkxN9rgFA0000",
         version="1",
         name="My test notebook (non-consecutive)",
         type="notebook",
