@@ -4,6 +4,7 @@ from typing import Union
 import lamindb_setup as ln_setup
 from lamin_utils import logger
 import re
+from click import ClickException
 
 
 def parse_uid_from_code(
@@ -52,6 +53,9 @@ def parse_uid_from_code(
 
     return uid, stem_uid, version
 
+class ClickInstanceNotSetupError(ClickException):
+        def show(self, file=None):
+            pass
 
 def save_from_filepath_cli(
     filepath: Union[str, Path],
@@ -71,6 +75,9 @@ def save_from_filepath_cli(
     from lamindb._finish import save_context_core
 
     ln_setup.settings.auto_connect = auto_connect_state
+    
+    if not ln_setup._check_instance_setup():
+        raise ClickInstanceNotSetupError("Save requires to be connected to an instance.")
 
     if registry is None:
         registry = "transform" if filepath.suffix in {".py", ".ipynb"} else "artifact"
