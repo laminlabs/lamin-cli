@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import Tuple
-from lamin_utils import logger
-import shutil
+
 import re
+import shutil
 from pathlib import Path
 
+from lamin_utils import logger
 
-def decompose_url(url: str) -> Tuple[str, str, str]:
+
+def decompose_url(url: str) -> tuple[str, str, str]:
     assert "transform" in url or "artifact" in url
     for entity in ["transform", "artifact"]:
         if entity in url:

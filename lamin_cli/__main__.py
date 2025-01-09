@@ -1,11 +1,15 @@
 from __future__ import annotations
+
+import inspect
 import os
 import sys
 from collections import OrderedDict
-import inspect
-from importlib.metadata import PackageNotFoundError, version
-from typing import Optional, Mapping
 from functools import wraps
+from importlib.metadata import PackageNotFoundError, version
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
@@ -17,11 +21,11 @@ if os.environ.get("NO_RICH"):
 
         def __init__(
             self,
-            name: Optional[str] = None,
-            commands: Optional[Mapping[str, click.Command]] = None,
+            name: str | None = None,
+            commands: Mapping[str, click.Command] | None = None,
             **kwargs,
         ):
-            super(OrderedGroup, self).__init__(name, commands, **kwargs)
+            super().__init__(name, commands, **kwargs)
             self.commands = commands or OrderedDict()
 
         def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
@@ -76,12 +80,14 @@ else:
         return wrapper
 
 
-from click import Command, Context
 from lamindb_setup._silence_loggers import silence_loggers
 
-from lamin_cli._settings import settings
 from lamin_cli._cache import cache
 from lamin_cli._migration import migrate
+from lamin_cli._settings import settings
+
+if TYPE_CHECKING:
+    from click import Command, Context
 
 try:
     lamindb_version = version("lamindb")
@@ -99,7 +105,7 @@ def main():
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The legacy API key.")
-def login(user: str, key: Optional[str]):
+def login(user: str, key: str | None):
     """Log into LaminHub.
 
     `lamin login` prompts for your API key unless you set it via environment variable `LAMIN_API_KEY`.
@@ -137,12 +143,12 @@ def logout():
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")  # noqa: E501
-@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")  # noqa: E501
-@click.option("--schema", type=str, default=None, help="Comma-separated string of schema modules.")  # noqa: E501
+@click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")
+@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")
+@click.option("--schema", type=str, default=None, help="Comma-separated string of schema modules.")
 @click.option("--name", type=str, default=None, help="The instance name.")
 # fmt: on
-def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
+def init(storage: str, db: str | None, schema: str | None, name: str | None):
     """Init an instance."""
     from lamindb_setup._init_instance import init as init_
 
@@ -162,7 +168,8 @@ def connect(instance: str):
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
     auto-connect in a Python session upon importing `lamindb`.
     """
-    from lamindb_setup import settings as settings_, connect as connect_
+    from lamindb_setup import connect as connect_
+    from lamindb_setup import settings as settings_
 
     settings_.auto_connect = True
     return connect_(slug=instance, _reload_lamindb=False)
@@ -197,7 +204,7 @@ def info(schema: bool):
 # fmt: off
 @main.command()
 @click.argument("instance", type=str, default=None)
-@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")  # noqa: E501
+@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")
 # fmt: on
 def delete(instance: str, force: bool = False):
     """Delete an entity.
@@ -232,7 +239,8 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
     """
     is_slug = entity.count("/") == 1
     if is_slug:
-        from lamindb_setup import settings as settings_, connect
+        from lamindb_setup import connect
+        from lamindb_setup import settings as settings_
 
         # can decide whether we want to actually deprecate
         # click.echo(
@@ -297,7 +305,7 @@ def _generate_help():
     out: dict[str, dict[str, str | None]] = {}
 
     def recursive_help(
-        cmd: Command, parent: Optional[Context] = None, name: tuple[str, ...] = ()
+        cmd: Command, parent: Context | None = None, name: tuple[str, ...] = ()
     ):
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
         assert cmd.name

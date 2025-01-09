@@ -1,9 +1,11 @@
 from __future__ import annotations
+
+import re
 from pathlib import Path
 from typing import Union
-from lamin_utils import logger
-import re
+
 from click import ClickException
+from lamin_utils import logger
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -47,7 +49,7 @@ class ClickInstanceNotSetupError(ClickException):
 
 
 def save_from_filepath_cli(
-    filepath: Union[str, Path],
+    filepath: str | Path,
     key: str | None,
     description: str | None,
     registry: str | None,
@@ -73,8 +75,8 @@ def save_from_filepath_cli(
     ln_setup.settings.auto_connect = auto_connect_state
 
     suffixes_transform = {
-        "py": set([".py", ".ipynb"]),
-        "R": set([".R", ".qmd", ".Rmd"]),
+        "py": {".py", ".ipynb"},
+        "R": {".R", ".qmd", ".Rmd"},
     }
 
     if filepath.suffix in {".qmd", ".Rmd"}:
