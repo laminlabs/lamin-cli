@@ -1,6 +1,5 @@
 import lamindb as ln
 
-ln.context.name = "My good script 2"
 # purposefully do not pass uid
 ln.track()
 

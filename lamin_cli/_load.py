@@ -37,9 +37,16 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         from lamin_utils._base62 import increment_base62
 
         if notebook_path.suffix == ".ipynb":
-            new_content = transform.source_code.replace(
-                "# # transform.name", f"# # {transform.name}"
-            )
+            # below is backward compat
+            if "# # transform.name" in transform.source_code:
+                new_content = transform.source_code.replace(
+                    "# # transform.name", f"# # {transform.description}"
+                )
+            elif transform.source_code.startswith("# %% [markdown]\n#\n"):
+                new_content = transform.source_code.replace(
+                    "# %% [markdown]\n#\n",
+                    f"# %% [markdown]\n# # {transform.description}\n",
+                )
         else:  # R notebook
             # Pattern to match title only within YAML header section
             title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
@@ -49,16 +56,18 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             new_content = transform.source_code
             if title_match:
                 current_title = title_match.group(1)
-                if current_title != transform.name:
+                if current_title != transform.description:
                     pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
-                    replacement = f'\\1"{transform.name}"\\3'
+                    replacement = f'\\1"{transform.description}"\\3'
                     new_content = re.sub(
                         pattern,
                         replacement,
                         new_content,
                         flags=re.DOTALL | re.MULTILINE,
                     )
-                    logger.important(f"fixed title: {current_title} → {transform.name}")
+                    logger.important(
+                        f"fixed title: {current_title} → {transform.description}"
+                    )
         if bump_revision:
             uid = transform.uid
             new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
@@ -104,19 +113,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
             if response != "y":
                 raise SystemExit("Aborted.")
 
-        if transform._source_code_artifact_id is not None:  # backward compat
-            # need lamindb here to have .cache() available
-            import lamindb as ln
-
-            ln.settings.track_run_inputs = False
-            filepath_cache = transform._source_code_artifact.cache()
-            if not target_relpath.suffix == transform._source_code_artifact.suffix:
-                target_relpath = target_relpath.with_suffix(
-                    transform._source_code_artifact.suffix
-                )
-            shutil.move(filepath_cache, target_relpath)
-
-        elif transform.source_code is not None:
+        if transform.source_code is not None:
             if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
                 script_to_notebook(transform, target_relpath, bump_revision=True)
             else:

@@ -1,4 +1,5 @@
 from lamin_cli._load import decompose_url
+from pathlib import Path
 import subprocess
 
 
@@ -16,22 +17,46 @@ def test_decompose_url():
 
 
 def test_load_transform():
+    import lamindb_setup as ln_setup
+
+    print(ln_setup.settings.instance.slug)
     result = subprocess.run(
         "lamin load"
-        " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
+        " 'https://lamin.ai/laminlabs/lamin-dev/transform/VFYCIuaw2GsX0000'"
         " --with-env",  # noqa
         shell=True,
         capture_output=True,
     )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
+
+    print(ln_setup.settings.instance.slug)
+
+    path1 = Path("run-track-and-finish.py")
+    path2 = Path("run-track-and-finish__requirements.txt")
+    assert path1.exists()
+    assert path2.exists()
+
+    # below will fail because it will say "these files already exist"
+    result = subprocess.run(
+        "lamin load transform --uid VFYCIuaw2GsX --with-env",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 1
+    path1.unlink()
+    path2.unlink()
 
     # partial uid
     result = subprocess.run(
-        "lamin load transform --uid 1GCKs8zLtkc85z --with-env",
+        "lamin load transform --uid VFYCIuaw2GsX --with-env",
         shell=True,
         capture_output=True,
     )
     assert result.returncode == 0
+    path1.unlink()
+    path2.unlink()
 
 
 def test_load_artifact():
