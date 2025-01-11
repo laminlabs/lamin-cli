@@ -17,6 +17,9 @@ def test_decompose_url():
 
 
 def test_load_transform():
+    import lamindb_setup as ln_setup
+
+    print(ln_setup.settings.instance.slug)
     result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-dev/transform/VFYCIuaw2GsX0000'"
@@ -24,7 +27,11 @@ def test_load_transform():
         shell=True,
         capture_output=True,
     )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
+
+    print(ln_setup.settings.instance.slug)
 
     path1 = Path("run-track-and-finish.py")
     path2 = Path("run-track-and-finish__requirements.txt")

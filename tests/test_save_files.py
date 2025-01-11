@@ -1,4 +1,5 @@
 import subprocess
+import lamindb_setup as ln_setup
 from pathlib import Path
 
 test_file = Path(__file__).parent.parent.resolve() / ".gitignore"
@@ -20,6 +21,8 @@ def test_save_file():
         in result.stdout.decode()
     )
     assert result.returncode == 1
+
+    print(ln_setup.settings.instance.slug)
 
     result = subprocess.run(
         f"lamin save {filepath} --key mytest",
