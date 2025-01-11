@@ -1,6 +1,6 @@
 from lamin_cli._load import decompose_url
 
-# import subprocess
+import subprocess
 
 
 def test_decompose_url():
@@ -16,41 +16,38 @@ def test_decompose_url():
         assert uid == "1GCKs8zLtkc85zKv"
 
 
-# TODO
-# def test_load_transform():
-#     result = subprocess.run(
-#         "lamin load"
-#         " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
-#         " --with-env",  # noqa
-#         shell=True,
-#         capture_output=True,
-#     )
-#     assert result.returncode == 0
+def test_load_transform():
+    result = subprocess.run(
+        "lamin load"
+        " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
+        " --with-env",  # noqa
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
 
-#     # partial uid
-#     result = subprocess.run(
-#         "lamin load transform --uid 1GCKs8zLtkc85z --with-env",
-#         shell=True,
-#         capture_output=True,
-#     )
-#     assert result.returncode == 0
+    # partial uid
+    result = subprocess.run(
+        "lamin load transform --uid 1GCKs8zLtkc85z --with-env",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
 
 
-# def test_load_artifact():
-# TODO
-# result = subprocess.run(
-#     "lamin load"
-#     " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",  # noqa
-#     shell=True,
-#     capture_output=True,
-# )
-# assert result.returncode == 0
+def test_load_artifact():
+    result = subprocess.run(
+        "lamin load"
+        " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",  # noqa
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
 
-# TODO
-# partial uid
-# result = subprocess.run(
-#     "lamin load artifact --uid e2G7k9EVul4JbfsEYA",
-#     shell=True,
-#     capture_output=True,
-# )
-# assert result.returncode == 0
+    # partial uid
+    result = subprocess.run(
+        "lamin load artifact --uid e2G7k9EVul4JbfsEYA",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
