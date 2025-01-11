@@ -150,7 +150,7 @@ def schema_to_modules_callback(ctx, param, value):
 @main.command()
 @click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")  # noqa: E501
 @click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")  # noqa: E501
-@click.option("--modules", type=str, default=None, help="Comma-separated string of schema modules.")  # noqa: E501
+@click.option("--modules", type=str, default=None, help="Comma-separated string of modules.")  # noqa: E501
 @click.option("--name", type=str, default=None, help="The instance name.")
 @click.option("--schema", type=str, default=None, help="[DEPRECATED] Use --modules instead.", callback=schema_to_modules_callback)  # noqa: E501
 # fmt: on
