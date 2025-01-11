@@ -19,7 +19,7 @@ def test_decompose_url():
 def test_load_transform():
     result = subprocess.run(
         "lamin load"
-        " 'https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv'"
+        " 'https://lamin.ai/laminlabs/lamin-dev/transform/VFYCIuaw2GsX0000'"
         " --with-env",  # noqa
         shell=True,
         capture_output=True,
