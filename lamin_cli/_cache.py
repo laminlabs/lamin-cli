@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 
 if os.environ.get("NO_RICH"):

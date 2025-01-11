@@ -1,6 +1,6 @@
+import subprocess
 from multiprocessing import Process
 from pathlib import Path
-import subprocess
 
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
 

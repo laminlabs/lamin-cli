@@ -1,4 +1,5 @@
 import argparse
+
 import lamindb as ln
 
 if __name__ == "__main__":
