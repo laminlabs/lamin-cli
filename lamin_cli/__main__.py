@@ -285,9 +285,7 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
 
 @main.command()
-@click.argument(
-    "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
-)
+@click.argument("filepath", type=click.Path(exists=True, dir_okay=True, file_okay=True))
 @click.option("--key", type=str, default=None)
 @click.option("--description", type=str, default=None)
 @click.option("--registry", type=str, default=None)
