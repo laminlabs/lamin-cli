@@ -10,7 +10,7 @@ else:
 
 @click.group()
 def migrate():
-    """Manage metadata schema migrations."""
+    """Manage database schema migrations."""
 
 
 @migrate.command("create")
