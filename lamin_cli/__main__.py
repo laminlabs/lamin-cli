@@ -185,7 +185,7 @@ def connect(instance: str):
     from lamindb_setup import settings as settings_, connect as connect_
 
     settings_.auto_connect = True
-    return connect_(slug=instance, _reload_lamindb=False)
+    return connect_(instance, _reload_lamindb=False)
 
 
 @main.command()
