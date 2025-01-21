@@ -66,13 +66,15 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                         flags=re.DOTALL | re.MULTILINE,
                     )
                     logger.important(
-                        f"fixed title: {current_title} → {transform.description}"
+                        f"updated title to match description: {current_title} →"
+                        f" {transform.description}"
                     )
         if bump_revision:
             uid = transform.uid
-            new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
-            new_content = new_content.replace(uid, new_uid)
-            logger.important(f"updated uid: {uid} → {new_uid}")
+            if uid in new_content:
+                new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
+                new_content = new_content.replace(uid, new_uid)
+                logger.important(f"updated uid: {uid} → {new_uid}")
         if notebook_path.suffix == ".ipynb":
             notebook = jupytext.reads(new_content, fmt="py:percent")
             jupytext.write(notebook, notebook_path)
