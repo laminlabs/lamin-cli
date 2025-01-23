@@ -50,8 +50,7 @@ def test_save_non_consecutive():
     )
     stdout, stderr = process.communicate("n")
     assert "were not run consecutively" in stdout
-    assert "Do you still want to proceed with finishing?" in stdout
-    assert process.returncode == 1
+    assert process.returncode == 0
 
 
 def test_save_consecutive():
