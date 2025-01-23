@@ -62,15 +62,15 @@ def save_from_filepath_cli(
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
 
-    if not ln_setup._check_instance_setup():
-        from lamindb_setup._check_setup import InstanceNotSetupError
-
-        raise ClickInstanceNotSetupError(InstanceNotSetupError.default_message)
-
     import lamindb as ln
     from lamindb._finish import save_context_core
 
     ln_setup.settings.auto_connect = auto_connect_state
+
+    if not ln_setup._check_instance_setup():
+        from lamindb_setup._check_setup import InstanceNotSetupError
+
+        raise ClickInstanceNotSetupError(InstanceNotSetupError.default_message)
 
     suffixes_transform = {
         "py": set([".py", ".ipynb"]),
