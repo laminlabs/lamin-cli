@@ -123,7 +123,7 @@ def save_from_filepath_cli(
             transform = ln.Transform.filter(key=filepath.name).one_or_none()
             if transform is None:
                 transform = ln.Transform(
-                    name=filepath.name,
+                    description=filepath.name,
                     key=filepath.name,
                     type="script" if filepath.suffix in {".R", ".py"} else "notebook",
                 ).save()
