@@ -1,5 +1,6 @@
 import lamindb as ln
 
+ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
 ln.context.name = "My good script"
 ln.track("m5uCHTTpJnjQ0000")
 
@@ -11,3 +12,5 @@ if __name__ == "__main__":
     ln.track(new_run=False)
 
     print("hello!")
+
+    ln.finish()
