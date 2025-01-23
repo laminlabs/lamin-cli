@@ -1,7 +1,7 @@
 import lamindb as ln
 
 ln.context.name = "My good script"
-ln.track("m5uCHTTpJnjQ0001")
+ln.track("m5uCHTTpJnjQ0000")
 
 
 if __name__ == "__main__":
@@ -11,6 +11,3 @@ if __name__ == "__main__":
     ln.track(new_run=False)
 
     print("hello!")
-
-
- # edited
