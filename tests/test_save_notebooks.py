@@ -50,8 +50,7 @@ def test_save_non_consecutive():
     )
     stdout, stderr = process.communicate("n")
     assert "were not run consecutively" in stdout
-    assert "Do you still want to proceed with finishing?" in stdout
-    assert process.returncode == 1
+    assert process.returncode == 0
 
 
 def test_save_consecutive():
@@ -83,7 +82,7 @@ def test_save_consecutive():
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
     assert transform is not None
     assert transform.latest_run.report is None
-    assert transform._source_code_artifact is None
+    assert transform.source_code is None
     assert transform.latest_run.environment is None
 
     # and save again
@@ -103,7 +102,7 @@ def test_save_consecutive():
     assert (
         transform.source_code
         == """# %% [markdown]
-# # transform.name
+#
 
 # %%
 import lamindb as ln
@@ -115,7 +114,7 @@ ln.track("hlsFXswrJjtt0000")
 print("my consecutive cell")
 """
     )
-    assert transform.hash == "OwVL-0-_gmk8heR3zV7BkA"
+    assert transform.hash == "ik5Dilxs2RmwOGydohFolQ"
     # below is the test that we can use if store the run repot as `.ipynb`
     # and not as html as we do right now
     assert transform.latest_run.report.suffix == ".html"
@@ -129,7 +128,6 @@ print("my consecutive cell")
     # }
     # testing for the hash of the report makes no sense because it contains timestamps
     assert transform.latest_run.environment.path.exists()
-    assert transform._source_code_artifact is None
 
     # edit the notebook
     nb = read_notebook(notebook_path)
@@ -163,9 +161,8 @@ print("my consecutive cell")
     transform = ln.Transform.get("hlsFXswrJjtt0000")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.hash == "BhQpym0JfeypqhVMPlQ0ng"
+    assert transform.hash == "Jv0_TrZfzM-0erbp1FGdrQ"
     assert transform.latest_run.environment.path.exists()
-    assert transform._source_code_artifact is None
 
     # get the the source code via command line
     result = subprocess.run(

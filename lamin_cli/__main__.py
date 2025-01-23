@@ -6,6 +6,7 @@ import inspect
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional, Mapping
 from functools import wraps
+import warnings
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
@@ -135,18 +136,37 @@ def logout():
     return logout_()
 
 
+def schema_to_modules_callback(ctx, param, value):
+    if param.name == "schema" and value is not None:
+        warnings.warn(
+            "The --schema option is deprecated and will be removed in a future version."
+            " Please use --modules instead.",
+            DeprecationWarning,
+        )
+    return value
+
+
 # fmt: off
 @main.command()
 @click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")  # noqa: E501
 @click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")  # noqa: E501
-@click.option("--schema", type=str, default=None, help="Comma-separated string of schema modules.")  # noqa: E501
+@click.option("--modules", type=str, default=None, help="Comma-separated string of modules.")  # noqa: E501
 @click.option("--name", type=str, default=None, help="The instance name.")
+@click.option("--schema", type=str, default=None, help="[DEPRECATED] Use --modules instead.", callback=schema_to_modules_callback)  # noqa: E501
 # fmt: on
-def init(storage: str, db: Optional[str], schema: Optional[str], name: Optional[str]):
+def init(
+    storage: str,
+    db: Optional[str],
+    modules: Optional[str],
+    name: Optional[str],
+    schema: Optional[str],
+):
     """Init an instance."""
     from lamindb_setup._init_instance import init as init_
 
-    return init_(storage=storage, db=db, schema=schema, name=name)
+    modules = modules if modules is not None else schema
+
+    return init_(storage=storage, db=db, modules=modules, name=name)
 
 
 # fmt: off
@@ -165,7 +185,7 @@ def connect(instance: str):
     from lamindb_setup import settings as settings_, connect as connect_
 
     settings_.auto_connect = True
-    return connect_(slug=instance, _reload_lamindb=False)
+    return connect_(instance, _reload_lamindb=False)
 
 
 @main.command()
@@ -180,7 +200,7 @@ def disconnect():
 
 
 @main.command()
-@click.option("--schema", is_flag=True, help="View schema.")
+@click.option("--schema", is_flag=True, help="View database schema.")
 def info(schema: bool):
     """Show info about current instance."""
     if schema:
@@ -239,7 +259,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
         #     f"! please use: lamin connect {entity}"
         # )
         settings_.auto_connect = True
-        return connect(slug=entity, _reload_lamindb=False)
+        return connect(entity, _reload_lamindb=False)
     else:
         from lamin_cli._load import load as load_
 
@@ -265,9 +285,7 @@ def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 
 
 @main.command()
-@click.argument(
-    "filepath", type=click.Path(exists=True, dir_okay=False, file_okay=True)
-)
+@click.argument("filepath", type=click.Path(exists=True, dir_okay=True, file_okay=True))
 @click.option("--key", type=str, default=None)
 @click.option("--description", type=str, default=None)
 @click.option("--registry", type=str, default=None)

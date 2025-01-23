@@ -1,10 +1,4 @@
 # LaminDB
-docs/guide/data-validation.ipynb
-docs/guide/knowledge.ipynb
-docs/guide/lnschema-bionty.ipynb
-docs/guide/lnschema-core.ipynb
-docs/paradisi05_laminopathic_nuclei.jpg
-lnschema_bionty_docs/
 lamindb_docs/
 _build
 mydata/
@@ -204,7 +198,3 @@ _build
 
 # Pycharm
 .idea
-
-# fred files
-docs/guide/insert-some-data-into-frederic-hub.ipynb
-docs/guide/insert-data-in-test-user-1-profile.ipynb
