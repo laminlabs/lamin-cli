@@ -1,8 +1,7 @@
 import lamindb as ln
 
-ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
 ln.context.name = "My good script"
-ln.track("m5uCHTTpJnjQ0000")
+ln.track("m5uCHTTpJnjQ0001")
 
 
 if __name__ == "__main__":
@@ -13,4 +12,5 @@ if __name__ == "__main__":
 
     print("hello!")
 
-    ln.finish()
+
+ # edited

@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Union
 from lamin_utils import logger
 import re
-from click import ClickException
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -41,11 +40,6 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
-class ClickInstanceNotSetupError(ClickException):
-    def show(self, file=None):
-        pass
-
-
 def save_from_filepath_cli(
     filepath: Union[str, Path],
     key: str | None,
@@ -62,15 +56,15 @@ def save_from_filepath_cli(
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
 
-    import lamindb as ln
-    from lamindb._finish import save_context_core
+    try:
+        import lamindb as ln
+        from lamindb._finish import save_context_core
+    except Exception as e:
+        if "Requested setting INSTALLED_APPS" in str(e) and "settings are not configured" in str(e):
+            import sys
+            sys.exit(-1)
 
     ln_setup.settings.auto_connect = auto_connect_state
-
-    if not ln_setup._check_instance_setup():
-        from lamindb_setup._check_setup import InstanceNotSetupError
-
-        raise ClickInstanceNotSetupError(InstanceNotSetupError.default_message)
 
     suffixes_transform = {
         "py": set([".py", ".ipynb"]),
