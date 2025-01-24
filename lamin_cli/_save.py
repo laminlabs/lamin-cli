@@ -120,7 +120,9 @@ def save_from_filepath_cli(
                 )
                 return "not-tracked-in-transform-registry"
         else:
-            transform = ln.Transform.filter(key=filepath.name).one_or_none()
+            transform = ln.Transform.filter(
+                key=filepath.name, is_latest=True
+            ).one_or_none()
             if transform is None:
                 transform = ln.Transform(
                     description=filepath.name,
