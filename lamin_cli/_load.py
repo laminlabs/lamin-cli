@@ -42,11 +42,13 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
                 new_content = transform.source_code.replace(
                     "# # transform.name", f"# # {transform.description}"
                 )
-            elif transform.source_code.startswith("# %% [markdown]\n#\n"):
-                new_content = transform.source_code.replace(
-                    "# %% [markdown]\n#\n",
-                    f"# %% [markdown]\n# # {transform.description}\n",
-                )
+            elif transform.source_code.startswith("# %% [markdown]"):
+                source_code_split = transform.source_code.split("\n")
+                if source_code_split[1] == "#":
+                    source_code_split[1] = f"# # {transform.description}"
+                new_content = "\n".join(source_code_split)
+            else:
+                new_content = transform.source_code
         else:  # R notebook
             # Pattern to match title only within YAML header section
             title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
