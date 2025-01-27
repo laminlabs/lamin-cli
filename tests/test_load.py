@@ -1,6 +1,5 @@
-from lamin_cli._load import decompose_url
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 from lamin_cli._load import decompose_url
 
@@ -25,7 +24,7 @@ def test_load_transform():
     result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-dev/transform/VFYCIuaw2GsX0000'"
-        " --with-env",  # noqa
+        " --with-env",
         shell=True,
         capture_output=True,
     )

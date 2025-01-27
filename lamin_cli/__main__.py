@@ -3,10 +3,11 @@ from __future__ import annotations
 import inspect
 import os
 import sys
+import warnings
 from collections import OrderedDict
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -147,6 +148,7 @@ def schema_to_modules_callback(ctx, param, value):
             "The --schema option is deprecated and will be removed in a future version."
             " Please use --modules instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
     return value
 
@@ -157,14 +159,14 @@ def schema_to_modules_callback(ctx, param, value):
 @click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")
 @click.option("--schema", type=str, default=None, help="Comma-separated string of schema modules.")
 @click.option("--name", type=str, default=None, help="The instance name.")
-@click.option("--schema", type=str, default=None, help="[DEPRECATED] Use --modules instead.", callback=schema_to_modules_callback)  # noqa: E501
+@click.option("--schema", type=str, default=None, help="[DEPRECATED] Use --modules instead.", callback=schema_to_modules_callback)
 # fmt: on
 def init(
     storage: str,
-    db: Optional[str],
-    modules: Optional[str],
-    name: Optional[str],
-    schema: Optional[str],
+    db: str | None,
+    modules: str | None,
+    name: str | None,
+    schema: str | None,
 ):
     """Init an instance."""
     from lamindb_setup._init_instance import init as init_
@@ -242,7 +244,7 @@ def delete(instance: str, force: bool = False):
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+def load(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
     """Load a file or folder.
 
     Pass a URL, `artifact`, or `transform`. For example:
@@ -280,7 +282,7 @@ def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def get(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+def get(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
     """Query metadata about an entity.
 
     Currently only works for artifact & transform and behaves like `lamin load`.

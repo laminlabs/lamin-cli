@@ -93,8 +93,8 @@ def save_from_filepath_cli(
             and filepath.with_suffix(".nb.html").exists()
         ):
             raise SystemExit(
-                f'Please delete one of\n - {filepath.with_suffix(".html")}\n -'
-                f' {filepath.with_suffix(".nb.html")}'
+                f"Please delete one of\n - {filepath.with_suffix('.html')}\n -"
+                f" {filepath.with_suffix('.nb.html')}"
             )
 
     if registry is None:
