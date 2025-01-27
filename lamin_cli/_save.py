@@ -133,10 +133,14 @@ def save_from_filepath_cli(
                 )
                 return "not-tracked-in-transform-registry"
         else:
-            transform = ln.Transform.filter(key=filepath.name).one_or_none()
+            # TODO: build in the logic that queries for relative file paths
+            # we have in Context; add tests for multiple versions
+            transform = ln.Transform.filter(
+                key=filepath.name, is_latest=True
+            ).one_or_none()
             if transform is None:
                 transform = ln.Transform(
-                    name=filepath.name,
+                    description=filepath.name,
                     key=filepath.name,
                     type="script" if filepath.suffix in {".R", ".py"} else "notebook",
                 ).save()
