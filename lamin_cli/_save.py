@@ -43,11 +43,6 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
-class ClickInstanceNotSetupError(ClickException):
-    def show(self, file=None):
-        pass
-
-
 def save_from_filepath_cli(
     filepath: str | Path,
     key: str | None,
@@ -63,11 +58,6 @@ def save_from_filepath_cli(
     # instances sequentially
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
-
-    if not ln_setup._check_instance_setup():
-        from lamindb_setup._check_setup import InstanceNotSetupError
-
-        raise ClickInstanceNotSetupError(InstanceNotSetupError.default_message)
 
     import lamindb as ln
     from lamindb._finish import save_context_core
