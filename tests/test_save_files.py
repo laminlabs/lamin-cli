@@ -1,6 +1,7 @@
 import subprocess
-import lamindb_setup as ln_setup
 from pathlib import Path
+
+import lamindb_setup as ln_setup
 
 test_file = Path(__file__).parent.parent.resolve() / ".gitignore"
 

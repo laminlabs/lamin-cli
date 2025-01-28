@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import Tuple
-from lamin_utils import logger
-import shutil
+
 import re
+import shutil
 from pathlib import Path
 
+from lamin_utils import logger
 
-def decompose_url(url: str) -> Tuple[str, str, str]:
+
+def decompose_url(url: str) -> tuple[str, str, str]:
     assert "transform" in url or "artifact" in url
     for entity in ["transform", "artifact"]:
         if entity in url:
@@ -16,7 +17,9 @@ def decompose_url(url: str) -> Tuple[str, str, str]:
     return instance_slug, entity, uid
 
 
-def load(entity: str, uid: str = None, key: str = None, with_env: bool = False):
+def load(
+    entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False
+):
     import lamindb_setup as ln_setup
 
     if entity.startswith("https://") and "lamin" in entity:
