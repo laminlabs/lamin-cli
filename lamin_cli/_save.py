@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
-from typing import Union
 
-from click import ClickException
 from lamin_utils import logger
 
 
@@ -59,13 +58,11 @@ def save_from_filepath_cli(
     auto_connect_state = ln_setup.settings.auto_connect
     ln_setup.settings.auto_connect = True
 
-    try:
-        import lamindb as ln
-        from lamindb._finish import save_context_core
-    except Exception as e:
-        if "Requested setting INSTALLED_APPS" in str(e) and "settings are not configured" in str(e):
-            import sys
-            sys.exit(-1)
+    import lamindb as ln
+
+    if not ln.setup.core.django.IS_SETUP:
+        sys.exit(-1)
+    from lamindb._finish import save_context_core
 
     ln_setup.settings.auto_connect = auto_connect_state
 
