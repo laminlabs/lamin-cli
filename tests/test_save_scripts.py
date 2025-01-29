@@ -1,9 +1,9 @@
-from pathlib import Path
-import subprocess
 import os
+import subprocess
+from pathlib import Path
+
 import lamindb as ln
 from lamindb_setup import settings
-
 
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
 
@@ -160,7 +160,7 @@ def test_run_save_cache_with_git_and_uid():
     # try to get the the source code via command line
     result = subprocess.run(
         "yes | lamin load"
-        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",  # noqa
+        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",
         shell=True,
         capture_output=True,
     )
@@ -168,7 +168,7 @@ def test_run_save_cache_with_git_and_uid():
     assert result.returncode == 0
 
     result = subprocess.run(
-        f"yes | lamin load transform --key {filepath.name}",  # noqa
+        f"yes | lamin load transform --key {filepath.name}",
         shell=True,
         capture_output=True,
     )

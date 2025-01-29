@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 from typing import Optional
 
@@ -34,9 +35,9 @@ def deploy():
 @click.option("--end-number", type=str, default=None)
 @click.option("--start-number", type=str, default=None)
 def squash(
-    package_name: Optional[str],
-    end_number: Optional[str],
-    start_number: Optional[str],
+    package_name: str | None,
+    end_number: str | None,
+    start_number: str | None,
 ):
     """Squash migrations."""
     from lamindb_setup._migrate import migrate

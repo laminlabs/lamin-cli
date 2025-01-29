@@ -1,6 +1,7 @@
-from pathlib import Path
-import subprocess
 import os
+import subprocess
+from pathlib import Path
+
 import lamindb as ln
 
 scripts_dir = Path(__file__).parent.resolve() / "scripts"
