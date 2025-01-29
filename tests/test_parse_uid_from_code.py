@@ -112,6 +112,6 @@ def test_r_track_pattern():
     for suffix in suffixes:
         for content, expected_uid in valid_cases:
             uid = parse_uid_from_code(content, suffix)
-            assert (
-                uid == expected_uid
-            ), f"Failed for valid content with {suffix}: {content}"
+            assert uid == expected_uid, (
+                f"Failed for valid content with {suffix}: {content}"
+            )

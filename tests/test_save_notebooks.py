@@ -1,12 +1,13 @@
+import json
 import os
 import subprocess
 from pathlib import Path
+
+import lamindb as ln
 import nbproject_test
 import pytest
-from nbproject.dev import read_notebook, write_notebook
 from nbclient.exceptions import CellExecutionError
-import json
-import lamindb as ln
+from nbproject.dev import read_notebook, write_notebook
 
 notebook_dir = "./sub/lamin-cli/tests/notebooks/"
 
@@ -167,13 +168,13 @@ print("my consecutive cell")
     # get the the source code via command line
     result = subprocess.run(
         "yes | lamin load"
-        f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0000",  # noqa
+        f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0000",
         shell=True,
         capture_output=True,
     )
     # print(result.stderr.decode())
     assert Path("./with-title-and-initialized-consecutive.ipynb").exists()
-    with open("./with-title-and-initialized-consecutive.ipynb", "r") as f:
+    with open("./with-title-and-initialized-consecutive.ipynb") as f:
         json_notebook = json.load(f)
     print(json_notebook["cells"][0])
     assert json_notebook["cells"][0]["source"] == ["# My test notebook (consecutive)"]
