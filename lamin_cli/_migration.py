@@ -16,7 +16,7 @@ def migrate():
 
 @migrate.command("create")
 def create():
-    """Generate a new numbered migration file."""
+    """Create a new numbered migration file."""
     from lamindb_setup._migrate import migrate
 
     return migrate.create()
@@ -24,7 +24,7 @@ def create():
 
 @migrate.command("deploy")
 def deploy():
-    """Apply pending migrations to bring database schema up to date."""
+    """Deploy pending migrations to bring database schema up to date."""
     from lamindb_setup._migrate import migrate
 
     return migrate.deploy()
@@ -39,7 +39,7 @@ def squash(
     end_number: str | None,
     start_number: str | None,
 ):
-    """Combine multiple migrations into a single migration file.
+    """Squash multiple migrations into a single migration file.
 
     Reduces migration history complexity by consolidating sequential changes.
     """
