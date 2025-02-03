@@ -29,7 +29,7 @@ def settings(ctx):
 )
 @click.argument("value", type=click.BOOL)
 def set(setting: str, value: bool):
-    """Configure LaminDB settings that define behavior flags.
+    """Set LaminDB behavior flags.
 
     - `auto-connect` (whether to automatically connect to instances on import of lamindb) → {attr}`~lamindb.setup.core.SetupSettings.auto_connect`
     - `private-django-api` (whether to turn django API private) → {attr}`~lamindb.setup.core.SetupSettings.private_django_api`
