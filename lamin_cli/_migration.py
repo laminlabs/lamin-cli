@@ -11,12 +11,12 @@ else:
 
 @click.group()
 def migrate():
-    """Manage database schema migrations."""
+    """Manage sequential database schema migrations."""
 
 
 @migrate.command("create")
 def create():
-    """Create a new migration."""
+    """Generate a new numbered migration file."""
     from lamindb_setup._migrate import migrate
 
     return migrate.create()
@@ -24,7 +24,7 @@ def create():
 
 @migrate.command("deploy")
 def deploy():
-    """Deploy migrations."""
+    """Apply pending migrations to bring database schema up to date."""
     from lamindb_setup._migrate import migrate
 
     return migrate.deploy()
@@ -39,7 +39,10 @@ def squash(
     end_number: str | None,
     start_number: str | None,
 ):
-    """Squash migrations."""
+    """Combine multiple migrations into a single migration file.
+
+    Reduces migration history complexity by consolidating sequential changes.
+    """
     from lamindb_setup._migrate import migrate
 
     return migrate.squash(

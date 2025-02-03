@@ -11,9 +11,9 @@ else:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage settings.
+    """Display or modify LaminDB configuration settings.
 
-    Call without subcommands and options to show settings.
+    Run without additional arguments to show current values.
     """
     if ctx.invoked_subcommand is None:
         from lamindb_setup import settings as settings_
@@ -29,10 +29,10 @@ def settings(ctx):
 )
 @click.argument("value", type=click.BOOL)
 def set(setting: str, value: bool):
-    """Update settings.
+    """Configure LaminDB settings that define behavior flags.
 
-    - `auto-connect` → {attr}`~lamindb.setup.core.SetupSettings.auto_connect`
-    - `private-django-api` → {attr}`~lamindb.setup.core.SetupSettings.private_django_api`
+    - `auto-connect` (whether to automatically connect to instances on import of lamindb) → {attr}`~lamindb.setup.core.SetupSettings.auto_connect`
+    - `private-django-api` (whether to turn django API private) → {attr}`~lamindb.setup.core.SetupSettings.private_django_api`
     """
     from lamindb_setup import settings as settings_
 

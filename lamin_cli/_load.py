@@ -8,6 +8,7 @@ from lamin_utils import logger
 
 
 def decompose_url(url: str) -> tuple[str, str, str]:
+    """Split LaminDB URL into instance slug, entity type and UID."""
     assert "transform" in url or "artifact" in url
     for entity in ["transform", "artifact"]:
         if entity in url:
@@ -20,6 +21,7 @@ def decompose_url(url: str) -> tuple[str, str, str]:
 def load(
     entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False
 ):
+    """Fetch and cache Transform/Artifact by URL, UID or key, optionally with environment."""
     import lamindb_setup as ln_setup
 
     if entity.startswith("https://") and "lamin" in entity:
@@ -36,6 +38,7 @@ def load(
     def script_to_notebook(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
     ) -> None:
+        """Convert Transform source code to notebook format, updating metadata and version if needed."""
         import jupytext
         from lamin_utils._base62 import increment_base62
 

@@ -8,6 +8,10 @@ from lamin_utils import logger
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
+    """Extract LaminDB tracking UID from source code based on file type.
+
+    Returns None if no UID found.
+    """
     if suffix == ".py":
         track_pattern = re.compile(
             r'ln\.track\(\s*(?:transform\s*=\s*)?(["\'])([a-zA-Z0-9]{16})\1'
@@ -26,8 +30,7 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
         uid_pattern = None
     else:
         raise SystemExit(
-            "Only .py, .ipynb, .R, .qmd, .Rmd files are supported for saving"
-            " transforms."
+            "Only .py, .ipynb, .R, .qmd, .Rmd files are supported for saving transforms."
         )
 
     # Search for matches in the entire file content
@@ -48,6 +51,10 @@ def save_from_filepath_cli(
     description: str | None,
     registry: str | None,
 ) -> str | None:
+    """Save file as artifact or transform, with automatic registry selection based on file type.
+
+    Returns error code on failure.
+    """
     import lamindb_setup as ln_setup
 
     if not isinstance(filepath, Path):
