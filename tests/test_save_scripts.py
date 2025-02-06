@@ -53,7 +53,7 @@ def test_run_save_cache_with_git_and_uid():
     assert "started new Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform.hash == "MoIciBQ0lpVPCKQGofPX6g"
+    assert transform.hash == "VC1oTPcaVSrzNrXUT9p4qw"
     assert transform.latest_run.environment.path.exists()
 
     assert (
