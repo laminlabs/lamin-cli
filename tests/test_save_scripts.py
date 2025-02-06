@@ -45,16 +45,37 @@ def test_run_save_cache_with_git_and_uid():
         shell=True,
         capture_output=True,
     )
-    # print(result.stdout.decode())
-    # print(result.stderr.decode())
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
     assert "started new Run" in result.stdout.decode()
 
     transform = ln.Transform.get("m5uCHTTpJnjQ")
-    assert transform.hash == "MoIciBQ0lpVPCKQGofPX6g"
+    assert transform.hash == "VC1oTPcaVSrzNrXUT9p4qw"
     assert transform.latest_run.environment.path.exists()
+
+    assert (
+        transform.source_code
+        == """import lamindb as ln
+
+ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
+ln.context.description = "My good script"
+ln.track("m5uCHTTpJnjQ0000")
+
+
+if __name__ == "__main__":
+    # we're using new_run here to mock the notebook situation
+    # and cover the look up of an existing run in the tests
+    # new_run = True is trivial
+    ln.track(new_run=False)
+
+    print("hello!")
+
+    ln.finish()
+"""
+    )
 
     # you can rerun the same script
     result = subprocess.run(
