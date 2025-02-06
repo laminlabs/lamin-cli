@@ -45,8 +45,8 @@ def test_run_save_cache_with_git_and_uid():
         shell=True,
         capture_output=True,
     )
-    # print(result.stdout.decode())
-    # print(result.stderr.decode())
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
@@ -61,7 +61,7 @@ def test_run_save_cache_with_git_and_uid():
         == """import lamindb as ln
 
 ln.settings.sync_git_repo = "https://github.com/laminlabs/lamin-cli"
-ln.context.name = "My good script"
+ln.context.description = "My good script"
 ln.track("m5uCHTTpJnjQ0000")
 
 
