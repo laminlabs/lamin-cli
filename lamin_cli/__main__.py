@@ -99,7 +99,7 @@ except PackageNotFoundError:
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
-    """Configure LaminDB and perform simple actions."""
+    """CLI for LaminDB configuration and basic operations."""
     silence_loggers()
 
 
@@ -168,7 +168,7 @@ def init(
     name: str | None,
     schema: str | None,
 ):
-    """Init an instance."""
+    """Initialize an instance."""
     from lamindb_setup._init_instance import init as init_
 
     modules = modules if modules is not None else schema
@@ -181,9 +181,7 @@ def init(
 @click.argument("instance", type=str)
 # fmt: on
 def connect(instance: str):
-    """Connect to an instance.
-
-    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
+    """Connect to instance by slug (account/name) or URL (`https://lamin.ai/account/name`).
 
     `lamin connect` switches
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
@@ -306,6 +304,9 @@ def save(filepath: str, key: str, description: str, registry: str):
 
     You can save a `.py` or `.ipynb` file as an {class}`~lamindb.Artifact` by
     passing `--registry artifact`.
+
+    To save renamed files, ensure that the tracking ID is specified in
+    {meth}`~lamindb.track`, or a new Transform will be created.
     """
     from lamin_cli._save import save_from_filepath_cli
 
