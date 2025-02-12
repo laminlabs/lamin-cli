@@ -44,7 +44,7 @@ def test_save_file():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert "returning existing artifact with same hash" in result.stdout.decode()
+    assert "found artifact with same hash" in result.stdout.decode()
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
     assert result.returncode == 0
