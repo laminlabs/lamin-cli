@@ -8,8 +8,8 @@ from lamin_utils import logger
 
 
 def decompose_url(url: str) -> tuple[str, str, str]:
-    assert "transform" in url or "artifact" in url
-    for entity in ["transform", "artifact"]:
+    assert any(keyword in url for keyword in ["transform", "artifact", "collection"])
+    for entity in ["transform", "artifact", "collection"]:
         if entity in url:
             break
     uid = url.split(f"{entity}/")[1]
@@ -25,8 +25,10 @@ def load(
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact", "transform"}:
-        raise SystemExit("Entity has to be a laminhub URL or 'artifact' or 'transform'")
+    elif entity not in {"artifact", "transform", "collection"}:
+        raise SystemExit(
+            "Entity has to be a laminhub URL or 'artifact', 'collection', or 'transform'"
+        )
     else:
         instance = ln_setup.settings.instance.slug
 
@@ -88,82 +90,93 @@ def load(
 
     query_by_uid = uid is not None
 
-    if entity == "transform":
-        if query_by_uid:
-            # we don't use .get here because DoesNotExist is hard to catch
-            # due to private django API
-            # here full uid is not expected anymore as before
-            # via ln.Transform.objects.get(uid=uid)
-            transforms = ln.Transform.objects.filter(uid__startswith=uid)
-        else:
-            # if below, we take is_latest=True as the criterion, we might get draft notebooks
-            # hence, we use source_code__isnull=False and order by created_at instead
-            transforms = ln.Transform.objects.filter(key=key, source_code__isnull=False)
-
-        if (n_transforms := len(transforms)) == 0:
-            err_msg = f"uid {uid}" if query_by_uid else f"key={key} and source_code"
-            raise SystemExit(f"Transform with {err_msg} does not exist.")
-
-        if n_transforms > 1:
-            transforms = transforms.order_by("-created_at")
-        transform = transforms.first()
-
-        target_relpath = Path(transform.key)
-        if len(target_relpath.parents) > 1:
-            logger.important(
-                "preserve the folder structure for versioning:"
-                f" {target_relpath.parent}/"
-            )
-            target_relpath.parent.mkdir(parents=True, exist_ok=True)
-        if target_relpath.exists():
-            response = input(f"! {target_relpath} exists: replace? (y/n)")
-            if response != "y":
-                raise SystemExit("Aborted.")
-
-        if transform.source_code is not None:
-            if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
-                script_to_notebook(transform, target_relpath, bump_revision=True)
+    match entity:
+        case "transform":
+            if query_by_uid:
+                # we don't use .get here because DoesNotExist is hard to catch
+                # due to private django API
+                # here full uid is not expected anymore as before
+                # via ln.Transform.objects.get(uid=uid)
+                transforms = ln.Transform.objects.filter(uid__startswith=uid)
             else:
-                target_relpath.write_text(transform.source_code)
-        else:
-            raise SystemExit("No source code available for this transform.")
-
-        logger.important(f"{transform.type} is here: {target_relpath}")
-
-        if with_env:
-            ln.settings.track_run_inputs = False
-            if (
-                transform.latest_run is not None
-                and transform.latest_run.environment is not None
-            ):
-                filepath_env_cache = transform.latest_run.environment.cache()
-                target_env_filename = (
-                    target_relpath.parent / f"{target_relpath.stem}__requirements.txt"
+                # if below, we take is_latest=True as the criterion, we might get draft notebooks
+                # hence, we use source_code__isnull=False and order by created_at instead
+                transforms = ln.Transform.objects.filter(
+                    key=key, source_code__isnull=False
                 )
-                shutil.move(filepath_env_cache, target_env_filename)
-                logger.important(f"environment is here: {target_env_filename}")
+
+            if (n_transforms := len(transforms)) == 0:
+                err_msg = f"uid {uid}" if query_by_uid else f"key={key} and source_code"
+                raise SystemExit(f"Transform with {err_msg} does not exist.")
+
+            if n_transforms > 1:
+                transforms = transforms.order_by("-created_at")
+            transform = transforms.first()
+
+            target_relpath = Path(transform.key)
+            if len(target_relpath.parents) > 1:
+                logger.important(
+                    "preserve the folder structure for versioning:"
+                    f" {target_relpath.parent}/"
+                )
+                target_relpath.parent.mkdir(parents=True, exist_ok=True)
+            if target_relpath.exists():
+                response = input(f"! {target_relpath} exists: replace? (y/n)")
+                if response != "y":
+                    raise SystemExit("Aborted.")
+
+            if transform.source_code is not None:
+                if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
+                    script_to_notebook(transform, target_relpath, bump_revision=True)
+                else:
+                    target_relpath.write_text(transform.source_code)
             else:
-                logger.warning("latest transform run with environment doesn't exist")
+                raise SystemExit("No source code available for this transform.")
 
-        return target_relpath
-    elif entity == "artifact":
-        ln.settings.track_run_inputs = False
+            logger.important(f"{transform.type} is here: {target_relpath}")
 
-        if query_by_uid:
-            # we don't use .get here because DoesNotExist is hard to catch
-            # due to private django API
-            artifacts = ln.Artifact.filter(uid__startswith=uid)
-        else:
-            artifacts = ln.Artifact.filter(key=key)
+            if with_env:
+                ln.settings.track_run_inputs = False
+                if (
+                    transform.latest_run is not None
+                    and transform.latest_run.environment is not None
+                ):
+                    filepath_env_cache = transform.latest_run.environment.cache()
+                    target_env_filename = (
+                        target_relpath.parent
+                        / f"{target_relpath.stem}__requirements.txt"
+                    )
+                    shutil.move(filepath_env_cache, target_env_filename)
+                    logger.important(f"environment is here: {target_env_filename}")
+                else:
+                    logger.warning(
+                        "latest transform run with environment doesn't exist"
+                    )
 
-        if (n_artifacts := len(artifacts)) == 0:
-            err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
-            raise SystemExit(f"Artifact with {err_msg} does not exist.")
+            return target_relpath
+        case "artifact" | "collection":
+            ln.settings.track_run_inputs = False
 
-        if n_artifacts > 1:
-            artifacts = artifacts.order_by("-created_at")
-        artifact = artifacts.first()
+            EntityClass = ln.Artifact if entity == "artifact" else ln.Collection
 
-        cache_path = artifact.cache()
-        logger.important(f"artifact is here: {cache_path}")
-        return cache_path
+            if query_by_uid:
+                entities = EntityClass.filter(uid__startswith=uid)
+            else:
+                entities = EntityClass.filter(key=key)
+
+            if (n_entities := len(entities)) == 0:
+                err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
+                raise SystemExit(
+                    f"{entity.capitalize()} with {err_msg} does not exist."
+                )
+
+            if n_entities > 1:
+                entities = entities.order_by("-created_at")
+
+            entity_obj = entities.first()
+            cache_path = entity_obj.cache()
+
+            logger.important(f"{entity} is here: {cache_path}")
+            return cache_path
+        case _:
+            raise AssertionError(f"unknown entity {entity}")
