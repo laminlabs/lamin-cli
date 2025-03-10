@@ -178,7 +178,15 @@ def load(
             entity_obj = entities.first()
             cache_path = entity_obj.cache()
 
-            logger.important(f"{entity} is here: {cache_path}")
-            return cache_path
+            # collection gives us a list of paths
+            if isinstance(cache_path, list):
+                logger.important(f"{entity} paths ({len(cache_path)} files):")
+                for i, path in enumerate(cache_path):
+                    if i < 5 or i >= len(cache_path) - 5:
+                        logger.important(f"  [{i + 1}/{len(cache_path)}] {path}")
+                    elif i == 5:
+                        logger.important(f"  ... {len(cache_path) - 10} more files ...")
+            else:
+                logger.important(f"{entity} is here: {cache_path}")
         case _:
             raise AssertionError(f"unknown entity {entity}")
