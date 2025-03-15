@@ -88,7 +88,7 @@ def test_get_load_artifact():
 
 def test_load_collection():
     result = subprocess.run(
-        "lamin load 'https://lamin.ai/laminlabs/lamindata/collection/Zc0r1t5UxxCi9aeS'",
+        "lamin load 'https://lamin.ai/laminlabs/lamindata/collection/2wUs6V1OuGzp5Ll4'",
         shell=True,
         capture_output=True,
     )
