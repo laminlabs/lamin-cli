@@ -62,6 +62,14 @@ def test_load_transform():
 
 def test_load_artifact():
     result = subprocess.run(
+        "lamin get"
+        " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
+    result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",
         shell=True,
