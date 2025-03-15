@@ -279,18 +279,31 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
 @click.argument("entity", type=str)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
-@click.option(
-    "--with-env", is_flag=True, help="Also return the environment for a tranform."
-)
-def get(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
+def get(entity: str, uid: str | None = None, key: str | None = None):
     """Query metadata about an entity.
 
-    Currently only works for artifact & transform and behaves like `lamin load`.
+    Currently only works for artifact.
     """
-    from lamin_cli._load import load as load_
+    import lamindb_setup as ln_setup
 
-    click.echo(f"! to load a file or folder, please use: lamin load {entity}")
-    return load_(entity, uid=uid, key=key, with_env=with_env)
+    from ._load import decompose_url
+
+    if entity.startswith("https://") and "lamin" in entity:
+        url = entity
+        instance, entity, uid = decompose_url(url)
+    elif entity not in {"artifact"}:
+        raise SystemExit("Entity has to be a laminhub URL or 'artifact'")
+    else:
+        instance = ln_setup.settings.instance.slug
+
+    ln_setup.connect(instance)
+    import lamindb as ln
+
+    if uid is not None:
+        artifact = ln.Artifact.get(uid)
+    else:
+        artifact = ln.Artifact.get(key=key)
+    artifact.describe()
 
 
 @main.command()
