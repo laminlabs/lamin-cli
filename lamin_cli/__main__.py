@@ -9,6 +9,13 @@ from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 
+from lamindb_setup._init_instance import (
+    DOC_DB,
+    DOC_INSTANCE_NAME,
+    DOC_MODULES,
+    DOC_STORAGE_ARG,
+)
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -155,23 +162,19 @@ def schema_to_modules_callback(ctx, param, value):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")
-@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")
-@click.option("--modules", type=str, default=None, help="Comma-separated string of schema modules.")
-@click.option("--name", type=str, default=None, help="The instance name.")
-@click.option("--schema", type=str, default=None, help="[DEPRECATED] Use --modules instead.", callback=schema_to_modules_callback)
+@click.option("--storage", type=str, default = ".", help=DOC_STORAGE_ARG)
+@click.option("--name", type=str, default=None, help=DOC_INSTANCE_NAME)
+@click.option("--db", type=str, default=None, help=DOC_DB)
+@click.option("--modules", type=str, default=None, help=DOC_MODULES)
 # fmt: on
 def init(
     storage: str,
+    name: str | None,
     db: str | None,
     modules: str | None,
-    name: str | None,
-    schema: str | None,
 ):
     """Init an instance."""
     from lamindb_setup._init_instance import init as init_
-
-    modules = modules if modules is not None else schema
 
     return init_(storage=storage, db=db, modules=modules, name=name)
 
