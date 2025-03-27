@@ -53,6 +53,7 @@ else:
                     "disconnect",
                     "info",
                     "init",
+                    "run"
                 ],
             },
             {
@@ -328,6 +329,10 @@ def save(filepath: str, key: str, description: str, registry: str):
     if save_from_filepath_cli(filepath, key, description, registry) is not None:
         sys.exit(1)
 
+@main.command()
+def run():
+    """Run a compute job."""
+    print('run script function')
 
 main.add_command(settings)
 main.add_command(cache)
