@@ -1,3 +1,4 @@
+# Execute any arbitrary python script from a given path, this function requires being defined in a seperate file. (Modal does not allow for local imports)
 def run_script_from_path(script_remote_path):
     import sys
     import traceback
