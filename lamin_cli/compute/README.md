@@ -13,16 +13,13 @@ print('hello from lamin')
 
 print('numpy is imported')
 print(np)
-
 ```
 
 
 2. Run your script from Lamin CLI
 
 ```
-
 lamin run --app_name helloworld --packages numpy --path ./helloworld.py
-
 ```
 
 ##### Note: once `--app_name` is specified the environment is attached to it and will not need to be rebuilt. You can specify pip_installs by using the `--packages` flag. To list multiple dependancies you can specify `numpy, sklearn` comma seperated.
@@ -148,17 +145,13 @@ def main():
     
 if __name__ == "__main__":
     main()
-
 ```
 
 Lets use the same image but add `lightning` and `torchvision` as an additional package to install
 
 
 ```
-
 lamin run --path ./helloworld_train.py --app_name lamin_run_pytorch --packages torch,lightning,torchvision --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
-
-
 ```
 
 
