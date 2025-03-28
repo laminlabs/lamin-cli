@@ -50,11 +50,18 @@ GPUs are specified in the following format:
 
 `T4:1` attaches one T4.
 `T4:4` would attach 4 T4 GPUs to your job.
+`A10:1` would attach 1 A10 GPU to your job.
 
 ```
 lamin run --path ./helloworld_gpu.py --app_name lamin_run_pytorch --packages torch --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
 
 ```
+
+3. Track your script through LaminDB 
+
+your scripts are saved in the following key on LaminDB: `/app_name/script_name`
+
+The above script is saved as `lamin_run_pytorch/helloworld_gpu.py` This key and script_name pair will be updated each time the script is updated.
 
 ### Lets expand the above to train a simple model 
 
@@ -148,6 +155,11 @@ Lets use the same image but add `lightning` and `torchvision` as an additional p
 
 
 ```
-lamin run --path ./helloworld_gpu.py --app_name lamin_run_pytorch --packages torch,lightning,torchvision --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
+
+lamin run --path ./helloworld_train.py --app_name lamin_run_pytorch --packages torch,lightning,torchvision --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
+
 
 ```
+
+
+Your script is now tracked as an Artifact with key `lamin_run_pytorch/helloworld_train.py`
