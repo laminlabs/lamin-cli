@@ -336,7 +336,8 @@ def save(filepath: str, key: str, description: str, registry: str):
 @click.option("--image", type=str, default=None, help="A public image or in the future one that Lamin has access to")
 @click.option("--cpu", type=int, default=4, help="The number of CPUs to use.")
 @click.option("--packages", type=str, default=None, help="A list of packages to install comma seperated") # DEMO ONLY....JUST FOR DEMO, we need like a config..
-def run(path:str, app_name:str, image:str, cpu:int, packages:str):
+@click.option("--gpu", type=str, default=None, help="The type of GPU to use, only compatible with cuda images, reference the tutorials.")   
+def run(path:str, app_name:str, image:str, cpu:int, packages:str, gpu:str):
     """Run a compute job."""
     import os
     import shutil 
@@ -356,9 +357,17 @@ def run(path:str, app_name:str, image:str, cpu:int, packages:str):
     shutil.copy(path, default_mount_dir)
     
     path = os.path.join(default_mount_dir, os.path.basename(path))
+    
+    packages = packages.split(',') if packages else None # obviously this is just a demo, we need a better way to handle this.
 
     # RUN THE SCRIPT
-    runner = Runner(local_mount_dir=default_mount_dir, app_name=app_name, cpu=cpu, packages=packages, image_url=image)
+    runner = Runner(local_mount_dir=default_mount_dir, 
+                    app_name=app_name, 
+                    cpu=cpu, 
+                    packages=packages, 
+                    image_url=image,
+                    gpu=gpu)
+    
     runner.run_compute_flow(path)
 
 

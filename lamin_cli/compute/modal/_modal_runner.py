@@ -22,7 +22,7 @@ class Runner:
         
         self.image = self.create_modal_image(local_dir=local_mount_dir, packages=packages, image_url=image_url)
         #@TODO add GPU support
-        self.modal_function = self.app.function(image=self.image, cpu=cpu)(run_script_from_path)
+        self.modal_function = self.app.function(image=self.image, cpu=cpu, gpu=gpu)(run_script_from_path)
     
     def run(self, script_local_path:str):
         script_remote_path = self.local_to_remote_path(script_local_path)
