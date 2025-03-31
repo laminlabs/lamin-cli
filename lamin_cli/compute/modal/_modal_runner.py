@@ -1,6 +1,7 @@
 import os
 import modal
 import typing as t
+import lamindb as ln
 from pathlib import Path
 from ._modal_script_function import run_script_from_path 
 
@@ -59,24 +60,52 @@ class Runner:
         save_from_filepath_cli(script_local_path, 
                                key=key, 
                                description=description, 
-                               registry='artifact') # Is it Artifact or Transform?....
+                               registry='artifact') # Is it Artifact or Transform?.... should be transform
+        
+        # scratch the track function and use the ln.track functionality.  
+
+
     
     # We ideally need some Lamin abstraction for images/containers/environments? that will be compatible will all backends?
     # For now I just focused on Modal, and they provide a nice python API, other backends use .yaml files for configs usually...
     # This is the simplest for of just installing python packahes or using a premade image.
-    def create_modal_image(self,python_version="3.10", packages=[], local_dir='./scripts', remote_dir='/scripts/', image_url=None):
+    def create_modal_image(self,python_version:str="3.10", packages:list=[], local_dir:str='./scripts', remote_dir='/scripts/', image_url:str=None, settings_env_variable:dict={}):
+        import lamindb_setup
+        from dotenv import load_dotenv
+        from pathlib import Path
+        
+        # Get the settings directory and user environment file
+        settings_dir = lamindb_setup.core._settings_store.settings_dir
+
+        user_env_path = Path(settings_dir) / 'current_user.env'
+        instance_env_path = Path(settings_dir) / 'current_instance.env'
+
+        load_dotenv(user_env_path)
+        load_dotenv(instance_env_path)
+
+        key_value = os.environ.get("lamin_user_api_key")
+
+        if not key_value:
+            raise ValueError("No Lamin API key found in current_user.env")
+
+        settings_env_variable['lamin_user_api_key'] = key_value
+        settings_env_variable['lamin_project_name'] = self.app_name
+        settings_env_variable['lamin_instance_name'] = os.environ.get("lamindb_instance_name")
+        settings_env_variable['lamin_instance_owner'] = os.environ.get("lamindb_instance_owner")
+
         if image_url:
-            return (modal.Image.from_registry(image_url, add_python=python_version)
+            image = (modal.Image.from_registry(image_url, add_python=python_version)
                     .pip_install(packages)
+                    .env(settings_env_variable)
                     .add_local_dir(local_dir, remote_dir))
         else:
-            return (modal.Image.debian_slim(python_version=python_version)
+            image = (modal.Image.debian_slim(python_version=python_version)
                     .pip_install(packages)
+                    .env(settings_env_variable)
                     .add_local_dir(self.local_mount_dir, self.remote_mount_dir))
+        
+        return image
     
 
-    def run_compute_flow(self, script_local_path):
-        self.track(script_local_path)
-        self.run(script_local_path)
-
-
+    # def run_compute_flow(self, script_local_path):
+    #     self.run(script_local_path)

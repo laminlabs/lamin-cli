@@ -5,37 +5,75 @@
 
 1. Create a local script
 
-save your script: `helloworld.py` 
+save your script: `helloworld_lamin.py` 
 
 ```python 
-import numpy as np
-print('hello from lamin')
+import os
+import lamindb as ln
 
-print('numpy is imported')
-print(np)
+API_KEY = os.environ['lamin_user_api_key']
+PROJECT_NAME = os.environ['lamin_project_name']
+INSTANCE_NAME = os.environ['lamin_instance_name']
+INSTANCE_OWNER = os.environ['lamin_instance_owner']
+
+# LAMIN SETUP
+ln.setup.login(api_key=API_KEY)
+ln.connect(f'{INSTANCE_OWNER}/{INSTANCE_NAME}')
+my_project = ln.Project(name=PROJECT_NAME).save()
+ln.track(project=PROJECT_NAME)
+
+def say_hello():
+    print('Hello, World! lamin, user key has been passed successfully')
+
+
+if __name__ == '__main__':
+    say_hello()
+
+ln.finish()
 ```
 
 
 2. Run your script from Lamin CLI
 
 ```
-lamin run --app_name helloworld --packages numpy --path ./helloworld.py
+lamin run ./helloworld_lamin.py --project modal_project
 ```
 
-##### Note: once `--app_name` is specified the environment is attached to it and will not need to be rebuilt. You can specify pip_installs by using the `--packages` flag. To list multiple dependancies you can specify `numpy, sklearn` comma seperated.
+##### Note: once `--project` is specified the environment is attached to it and will not need to be rebuilt.
 
 
-#### Running a job with a premade image and attaching GPUs
+#### Running a job with a premade image and additional python dependancies
 
 1. Create a local script 
 
 save your script locally `helloworld_gpu.py`
 
 ```python 
-import torch
+import os
+import lamindb as ln
 
-print('Imported pytorch and detecting GPUs')
-print(torch.cuda.is_available())
+API_KEY = os.environ['lamin_user_api_key']
+PROJECT_NAME = os.environ['lamin_project_name']
+INSTANCE_NAME = os.environ['lamin_instance_name']
+INSTANCE_OWNER = os.environ['lamin_instance_owner']
+
+# LAMIN SETUP
+ln.setup.login(api_key=API_KEY)
+ln.connect(f'{INSTANCE_OWNER}/{INSTANCE_NAME}')
+my_project = ln.Project(name=PROJECT_NAME).save()
+ln.track(project=PROJECT_NAME)
+
+def say_hello():
+    import torch
+    print('Imported pytorch and detecting GPUs')
+    print(torch.cuda.is_available())
+
+
+if __name__ == '__main__':
+    say_hello()
+
+ln.finish()
+
 
 ```
 
@@ -50,11 +88,10 @@ GPUs are specified in the following format:
 `A10:1` would attach 1 A10 GPU to your job.
 
 ```
-lamin run --path ./helloworld_gpu.py --app_name lamin_run_pytorch --packages torch --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
-
+lamin run ./helloworld_gpu.py --project modal_project_gpu --image nvcr.io/nvidia/pytorch:22.12-py3 --packages torch --gpu T4:1
 ```
 
-3. Track your script through LaminDB 
+3. Run a training job tracked by lamindb
 
 your scripts are saved in the following key on LaminDB: `/app_name/script_name`
 
@@ -74,6 +111,18 @@ from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
 
+import lamindb as ln
+
+API_KEY = os.environ['lamin_user_api_key']
+PROJECT_NAME = os.environ['lamin_project_name']
+INSTANCE_NAME = os.environ['lamin_instance_name']
+INSTANCE_OWNER = os.environ['lamin_instance_owner']
+
+# LAMIN SETUP
+ln.setup.login(api_key=API_KEY)
+ln.connect(f'{INSTANCE_OWNER}/{INSTANCE_NAME}')
+my_project = ln.Project(name=PROJECT_NAME).save()
+ln.track(project=PROJECT_NAME) 
 
 class MNISTModel(pl.LightningModule):
     def __init__(self):
@@ -145,14 +194,14 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+ln.finish()
 ```
 
 Lets use the same image but add `lightning` and `torchvision` as an additional package to install
 
-
 ```
-lamin run --path ./helloworld_train.py --app_name lamin_run_pytorch --packages torch,lightning,torchvision --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
+lamin run ./helloworld_train.py --project modal_project_gpu --packages torch,pytorch_lightning,torchvision --image nvcr.io/nvidia/pytorch:22.12-py3 --gpu T4:1
 ```
-
 
 Your script is now tracked as an Artifact with key `lamin_run_pytorch/helloworld_train.py`

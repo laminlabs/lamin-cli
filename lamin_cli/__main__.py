@@ -330,45 +330,51 @@ def save(filepath: str, key: str, description: str, registry: str):
         sys.exit(1)
 
 @main.command()
-@click.option("--path", type=str, default=None, help="The path to the script to run.", required=True)
-@click.option("--app_name", type=str, default=None, help="The name of the app to run the script on.", required=True) # IMPORTANT: Once an image is built it is tied to this app. Artifact key is also tracked here.
+@click.argument("filepath", type=str)
+@click.option("--project", type=str, default=None, help="The name of the app to run the script on.", required=True) # IMPORTANT: Once an image is built it is tied to this app. Artifact key is also tracked here.
 # Super important: Maybe in the future lamin can be empowered by an image registry?... 
 @click.option("--image", type=str, default=None, help="A public image or in the future one that Lamin has access to")
 @click.option("--cpu", type=int, default=4, help="The number of CPUs to use.")
-@click.option("--packages", type=str, default=None, help="A list of packages to install comma seperated") # DEMO ONLY....JUST FOR DEMO, we need like a config..
+@click.option("--packages", type=str, default="lamindb", help="A list of packages to install comma seperated") # DEMO ONLY....JUST FOR DEMO, we need like a config..
 @click.option("--gpu", type=str, default=None, help="The type of GPU to use, only compatible with cuda images, reference the tutorials.")   
-def run(path:str, app_name:str, image:str, cpu:int, packages:str, gpu:str):
+def run(filepath:str, project:str, image:str, cpu:int, packages:str, gpu:str):
     """Run a compute job."""
-    import os
     import shutil 
     from lamin_cli.compute.modal import Runner
+    from pathlib import Path
     
     # DEFAULT DIRECTORY TO MOUNT SCRIPTS LOCALLY
     default_mount_dir = './lamin_scripts' # Should be part of lamin.compute.settings? something like that 
     
     # MAKE THE DEFAULT DIRECTORY
-    if not os.path.exists(default_mount_dir):
+    if not Path.is_dir(Path(default_mount_dir)):
         print('creating default mount dir')
-        os.makedirs(default_mount_dir)
-    print('run script function')
+        Path(default_mount_dir).mkdir(parents=True, exist_ok=True)
+
+    print('running script function')
 
     # copy path to default mount dir, we can avoid copying the script again.. Need to think more here
     
-    shutil.copy(path, default_mount_dir)
+    shutil.copy(filepath, default_mount_dir)
     
-    path = os.path.join(default_mount_dir, os.path.basename(path))
+    filepath = Path(default_mount_dir) / Path(filepath).name
     
     packages = packages.split(',') if packages else None # obviously this is just a demo, we need a better way to handle this.
-
+    if packages:
+        packages = [package.strip() for package in packages]
+    
+    if "lamindb" not in packages:
+        packages.append("lamindb") # ensure lamindb is installed
+    
     # RUN THE SCRIPT
     runner = Runner(local_mount_dir=default_mount_dir, 
-                    app_name=app_name, 
+                    app_name=project, 
                     cpu=cpu, 
                     packages=packages, 
                     image_url=image,
                     gpu=gpu)
     
-    runner.run_compute_flow(path)
+    runner.run(filepath)
 
 
 main.add_command(settings)
