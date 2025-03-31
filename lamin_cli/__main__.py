@@ -48,13 +48,7 @@ else:
         "lamin": [
             {
                 "name": "Connect to an instance",
-                "commands": [
-                    "connect",
-                    "disconnect",
-                    "info",
-                    "init",
-                    "run"
-                ],
+                "commands": ["connect", "disconnect", "info", "init", "run"],
             },
             {
                 "name": "Read & write data",
@@ -329,52 +323,54 @@ def save(filepath: str, key: str, description: str, registry: str):
     if save_from_filepath_cli(filepath, key, description, registry) is not None:
         sys.exit(1)
 
+# Test feature
 @main.command()
 @click.argument("filepath", type=str)
-@click.option("--project", type=str, default=None, help="The name of the app to run the script on.", required=True) # IMPORTANT: Once an image is built it is tied to this app. Artifact key is also tracked here.
-# Super important: Maybe in the future lamin can be empowered by an image registry?... 
+@click.option("--project", type=str, default=None, help="The name of the app to run the script on.", required=True)
 @click.option("--image", type=str, default=None, help="A public image or in the future one that Lamin has access to")
 @click.option("--cpu", type=int, default=4, help="The number of CPUs to use.")
-@click.option("--packages", type=str, default="lamindb", help="A list of packages to install comma seperated") # DEMO ONLY....JUST FOR DEMO, we need like a config..
-@click.option("--gpu", type=str, default=None, help="The type of GPU to use, only compatible with cuda images, reference the tutorials.")   
-def run(filepath:str, project:str, image:str, cpu:int, packages:str, gpu:str):
+@click.option("--packages", type=str, default="lamindb", help="A list of packages to install comma separated")
+@click.option("--gpu", type=str, default=None, help="The type of GPU to use, only compatible with cuda images, reference the tutorials.")
+def run(filepath: str, project: str, image: str, cpu: int, packages: str, gpu: str | None):
     """Run a compute job."""
-    import shutil 
-    from lamin_cli.compute.modal import Runner
+    import shutil
     from pathlib import Path
-    
+
+    from lamin_cli.compute.modal import Runner
+
     # DEFAULT DIRECTORY TO MOUNT SCRIPTS LOCALLY
-    default_mount_dir = './lamin_scripts' # Should be part of lamin.compute.settings? something like that 
-    
+    default_mount_dir = './lamin_scripts'
+
     # MAKE THE DEFAULT DIRECTORY
-    if not Path.is_dir(Path(default_mount_dir)):
+    if not Path(default_mount_dir).is_dir():
         print('creating default mount dir')
         Path(default_mount_dir).mkdir(parents=True, exist_ok=True)
 
     print('running script function')
 
-    # copy path to default mount dir, we can avoid copying the script again.. Need to think more here
-    
+    # copy path to default mount dir
     shutil.copy(filepath, default_mount_dir)
-    
-    filepath = Path(default_mount_dir) / Path(filepath).name
-    
-    packages = packages.split(',') if packages else None # obviously this is just a demo, we need a better way to handle this.
+
+    filepath_path = Path(default_mount_dir) / Path(filepath).name
+
+    # Fix the packages handling
+    package_list = []
     if packages:
-        packages = [package.strip() for package in packages]
-    
-    if "lamindb" not in packages:
-        packages.append("lamindb") # ensure lamindb is installed
-    
+        package_list = [package.strip() for package in packages.split(',')]
+
+    if "lamindb" not in package_list:
+        package_list.append("lamindb")  # ensure lamindb is installed
+
     # RUN THE SCRIPT
-    runner = Runner(local_mount_dir=default_mount_dir, 
-                    app_name=project, 
-                    cpu=cpu, 
-                    packages=packages, 
+    runner = Runner(local_mount_dir=default_mount_dir,
+                    app_name=project,
+                    cpu=cpu,
+                    packages=package_list,
                     image_url=image,
                     gpu=gpu)
-    
-    runner.run(filepath)
+
+    # Convert Path to string for the run method
+    runner.run(str(filepath_path))
 
 
 main.add_command(settings)
