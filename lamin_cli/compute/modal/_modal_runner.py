@@ -64,32 +64,13 @@ class Runner:
         # Return as string with normalized separators
         return remote_path.as_posix()
 
-    # We ideally need some Lamin abstraction for images/containers/environments? that will be compatible will all backends?
-    # For now I just focused on Modal, and they provide a nice python API, other backends use .yaml files for configs usually...
-    # This is the simplest for of just installing python packahes or using a premade image.
-    def create_modal_image(
-        self,
-        python_version: str = "3.10",
-        packages: list | None = None,
-        local_dir: str | Path = "./scripts",
-        remote_dir="/scripts/",
-        image_url: str | None = None,
-        settings_env_variable: dict | None = None,
-    ):
+    def lamin_env_setup(self):
         from pathlib import Path
 
         import lamindb_setup
         from dotenv import load_dotenv
 
-        # Get the settings directory and user environment file
-        if settings_env_variable is None:
-            settings_env_variable = {}
-        if settings_env_variable is None:
-            settings_env_variable = {}
-        if settings_env_variable is None:
-            settings_env_variable = {}
-        if packages is None:
-            packages = []
+        settings_env_variable: dict = {}
         settings_dir = lamindb_setup.core._settings_store.settings_dir
 
         user_env_path = Path(settings_dir) / "current_user.env"
@@ -112,6 +93,27 @@ class Runner:
             "lamindb_instance_owner"
         )
 
+        return settings_env_variable
+
+    # We ideally need some Lamin abstraction for images/containers/environments? that will be compatible will all backends?
+    # For now I just focused on Modal, and they provide a nice python API, other backends use .yaml files for configs usually...
+    # This is the simplest for of just installing python packahes or using a premade image.
+    def create_modal_image(
+        self,
+        python_version: str = "3.10",
+        packages: list | None = None,
+        local_dir: str | Path = "./scripts",
+        remote_dir="/scripts/",
+        image_url: str | None = None,
+        env_variables: dict | None = None,
+    ):
+        settings_env_variable = self.lamin_env_setup()  # Lamin default env variables
+        if packages is None:
+            packages = []
+        # Additional env_variables
+        if env_variables:
+            settings_env_variable.update(env_variables)
+
         if image_url:
             image = (
                 modal.Image.from_registry(image_url, add_python=python_version)
@@ -128,6 +130,3 @@ class Runner:
             )
 
         return image
-
-    # def run_compute_flow(self, script_local_path):
-    #     self.run(script_local_path)
