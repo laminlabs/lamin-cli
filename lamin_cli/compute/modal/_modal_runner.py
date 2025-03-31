@@ -34,13 +34,13 @@ class Runner:
             run_script_from_path
         )
 
-    def run(self, script_local_path: str):
-        script_remote_path = self.local_to_remote_path(script_local_path)
+    def run(self, script_local_path: str | Path):
+        script_remote_path = self.local_to_remote_path(str(script_local_path))
         with modal.enable_output():  # Prints out modal logs
             with self.app.run():
                 self.modal_function.remote(script_remote_path)
 
-    def create_modal_app(self, app_name):
+    def create_modal_app(self, app_name: str):
         app = modal.App(app_name)
         return app
 
@@ -63,23 +63,6 @@ class Runner:
 
         # Return as string with normalized separators
         return remote_path.as_posix()
-
-    # Just to demo what saving script on lamin would look like
-    def track(
-        self,
-        script_local_path: t.Union[str, Path],
-        description: str = "lamin compute run",
-    ):
-        from lamin_cli._save import save_from_filepath_cli
-
-        # How should we handle the key?, this for now?
-        key = self.app_name + "/" + Path(script_local_path).name
-
-        save_from_filepath_cli(
-            script_local_path, key=key, description=description, registry="artifact"
-        )  # Is it Artifact or Transform?.... should be transform
-
-        # scratch the track function and use the ln.track functionality.
 
     # We ideally need some Lamin abstraction for images/containers/environments? that will be compatible will all backends?
     # For now I just focused on Modal, and they provide a nice python API, other backends use .yaml files for configs usually...
