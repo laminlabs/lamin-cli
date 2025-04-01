@@ -46,6 +46,7 @@ def save_from_filepath_cli(
     filepath: str | Path,
     key: str | None,
     description: str | None,
+    stem_uid: str | None,
     registry: str | None,
 ) -> str | None:
     import lamindb_setup as ln_setup
@@ -99,10 +100,21 @@ def save_from_filepath_cli(
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
-        if key is None and description is None:
+        revises = None
+        if stem_uid is not None:
+            revises = (
+                ln.Artifact.filter(uid__startswith=stem_uid)
+                .order_by("-created_at")
+                .first()
+            )
+            if revises is None:
+                raise ln.errors.InvalidArgument("The stem uid is not found.")
+        elif key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
-        artifact = ln.Artifact(filepath, key=key, description=description).save()
+        artifact = ln.Artifact(
+            filepath, key=key, description=description, revises=revises
+        ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if ln_setup.settings.storage.type == "s3":
@@ -125,6 +137,15 @@ def save_from_filepath_cli(
                 )
                 return "not-tracked-in-transform-registry"
         else:
+            revises = None
+            if stem_uid is not None:
+                revises = (
+                    ln.Transform.filter(uid__startswith=stem_uid)
+                    .order_by("-created_at")
+                    .first()
+                )
+                if revises is None:
+                    raise ln.errors.InvalidArgument("The stem uid is not found.")
             # TODO: build in the logic that queries for relative file paths
             # we have in Context; add tests for multiple versions
             transform = ln.Transform.filter(
@@ -135,6 +156,7 @@ def save_from_filepath_cli(
                     description=filepath.name,
                     key=filepath.name,
                     type="script" if filepath.suffix in {".R", ".py"} else "notebook",
+                    revises=revises,
                 ).save()
                 logger.important(f"created Transform('{transform.uid}')")
         # latest run of this transform by user
