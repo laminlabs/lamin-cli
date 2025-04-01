@@ -185,6 +185,8 @@ print("my consecutive cell")
     os.system(f"cp {notebook_path} {new_path}")
 
     # upon re-running it, the notebook name is updated
+    transform = ln.Transform.get("hlsFXswrJjtt0001")
+    assert "with-title-and-initialized" in transform.key
     nbproject_test.execute_notebooks(new_path, print_outputs=True)
-    transform = ln.Transform.get("hlsFXswrJjtt0000")
+    transform = ln.Transform.get("hlsFXswrJjtt0001")
     assert "new_name.ipynb" in transform.key
