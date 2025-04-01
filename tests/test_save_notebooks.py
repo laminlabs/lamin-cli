@@ -184,9 +184,7 @@ print("my consecutive cell")
     new_path = notebook_path.with_name("new_name.ipynb")
     os.system(f"cp {notebook_path} {new_path}")
 
-    # upon re-running it, the user is asked to create a new stem uid
-    with pytest.raises(CellExecutionError) as error:
-        nbproject_test.execute_notebooks(new_path, print_outputs=True)
-
-    print(error.exconly())
-    assert "clashes with the existing key" in error.exconly()
+    # upon re-running it, the notebook name is updated
+    nbproject_test.execute_notebooks(new_path, print_outputs=True)
+    transform = ln.Transform.get("hlsFXswrJjtt0000")
+    assert "new_name.ipynb" in transform.key
