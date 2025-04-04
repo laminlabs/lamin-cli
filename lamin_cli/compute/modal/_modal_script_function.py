@@ -5,6 +5,7 @@ def run_script_from_path(script_remote_path: str):
     import threading
     from pathlib import Path
 
+    print("########## SCRIPT START ##########################")
     result = {"success": False, "output": "", "error": ""}
 
     def stream_output(stream, capture_list):
@@ -70,6 +71,7 @@ def run_script_from_path(script_remote_path: str):
         import traceback
 
         result["error"] = str(e) + "\n" + traceback.format_exc()
+    print("########## SCRIPT END ##########################")
 
     print(f"Result status: {'success' if result['success'] else 'failed'}")
 

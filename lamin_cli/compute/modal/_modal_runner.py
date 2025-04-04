@@ -36,7 +36,7 @@ class Runner:
 
     def run(self, script_local_path: str | Path):
         script_remote_path = self.local_to_remote_path(str(script_local_path))
-        with modal.enable_output():  # Prints out modal logs
+        with modal.enable_output(show_progress=True):  # Prints out modal logs
             with self.app.run():
                 self.modal_function.remote(script_remote_path)
 
