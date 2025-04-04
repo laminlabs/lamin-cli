@@ -18,7 +18,7 @@ def run_script_from_path(script_remote_path: str):
         # Check if the file exists
         if not Path(script_remote_path).exists():
             raise FileNotFoundError(f"Script file not found: {script_remote_path}")
-        # ln.track()
+
         # Run the script using subprocess
         process = subprocess.Popen(
             [sys.executable, script_remote_path],

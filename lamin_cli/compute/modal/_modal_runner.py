@@ -84,7 +84,7 @@ class Runner:
         if not key_value:
             raise ValueError("No Lamin API key found in current_user.env")
         # pass keys to the image env as a dictionary
-        settings_env_variable["lamin_user_api_key"] = key_value
+        settings_env_variable["LAMIN_API_KEY"] = key_value
         settings_env_variable["lamin_project_name"] = self.app_name
         settings_env_variable["lamin_instance_name"] = os.environ.get(
             "lamindb_instance_name"
@@ -108,25 +108,24 @@ class Runner:
         env_variables: dict | None = None,
     ):
         settings_env_variable = self.lamin_env_setup()  # Lamin default env variables
+
         if packages is None:
             packages = []
+
         # Additional env_variables
         if env_variables:
             settings_env_variable.update(env_variables)
 
         if image_url:
-            image = (
-                modal.Image.from_registry(image_url, add_python=python_version)
-                .pip_install(packages)
-                .env(settings_env_variable)
-                .add_local_dir(local_dir, remote_dir)
-            )
+            image = modal.Image.from_registry(
+                image_url, add_python=python_version
+            ).pip_install(packages)
         else:
-            image = (
-                modal.Image.debian_slim(python_version=python_version)
-                .pip_install(packages)
-                .env(settings_env_variable)
-                .add_local_dir(self.local_mount_dir, self.remote_mount_dir)
+            image = modal.Image.debian_slim(python_version=python_version).pip_install(
+                packages
             )
 
+        # Mount local directory to remote directory
+        image = image.env(settings_env_variable)
+        image = image.add_local_dir(local_dir, remote_dir)
         return image
