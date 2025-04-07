@@ -186,6 +186,8 @@ def connect(instance: str):
     `lamin connect` switches
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
     auto-connect in a Python session upon importing `lamindb`.
+
+    For manually connecting in a Python session, use {func}`~lamindb.connect`.
     """
     from lamindb_setup import connect as connect_
     from lamindb_setup import settings as settings_
