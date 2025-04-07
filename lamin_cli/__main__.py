@@ -323,14 +323,14 @@ def save(filepath: str, key: str, description: str, registry: str):
     if save_from_filepath_cli(filepath, key, description, registry) is not None:
         sys.exit(1)
 
-# Test feature
+
 @main.command()
 @click.argument("filepath", type=str)
-@click.option("--project", type=str, default=None, help="The name of the app to run the script on.", required=True)
-@click.option("--image", type=str, default=None, help="A public image or in the future one that Lamin has access to")
+@click.option("--project", type=str, default=None, help="The project name or uid to run the script on. When running on Modal, creates an app with the same name.", required=True)
+@click.option("--image", type=str, default=None, help="A base docker image to use.")
+@click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
 @click.option("--cpu", type=int, default=4, help="The number of CPUs to use.")
-@click.option("--packages", type=str, default="lamindb", help="A list of packages to install comma separated")
-@click.option("--gpu", type=str, default=None, help="The type of GPU to use, only compatible with cuda images, reference the tutorials.")
+@click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
 def run(filepath: str, project: str, image: str, cpu: int, packages: str, gpu: str | None):
     """Run a compute job."""
     import shutil
