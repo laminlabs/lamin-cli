@@ -144,7 +144,10 @@ class Runner:
         if packages is None:
             packages = []
         if "lamindb" not in packages:
-            packages.append("lamindb")  # ensure lamindb gets installed
+            packages += [
+                "git+https://github.com/laminlabs/lamindb-setup.git@currentinstance",
+                "git+https://github.com/laminlabs/lamindb.git@run",
+            ]
 
         if ln_setup.settings.user.api_key is None:
             raise ValueError("Please authenticate via: lamin login")
