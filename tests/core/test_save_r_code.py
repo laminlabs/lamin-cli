@@ -4,7 +4,7 @@ from pathlib import Path
 
 import lamindb as ln
 
-scripts_dir = Path(__file__).parent.resolve() / "scripts"
+scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def test_run_save_cache():
