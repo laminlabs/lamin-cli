@@ -85,7 +85,7 @@ class Runner:
         remote_mount_dir: str | Path = "/scripts",
         image_url: str | None = None,
         packages: list[str] | None = None,
-        n_cpu: int = 8,
+        cpu: float | None = None,
         gpu: str | None = None,
     ):
         self.app_name = app_name  # we use the LaminDB project name as the app name
@@ -98,7 +98,7 @@ class Runner:
             local_dir=local_mount_dir, packages=packages, image_url=image_url
         )
 
-        self.modal_function = self.app.function(image=self.image, cpu=n_cpu, gpu=gpu)(
+        self.modal_function = self.app.function(image=self.image, cpu=cpu, gpu=gpu)(
             run_script
         )
 

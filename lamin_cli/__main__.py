@@ -330,9 +330,9 @@ def save(path: str, key: str, description: str, stem_uid: str, registry: str):
 @click.option("--project", type=str, default=None, help="The project name or uid to run the script on. When running on Modal, creates an app with the same name.", required=True)
 @click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
 @click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
-@click.option("--n-cpu", type=int, default=4, help="The number of CPUs to use.")
+@click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
 @click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
-def run(filepath: str, project: str, image_url: str, packages: str, n_cpu: int, gpu: str | None):
+def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
     """Run a compute job."""
     import shutil
     from pathlib import Path
@@ -355,7 +355,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, n_cpu: int, 
         app_name=project,
         packages=package_list,
         image_url=image_url,
-        n_cpu=n_cpu,
+        cpu=cpu,
         gpu=gpu
     )
 
