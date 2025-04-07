@@ -4,11 +4,10 @@ from pathlib import Path
 import modal
 
 
-def run_script(script_remote_path: str):
+def run_script(path: Path):
     import subprocess
     import sys
     import threading
-    from pathlib import Path
 
     result = {"success": False, "output": "", "error": ""}
 
@@ -19,14 +18,13 @@ def run_script(script_remote_path: str):
             capture_list.append(line)
         stream.close()
 
-    try:
-        # Check if the file exists
-        if not Path(script_remote_path).exists():
-            raise FileNotFoundError(f"Script file not found: {script_remote_path}")
+    if not path.exists():
+        raise FileNotFoundError(f"Script file not found: {path}")
 
+    try:
         # Run the script using subprocess
         process = subprocess.Popen(
-            [sys.executable, script_remote_path],
+            [sys.executable, path.as_posix()],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -107,7 +105,7 @@ class Runner:
         script_remote_path = self.local_to_remote_path(str(script_local_path))
         with modal.enable_output(show_progress=True):  # Prints out modal logs
             with self.app.run():
-                self.modal_function.remote(script_remote_path)
+                self.modal_function.remote(Path(script_remote_path))
 
     def create_modal_app(self, app_name: str):
         app = modal.App(app_name)
