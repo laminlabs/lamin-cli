@@ -362,7 +362,8 @@ def run(filepath: str, project: str, image: str, cpu: int, packages: str, gpu: s
         package_list.append("lamindb")  # ensure lamindb is installed
 
     # RUN THE SCRIPT
-    runner = Runner(local_mount_dir=default_mount_dir,
+    runner = Runner(
+        local_mount_dir=default_mount_dir,
                     app_name=project,
                     cpu=cpu,
                     packages=package_list,

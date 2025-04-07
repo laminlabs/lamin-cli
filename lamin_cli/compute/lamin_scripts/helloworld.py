@@ -1,1 +1,1 @@
-print('hello world from lamin')
+print("hello world from lamin")
