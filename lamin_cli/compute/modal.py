@@ -142,12 +142,7 @@ class Runner:
         env_variables: dict | None = None,
     ) -> modal.Image:
         if packages is None:
-            packages = []
-        if "lamindb" not in packages:
-            packages += [
-                "git+https://github.com/laminlabs/lamindb-setup.git@currentinstance",
-                "git+https://github.com/laminlabs/lamindb.git@run",
-            ]
+            packages = ["lamindb"]
 
         if ln_setup.settings.user.api_key is None:
             raise ValueError("Please authenticate via: lamin login")
@@ -164,7 +159,8 @@ class Runner:
         else:
             image = modal.Image.from_registry(image_url, add_python=python_version)
         return (
-            image.pip_install(packages, force_build=True)
+            image.add_local_python_source("lamindb", "lamindb_setup")
+            .pip_install(packages, force_build=True)
             .env(all_env_variables)
             .add_local_dir(local_dir, remote_dir)
         )
