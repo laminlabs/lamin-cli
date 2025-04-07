@@ -338,23 +338,16 @@ def run(filepath: str, project: str, image_url: str, packages: str, n_cpu: int, 
 
     from lamin_cli.compute.modal import Runner
 
-    # a default mount dir
-    default_mount_dir = './lamin_scripts'
+    default_mount_dir = './modal_mount_dir'
     if not Path(default_mount_dir).is_dir():
         Path(default_mount_dir).mkdir(parents=True, exist_ok=True)
-
-    # copy path to default mount dir
     shutil.copy(filepath, default_mount_dir)
 
-    filepath_path = Path(default_mount_dir) / Path(filepath).name
+    filepath_in_mount_dir = Path(default_mount_dir) / Path(filepath).name
 
-    # Fix the packages handling
     package_list = []
     if packages:
         package_list = [package.strip() for package in packages.split(',')]
-
-    if "lamindb" not in package_list:
-        package_list.append("lamindb")  # ensure lamindb is installed
 
     runner = Runner(
         local_mount_dir=default_mount_dir,
@@ -365,8 +358,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, n_cpu: int, 
         gpu=gpu
     )
 
-    # convert Path to string for the run method
-    runner.run(str(filepath_path))
+    runner.run(filepath_in_mount_dir)
 
 
 main.add_command(settings)

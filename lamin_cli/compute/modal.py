@@ -4,6 +4,7 @@ import sys
 import threading
 from pathlib import Path
 
+import lamindb_setup as ln_setup
 import modal
 
 
@@ -101,11 +102,11 @@ class Runner:
             run_script
         )
 
-    def run(self, script_local_path: str | Path):
+    def run(self, script_local_path: Path):
         script_remote_path = self.local_to_remote_path(str(script_local_path))
         with modal.enable_output(show_progress=True):  # Prints out modal logs
             with self.app.run():
-                self.modal_function.remote(Path(script_remote_path))
+                self.modal_function.remote(script_remote_path)
 
     def create_modal_app(self, app_name: str):
         app = modal.App(app_name)
@@ -131,51 +132,27 @@ class Runner:
         # Return as string with normalized separators
         return remote_path.as_posix()
 
-    def lamin_env_setup(self):
-        from pathlib import Path
-
-        import lamindb_setup
-        from dotenv import load_dotenv
-
-        settings_env_variable: dict = {}
-        settings_dir = lamindb_setup.core._settings_store.settings_dir
-
-        user_env_path = Path(settings_dir) / "current_user.env"
-        instance_env_path = Path(settings_dir) / "current_instance.env"
-
-        load_dotenv(user_env_path)
-        load_dotenv(instance_env_path)
-
-        key_value = os.environ.get("lamin_user_api_key")
-
-        if not key_value:
-            raise ValueError("No Lamin API key found in current_user.env")
-        # pass keys to the image env as a dictionary
-        settings_env_variable["LAMIN_API_KEY"] = key_value
-        settings_env_variable["lamin_project_name"] = self.app_name
-        settings_env_variable["lamin_instance_name"] = os.environ.get(
-            "lamindb_instance_name"
-        )
-        settings_env_variable["lamin_instance_owner"] = os.environ.get(
-            "lamindb_instance_owner"
-        )
-
-        return settings_env_variable
-
     def create_modal_image(
         self,
         python_version: str = "3.12",
-        packages: list | None = None,
+        packages: list[str] | None = None,
         local_dir: str | Path = "./scripts",
         remote_dir: str = "/scripts/",
         image_url: str | None = None,
         env_variables: dict | None = None,
     ) -> modal.Image:
-        all_env_variables = self.lamin_env_setup()  # Lamin default env variables
-
         if packages is None:
             packages = []
+        if "lamindb" not in packages:
+            packages.append("lamindb")  # ensure lamindb gets installed
 
+        if ln_setup.settings.user.api_key is None:
+            raise ValueError("Please authenticate via: lamin login")
+        all_env_variables = {
+            "LAMIN_API_KEY": ln_setup.settings.user.api_key,
+            "LAMIN_PROJECT_NAME": self.app_name,
+            "LAMINDB_INSTANCE_SLUG": ln_setup.settings.instance.slug,
+        }
         if env_variables:
             all_env_variables.update(env_variables)
 
