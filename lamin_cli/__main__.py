@@ -338,15 +338,10 @@ def run(filepath: str, project: str, image: str, cpu: int, packages: str, gpu: s
 
     from lamin_cli.compute.modal import Runner
 
-    # DEFAULT DIRECTORY TO MOUNT SCRIPTS LOCALLY
+    # a default mount dir
     default_mount_dir = './lamin_scripts'
-
-    # MAKE THE DEFAULT DIRECTORY
     if not Path(default_mount_dir).is_dir():
-        print('creating default mount dir')
         Path(default_mount_dir).mkdir(parents=True, exist_ok=True)
-
-    print('running script function')
 
     # copy path to default mount dir
     shutil.copy(filepath, default_mount_dir)
@@ -361,16 +356,16 @@ def run(filepath: str, project: str, image: str, cpu: int, packages: str, gpu: s
     if "lamindb" not in package_list:
         package_list.append("lamindb")  # ensure lamindb is installed
 
-    # RUN THE SCRIPT
     runner = Runner(
         local_mount_dir=default_mount_dir,
-                    app_name=project,
-                    cpu=cpu,
-                    packages=package_list,
-                    image_url=image,
-                    gpu=gpu)
+        app_name=project,
+        cpu=cpu,
+        packages=package_list,
+        image_url=image,
+        gpu=gpu
+    )
 
-    # Convert Path to string for the run method
+    # convert Path to string for the run method
     runner.run(str(filepath_path))
 
 
