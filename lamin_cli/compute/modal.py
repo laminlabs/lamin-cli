@@ -164,7 +164,7 @@ class Runner:
         else:
             image = modal.Image.from_registry(image_url, add_python=python_version)
         return (
-            image.pip_install(packages)
+            image.pip_install(packages, force_build=True)
             .env(all_env_variables)
             .add_local_dir(local_dir, remote_dir)
         )
