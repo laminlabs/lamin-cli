@@ -8,7 +8,7 @@ import lamindb_setup as ln_setup
 import modal
 
 
-def run_script(path: Path):
+def run_script(path: Path) -> dict:
     """Takes a path to a script for running it as a function through Modal."""
     result = {"success": False, "output": "", "error": ""}
 
@@ -102,13 +102,13 @@ class Runner:
             run_script
         )
 
-    def run(self, script_local_path: Path):
+    def run(self, script_local_path: Path) -> None:
         script_remote_path = self.local_to_remote_path(str(script_local_path))
         with modal.enable_output(show_progress=True):  # Prints out modal logs
             with self.app.run():
                 self.modal_function.remote(Path(script_remote_path))
 
-    def create_modal_app(self, app_name: str):
+    def create_modal_app(self, app_name: str) -> modal.App:
         app = modal.App(app_name)
         return app
 
