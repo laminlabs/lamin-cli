@@ -1,14 +1,14 @@
 import os
+import subprocess
+import sys
+import threading
 from pathlib import Path
 
 import modal
 
 
 def run_script(path: Path):
-    import subprocess
-    import sys
-    import threading
-
+    """Takes a path to a script for running it as a function through Modal."""
     result = {"success": False, "output": "", "error": ""}
 
     def stream_output(stream, capture_list):
@@ -87,7 +87,7 @@ class Runner:
         cpu=8.0,
         gpu=None,
     ):
-        self.app_name = app_name  # Project? Still thinking of --rebuild-image feature
+        self.app_name = app_name  # we use the LaminDB project name as the app name
         self.app = self.create_modal_app(app_name)
 
         self.local_mount_dir = local_mount_dir
@@ -170,7 +170,7 @@ class Runner:
         python_version: str = "3.10",
         packages: list | None = None,
         local_dir: str | Path = "./scripts",
-        remote_dir="/scripts/",
+        remote_dir: str = "/scripts/",
         image_url: str | None = None,
         env_variables: dict | None = None,
     ):
