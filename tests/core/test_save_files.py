@@ -3,7 +3,7 @@ from pathlib import Path
 
 import lamindb_setup as ln_setup
 
-test_file = Path(__file__).parent.resolve() / ".gitignore"
+test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
 
 
 def test_save_file():
