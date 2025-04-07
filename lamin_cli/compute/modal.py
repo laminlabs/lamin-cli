@@ -150,8 +150,8 @@ class Runner:
             raise ValueError("Please authenticate via: lamin login")
         all_env_variables = {
             "LAMIN_API_KEY": ln_setup.settings.user.api_key,
-            "LAMIN_PROJECT_NAME": self.app_name,
-            "LAMINDB_INSTANCE_SLUG": ln_setup.settings.instance.slug,
+            "LAMIN_CURRENT_PROJECT_NAME": self.app_name,
+            "LAMIN_CURRENT_INSTANCE_SLUG": ln_setup.settings.instance.slug,
         }
         if env_variables:
             all_env_variables.update(env_variables)
