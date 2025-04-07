@@ -159,8 +159,9 @@ class Runner:
         else:
             image = modal.Image.from_registry(image_url, add_python=python_version)
         return (
-            image.pip_install(packages, force_build=True)
+            image.pip_install(packages)
             .env(all_env_variables)
             .add_local_dir(local_dir, remote_dir)
             .add_local_python_source("lamindb", "lamindb_setup")
+            .run_commands("lamin settings set auto-connect true", force_build=True)
         )
