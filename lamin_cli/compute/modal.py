@@ -162,37 +162,29 @@ class Runner:
 
         return settings_env_variable
 
-    # We ideally need some Lamin abstraction for images/containers/environments? that will be compatible will all backends?
-    # For now I just focused on Modal, and they provide a nice python API, other backends use .yaml files for configs usually...
-    # This is the simplest for of just installing python packahes or using a premade image.
     def create_modal_image(
         self,
-        python_version: str = "3.10",
+        python_version: str = "3.12",
         packages: list | None = None,
         local_dir: str | Path = "./scripts",
         remote_dir: str = "/scripts/",
         image_url: str | None = None,
         env_variables: dict | None = None,
-    ):
-        settings_env_variable = self.lamin_env_setup()  # Lamin default env variables
+    ) -> modal.Image:
+        all_env_variables = self.lamin_env_setup()  # Lamin default env variables
 
         if packages is None:
             packages = []
 
-        # Additional env_variables
         if env_variables:
-            settings_env_variable.update(env_variables)
+            all_env_variables.update(env_variables)
 
-        if image_url:
-            image = modal.Image.from_registry(
-                image_url, add_python=python_version
-            ).pip_install(packages)
+        if image_url is None:
+            image = modal.Image.debian_slim(python_version=python_version)
         else:
-            image = modal.Image.debian_slim(python_version=python_version).pip_install(
-                packages
-            )
-
-        # Mount local directory to remote directory
-        image = image.env(settings_env_variable)
-        image = image.add_local_dir(local_dir, remote_dir)
-        return image
+            image = modal.Image.from_registry(image_url, add_python=python_version)
+        return (
+            image.pip_install(packages)
+            .env(all_env_variables)
+            .add_local_dir(local_dir, remote_dir)
+        )
