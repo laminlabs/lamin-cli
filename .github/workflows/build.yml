@@ -75,7 +75,7 @@ jobs:
 
       - run: pip install git+https://github.com/laminlabs/laminci
 
-      - run: pip install modal
+      - run: uv pip install modal pytest
 
       - run: modal token set --token-id ${{ secrets.MODAL_DEV_TOKEN_ID }} --token-secret ${{ secrets.MODAL_DEV_TOKEN_SECRET }}
 
