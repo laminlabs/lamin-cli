@@ -47,6 +47,8 @@ jobs:
   test:
     needs: pre-filter
     runs-on: ubuntu-latest
+    env:
+      LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
     strategy:
       fail-fast: false
       matrix: ${{fromJson(needs.pre-filter.outputs.matrix)}}
@@ -80,5 +82,7 @@ jobs:
       - run: modal token set --token-id ${{ secrets.MODAL_DEV_TOKEN_ID }} --token-secret ${{ secrets.MODAL_DEV_TOKEN_SECRET }}
 
       - run: nox -s setup
+
+      - run: lamin login
 
       - run: pytest tests/modal
