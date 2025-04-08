@@ -9,6 +9,6 @@ nox.options.default_venv_backend = "none"
 
 @nox.session
 def setup(session):
-    branch = "main" if IS_PR else "release"  # point back to "release"
+    branch = "run" if IS_PR else "release"
     install_lamindb(session, branch=branch)
     login_testuser1(session)
