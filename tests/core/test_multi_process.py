@@ -2,7 +2,7 @@ import subprocess
 from multiprocessing import Process
 from pathlib import Path
 
-scripts_dir = Path(__file__).parent.resolve() / "scripts"
+scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def run_script():

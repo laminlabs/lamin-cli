@@ -5,7 +5,7 @@ from pathlib import Path
 import lamindb as ln
 from lamindb_setup import settings
 
-scripts_dir = Path(__file__).parent.resolve() / "scripts"
+scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def test_save_without_uid():

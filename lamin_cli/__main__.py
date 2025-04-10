@@ -48,12 +48,7 @@ else:
         "lamin": [
             {
                 "name": "Connect to an instance",
-                "commands": [
-                    "connect",
-                    "disconnect",
-                    "info",
-                    "init",
-                ],
+                "commands": ["connect", "disconnect", "info", "init", "run"],
             },
             {
                 "name": "Read & write data",
@@ -191,6 +186,8 @@ def connect(instance: str):
     `lamin connect` switches
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
     auto-connect in a Python session upon importing `lamindb`.
+
+    For manually connecting in a Python session, use {func}`~lamindb.connect`.
     """
     from lamindb_setup import connect as connect_
     from lamindb_setup import settings as settings_
@@ -328,10 +325,55 @@ def save(path: str, key: str, description: str, stem_uid: str, registry: str):
         sys.exit(1)
 
 
+@main.command()
+@click.argument("filepath", type=str)
+@click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
+@click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
+@click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
+@click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
+@click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
+def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
+    """Run a compute job in the cloud.
+
+    This is an EXPERIMENTAL feature that enables to run a script on Modal.
+
+    Example: Given a valid project name "my_project".
+
+    ```
+    lamin run my_script.py --project my_project
+    ```
+    """
+    import shutil
+    from pathlib import Path
+
+    from lamin_cli.compute.modal import Runner
+
+    default_mount_dir = './modal_mount_dir'
+    if not Path(default_mount_dir).is_dir():
+        Path(default_mount_dir).mkdir(parents=True, exist_ok=True)
+    shutil.copy(filepath, default_mount_dir)
+
+    filepath_in_mount_dir = Path(default_mount_dir) / Path(filepath).name
+
+    package_list = []
+    if packages:
+        package_list = [package.strip() for package in packages.split(',')]
+
+    runner = Runner(
+        local_mount_dir=default_mount_dir,
+        app_name=project,
+        packages=package_list,
+        image_url=image_url,
+        cpu=cpu,
+        gpu=gpu
+    )
+
+    runner.run(filepath_in_mount_dir)
+
+
 main.add_command(settings)
 main.add_command(cache)
 main.add_command(migrate)
-
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
