@@ -327,13 +327,22 @@ def save(path: str, key: str, description: str, stem_uid: str, registry: str):
 
 @main.command()
 @click.argument("filepath", type=str)
-@click.option("--project", type=str, default=None, help="The project name or uid to run the script on. When running on Modal, creates an app with the same name.", required=True)
+@click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
 @click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
 @click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
 @click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
 @click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
 def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
-    """Run a compute job."""
+    """Run a compute job in the cloud.
+
+    This is an EXPERIMENTAL feature that enables to run a script on Modal.
+
+    Example: Given a valid project name "my_project".
+
+    ```
+    lamin run my_script.py --project my_project
+    ```
+    """
     import shutil
     from pathlib import Path
 
