@@ -98,9 +98,11 @@ class Runner:
             local_dir=local_mount_dir, packages=packages, image_url=image_url
         )
 
-        self.modal_function = self.app.function(image=self.image, cpu=cpu, gpu=gpu)(
-            run_script
-        )
+        local_secrets = self._configure_local_secrets()
+
+        self.modal_function = self.app.function(
+            image=self.image, cpu=cpu, gpu=gpu, secrets=[local_secrets]
+        )(run_script)
 
     def run(self, script_local_path: Path) -> None:
         script_remote_path = self.local_to_remote_path(str(script_local_path))
@@ -132,6 +134,18 @@ class Runner:
         # Return as string with normalized separators
         return remote_path.as_posix()
 
+    def _configure_local_secrets(self) -> dict:
+        if ln_setup.settings.user.api_key is None:
+            raise ValueError("Please authenticate via: lamin login")
+
+        all_env_variables = {
+            "LAMIN_API_KEY": ln_setup.settings.user.api_key,
+            "LAMIN_CURRENT_PROJECT": self.app_name,
+            "LAMIN_CURRENT_INSTANCE": ln_setup.settings.instance.slug,
+        }
+        local_secrets = modal.Secret.from_dict(all_env_variables)
+        return local_secrets
+
     def create_modal_image(
         self,
         python_version: str = "3.12",
@@ -141,18 +155,12 @@ class Runner:
         image_url: str | None = None,
         env_variables: dict | None = None,
     ) -> modal.Image:
+        if env_variables is None:
+            env_variables = {}
         if packages is None:
             packages = ["lamindb"]
-
-        if ln_setup.settings.user.api_key is None:
-            raise ValueError("Please authenticate via: lamin login")
-        all_env_variables = {
-            "LAMIN_API_KEY": ln_setup.settings.user.api_key,
-            "LAMIN_CURRENT_PROJECT": self.app_name,
-            "LAMIN_CURRENT_INSTANCE": ln_setup.settings.instance.slug,
-        }
-        if env_variables:
-            all_env_variables.update(env_variables)
+        else:
+            packages.append("lamindb")  # Append lamindb to the list of packages
 
         if image_url is None:
             image = modal.Image.debian_slim(python_version=python_version)
@@ -160,7 +168,7 @@ class Runner:
             image = modal.Image.from_registry(image_url, add_python=python_version)
         return (
             image.pip_install(packages)
-            .env(all_env_variables)
+            .env(env_variables)
             .add_local_python_source("lamindb", "lamindb_setup", copy=True)
             .run_commands("lamin settings set auto-connect true")
             .add_local_dir(local_dir, remote_dir)
