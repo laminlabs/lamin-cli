@@ -169,6 +169,11 @@ def save_from_filepath_cli(
             )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
+        if run is None and transform.key.endswith(".ipynb"):
+            run = ln.Run(transform=transform).save()
+            logger.important(
+                f"found no run, creating Run('{run.uid}') to display the html"
+            )
         return_code = save_context_core(
             run=run,
             transform=transform,
