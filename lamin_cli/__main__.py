@@ -348,9 +348,10 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
     from lamin_cli.compute.modal import Runner
 
-    default_mount_dir = './modal_mount_dir'
-    if not Path(default_mount_dir).is_dir():
-        Path(default_mount_dir).mkdir(parents=True, exist_ok=True)
+    default_mount_dir = Path('./modal_mount_dir')
+    if not default_mount_dir.is_dir():
+        default_mount_dir.mkdir(parents=True, exist_ok=True)
+
     shutil.copy(filepath, default_mount_dir)
 
     filepath_in_mount_dir = Path(default_mount_dir) / Path(filepath).name
