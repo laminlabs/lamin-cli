@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import inspect
 import os
+import shutil
 import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from lamindb_setup._init_instance import (
@@ -343,9 +345,6 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     lamin run my_script.py --project my_project
     ```
     """
-    import shutil
-    from pathlib import Path
-
     from lamin_cli.compute.modal import Runner
 
     default_mount_dir = Path('./modal_mount_dir')
@@ -354,7 +353,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
     shutil.copy(filepath, default_mount_dir)
 
-    filepath_in_mount_dir = Path(default_mount_dir) / Path(filepath).name
+    filepath_in_mount_dir = default_mount_dir / Path(filepath).name
 
     package_list = []
     if packages:
