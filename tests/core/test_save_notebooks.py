@@ -77,7 +77,13 @@ def test_save_consecutive():
     assert "Did not find uid 'hlsFXswrJjtt0000'" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run
-    nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
+    result = subprocess.run(
+        f"jupyter nbconvert --to notebook --inplace --execute {notebook_path}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    assert result.returncode == 0
 
     # now, there is a transform record, but we're missing all artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
@@ -185,6 +191,12 @@ print("my consecutive cell")
     os.system(f"cp {notebook_path} {new_path}")
 
     # upon re-running it, the notebook name is updated
-    nbproject_test.execute_notebooks(new_path, print_outputs=True)
+    result = subprocess.run(
+        f"jupyter nbconvert --to notebook --inplace --execute {new_path}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    assert result.returncode == 0
     transform = ln.Transform.get("hlsFXswrJjtt0001")
     assert "new_name.ipynb" in transform.key
