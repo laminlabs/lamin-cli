@@ -119,26 +119,26 @@ def save_from_path_cli(
 
     if registry == "transform":
         if objpath.suffix in {".qmd", ".Rmd"}:
-            if not (
-                objpath.with_suffix(".html").exists()
-                or objpath.with_suffix(".nb.html").exists()
-            ):
-                raise SystemExit(
+            html_file_exists = objpath.with_suffix(".html").exists()
+            nb_html_file_exists = objpath.with_suffix(".nb.html").exists()
+
+            if not html_file_exists and not nb_html_file_exists:
+                logger.error(
                     f"Please export your {objpath.suffix} file as an html file here"
                     f" {objpath.with_suffix('.html')}"
                 )
-            if (
-                objpath.with_suffix(".html").exists()
-                and objpath.with_suffix(".nb.html").exists()
-            ):
-                raise SystemExit(
+                return "export-qmd-Rmd-as-html"
+            elif html_file_exists and nb_html_file_exists:
+                logger.error(
                     f"Please delete one of\n - {objpath.with_suffix('.html')}\n -"
                     f" {objpath.with_suffix('.nb.html')}"
                 )
+                return "delete-html-or-nb-html"
 
         with objpath.open() as file:
             content = file.read()
         uid = parse_uid_from_code(content, objpath.suffix)
+
         if uid is not None:
             logger.important(f"mapped '{objpath}' on uid '{uid}'")
             transform = ln.Transform.filter(uid=uid).one_or_none()
