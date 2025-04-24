@@ -321,7 +321,7 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, reg
     Example: Given a valid project name "my_project".
 
     ```
-    lamin save my_table.csv --project my_project
+    lamin save my_table.csv --key my_tables/my_table.csv --project my_project
     ```
 
     Note: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
