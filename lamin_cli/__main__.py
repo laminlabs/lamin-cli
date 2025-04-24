@@ -310,20 +310,27 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
 
 @main.command()
 @click.argument("path", type=click.Path(exists=True, dir_okay=True, file_okay=True))
-@click.option("--key", type=str, default=None)
-@click.option("--description", type=str, default=None)
-@click.option("--stem-uid", type=str, default=None)
-@click.option("--registry", type=str, default=None)
-def save(path: str, key: str, description: str, stem_uid: str, registry: str):
+@click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
+@click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
+@click.option("--stem-uid", type=str, default=None, help="The stem uid of the artifact or transform.")
+@click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
+def save(path: str, key: str, description: str, stem_uid: str, project: str, registry: str):
     """Save a file or folder.
 
-    Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
-    other file types and folders as {class}`~lamindb.Artifact`. You can save a `.py` or `.ipynb` file as
+    Example: Given a valid project name "my_project".
+
+    ```
+    lamin save my_table.csv --key my_tables/my_table.csv --project my_project
+    ```
+
+    Note: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
+    other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
     from lamin_cli._save import save_from_filepath_cli
 
-    if save_from_filepath_cli(path, key, description, stem_uid, registry) is not None:
+    if save_from_filepath_cli(path, key, description, stem_uid, project, registry) is not None:
         sys.exit(1)
 
 
