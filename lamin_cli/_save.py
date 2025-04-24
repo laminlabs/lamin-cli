@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import re
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
+import click
 from lamin_utils import logger
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -42,8 +46,8 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
-def save_from_filepath_cli(
-    filepath: str | Path,
+def save_from_path_cli(
+    path: Path | str,
     key: str | None,
     description: str | None,
     stem_uid: str | None,
@@ -51,9 +55,7 @@ def save_from_filepath_cli(
     registry: str | None,
 ) -> str | None:
     import lamindb_setup as ln_setup
-
-    if not isinstance(filepath, Path):
-        filepath = Path(filepath)
+    from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
@@ -68,34 +70,22 @@ def save_from_filepath_cli(
 
     ln_setup.settings.auto_connect = auto_connect_state
 
-    suffixes_transform = {
-        "py": {".py", ".ipynb"},
-        "R": {".R", ".qmd", ".Rmd"},
-    }
-
-    if filepath.suffix in {".qmd", ".Rmd"}:
-        if not (
-            filepath.with_suffix(".html").exists()
-            or filepath.with_suffix(".nb.html").exists()
-        ):
-            raise SystemExit(
-                f"Please export your {filepath.suffix} file as an html file here"
-                f" {filepath.with_suffix('.html')}"
-            )
-        if (
-            filepath.with_suffix(".html").exists()
-            and filepath.with_suffix(".nb.html").exists()
-        ):
-            raise SystemExit(
-                f"Please delete one of\n - {filepath.with_suffix('.html')}\n -"
-                f" {filepath.with_suffix('.nb.html')}"
-            )
+    # this allows to have the correct treatment of credentials in case of cloud paths
+    path = create_path(path)
+    # isinstance is needed to cast the type of path to UPath
+    # to avoid mypy erors
+    assert isinstance(path, UPath)
+    if not path.exists():
+        raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
 
     if registry is None:
+        suffixes_transform = {
+            "py": {".py", ".ipynb"},
+            "R": {".R", ".qmd", ".Rmd"},
+        }
         registry = (
             "transform"
-            if filepath.suffix
-            in suffixes_transform["py"].union(suffixes_transform["R"])
+            if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
             else "artifact"
         )
 
@@ -108,6 +98,8 @@ def save_from_filepath_cli(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
 
+    is_cloud_path = not isinstance(path, LocalPathClasses)
+
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
@@ -119,11 +111,17 @@ def save_from_filepath_cli(
             )
             if revises is None:
                 raise ln.errors.InvalidArgument("The stem uid is not found.")
+
+        if is_cloud_path:
+            if key is not None:
+                logger.error("Do not pass --key for cloud paths")
+                return "key-with-cloud-path"
         elif key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
+
         artifact = ln.Artifact(
-            filepath, key=key, description=description, revises=revises
+            path, key=key, description=description, revises=revises
         ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
@@ -136,12 +134,35 @@ def save_from_filepath_cli(
             slug = ln_setup.settings.instance.slug
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
-    elif registry == "transform":
-        with open(filepath) as file:
+
+    if registry == "transform":
+        if is_cloud_path:
+            logger.error("Can not register a transform from a cloud path")
+            return "transform-with-cloud-path"
+
+        if path.suffix in {".qmd", ".Rmd"}:
+            html_file_exists = path.with_suffix(".html").exists()
+            nb_html_file_exists = path.with_suffix(".nb.html").exists()
+
+            if not html_file_exists and not nb_html_file_exists:
+                logger.error(
+                    f"Please export your {path.suffix} file as an html file here"
+                    f" {path.with_suffix('.html')}"
+                )
+                return "export-qmd-Rmd-as-html"
+            elif html_file_exists and nb_html_file_exists:
+                logger.error(
+                    f"Please delete one of\n - {path.with_suffix('.html')}\n -"
+                    f" {path.with_suffix('.nb.html')}"
+                )
+                return "delete-html-or-nb-html"
+
+        with path.open() as file:
             content = file.read()
-        uid = parse_uid_from_code(content, filepath.suffix)
+        uid = parse_uid_from_code(content, path.suffix)
+
         if uid is not None:
-            logger.important(f"mapped '{filepath}' on uid '{uid}'")
+            logger.important(f"mapped '{path}' on uid '{uid}'")
             transform = ln.Transform.filter(uid=uid).one_or_none()
             if transform is None:
                 logger.error(
@@ -161,14 +182,12 @@ def save_from_filepath_cli(
                     raise ln.errors.InvalidArgument("The stem uid is not found.")
             # TODO: build in the logic that queries for relative file paths
             # we have in Context; add tests for multiple versions
-            transform = ln.Transform.filter(
-                key=filepath.name, is_latest=True
-            ).one_or_none()
+            transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
             if transform is None:
                 transform = ln.Transform(
-                    description=filepath.name,
-                    key=filepath.name,
-                    type="script" if filepath.suffix in {".R", ".py"} else "notebook",
+                    description=path.name,
+                    key=path.name,
+                    type="script" if path.suffix in {".R", ".py"} else "notebook",
                     revises=revises,
                 ).save()
                 logger.important(f"created Transform('{transform.uid}')")
@@ -193,7 +212,7 @@ def save_from_filepath_cli(
         return_code = save_context_core(
             run=run,
             transform=transform,
-            filepath=filepath,
+            filepath=path,
             from_cli=True,
         )
         return return_code

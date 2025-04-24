@@ -309,7 +309,7 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
 
 
 @main.command()
-@click.argument("path", type=click.Path(exists=True, dir_okay=True, file_okay=True))
+@click.argument("path", type=str)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
 @click.option("--stem-uid", type=str, default=None, help="The stem uid of the artifact or transform.")
@@ -328,9 +328,9 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, reg
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli._save import save_from_filepath_cli
+    from lamin_cli._save import save_from_path_cli
 
-    if save_from_filepath_cli(path, key, description, stem_uid, project, registry) is not None:
+    if save_from_path_cli(path, key, description, stem_uid, project, registry) is not None:
         sys.exit(1)
 
 
