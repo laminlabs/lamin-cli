@@ -55,7 +55,7 @@ def test_run_save_cache():
     # print(result.stdout.decode())
     # print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Please export your" in result.stderr.decode()
+    assert "Please export your" in result.stdout.decode()
 
     filepath.with_suffix(".html").write_text("dummy html")
 
