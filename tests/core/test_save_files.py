@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 
+import lamindb as ln
 import lamindb_setup as ln_setup
 
 test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
@@ -23,10 +24,10 @@ def test_save_file():
     )
     assert result.returncode == 1
 
-    print(ln_setup.settings.instance.slug)
+    ln.Project(name="test_project").save()
 
     result = subprocess.run(
-        f"lamin save {filepath} --key mytest",
+        f"lamin save {filepath} --key mytest --project test_project",
         shell=True,
         capture_output=True,
     )
@@ -34,6 +35,7 @@ def test_save_file():
     print(result.stderr.decode())
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
+    assert "labeled with project:" in result.stdout.decode()
     assert result.returncode == 0
 
     # test passing the registry and saving the same file
