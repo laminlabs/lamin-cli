@@ -328,13 +328,13 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, reg
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    objpath = UPath(path)
-    if not objpath.exists():
+    upath = UPath(path)
+    if not upath.exists():
         raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
 
     from lamin_cli._save import save_from_path_cli
 
-    if save_from_path_cli(path, key, description, stem_uid, project, registry) is not None:
+    if save_from_path_cli(upath, key, description, stem_uid, project, registry) is not None:
         sys.exit(1)
 
 
