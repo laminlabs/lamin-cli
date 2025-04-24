@@ -44,14 +44,14 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
 
 
 def save_from_path_cli(
-    objpath: UPath,
+    path: UPath,
     key: str | None,
     description: str | None,
     stem_uid: str | None,
     project: str | None,
     registry: str | None,
 ) -> str | None:
-    assert isinstance(objpath, UPath)
+    assert isinstance(path, UPath)
 
     import lamindb_setup as ln_setup
     from lamindb_setup.core.upath import LocalPathClasses
@@ -76,7 +76,7 @@ def save_from_path_cli(
         }
         registry = (
             "transform"
-            if objpath.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
+            if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
             else "artifact"
         )
 
@@ -89,7 +89,7 @@ def save_from_path_cli(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
 
-    is_cloud_path = not isinstance(objpath, LocalPathClasses)
+    is_cloud_path = not isinstance(path, LocalPathClasses)
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
@@ -112,7 +112,7 @@ def save_from_path_cli(
             return "missing-key-or-description"
 
         artifact = ln.Artifact(
-            objpath, key=key, description=description, revises=revises
+            path, key=key, description=description, revises=revises
         ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
@@ -131,29 +131,29 @@ def save_from_path_cli(
             logger.error("Can not register a transform from a cloud path")
             return "transform-with-cloud-path"
 
-        if objpath.suffix in {".qmd", ".Rmd"}:
-            html_file_exists = objpath.with_suffix(".html").exists()
-            nb_html_file_exists = objpath.with_suffix(".nb.html").exists()
+        if path.suffix in {".qmd", ".Rmd"}:
+            html_file_exists = path.with_suffix(".html").exists()
+            nb_html_file_exists = path.with_suffix(".nb.html").exists()
 
             if not html_file_exists and not nb_html_file_exists:
                 logger.error(
-                    f"Please export your {objpath.suffix} file as an html file here"
-                    f" {objpath.with_suffix('.html')}"
+                    f"Please export your {path.suffix} file as an html file here"
+                    f" {path.with_suffix('.html')}"
                 )
                 return "export-qmd-Rmd-as-html"
             elif html_file_exists and nb_html_file_exists:
                 logger.error(
-                    f"Please delete one of\n - {objpath.with_suffix('.html')}\n -"
-                    f" {objpath.with_suffix('.nb.html')}"
+                    f"Please delete one of\n - {path.with_suffix('.html')}\n -"
+                    f" {path.with_suffix('.nb.html')}"
                 )
                 return "delete-html-or-nb-html"
 
-        with objpath.open() as file:
+        with path.open() as file:
             content = file.read()
-        uid = parse_uid_from_code(content, objpath.suffix)
+        uid = parse_uid_from_code(content, path.suffix)
 
         if uid is not None:
-            logger.important(f"mapped '{objpath}' on uid '{uid}'")
+            logger.important(f"mapped '{path}' on uid '{uid}'")
             transform = ln.Transform.filter(uid=uid).one_or_none()
             if transform is None:
                 logger.error(
@@ -173,14 +173,12 @@ def save_from_path_cli(
                     raise ln.errors.InvalidArgument("The stem uid is not found.")
             # TODO: build in the logic that queries for relative file paths
             # we have in Context; add tests for multiple versions
-            transform = ln.Transform.filter(
-                key=objpath.name, is_latest=True
-            ).one_or_none()
+            transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
             if transform is None:
                 transform = ln.Transform(
-                    description=objpath.name,
-                    key=objpath.name,
-                    type="script" if objpath.suffix in {".R", ".py"} else "notebook",
+                    description=path.name,
+                    key=path.name,
+                    type="script" if path.suffix in {".R", ".py"} else "notebook",
                     revises=revises,
                 ).save()
                 logger.important(f"created Transform('{transform.uid}')")
@@ -205,7 +203,7 @@ def save_from_path_cli(
         return_code = save_context_core(
             run=run,
             transform=transform,
-            filepath=objpath,
+            filepath=path,
             from_cli=True,
         )
         return return_code
