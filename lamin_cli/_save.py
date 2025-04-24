@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from lamin_utils import logger
+
+if TYPE_CHECKING:
+    from upath import UPath
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -42,8 +45,8 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
-def save_from_filepath_cli(
-    filepath: str | Path,
+def save_from_path_cli(
+    objpath: UPath,
     key: str | None,
     description: str | None,
     stem_uid: str | None,
@@ -51,9 +54,6 @@ def save_from_filepath_cli(
     registry: str | None,
 ) -> str | None:
     import lamindb_setup as ln_setup
-
-    if not isinstance(filepath, Path):
-        filepath = Path(filepath)
 
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
@@ -68,34 +68,14 @@ def save_from_filepath_cli(
 
     ln_setup.settings.auto_connect = auto_connect_state
 
-    suffixes_transform = {
-        "py": {".py", ".ipynb"},
-        "R": {".R", ".qmd", ".Rmd"},
-    }
-
-    if filepath.suffix in {".qmd", ".Rmd"}:
-        if not (
-            filepath.with_suffix(".html").exists()
-            or filepath.with_suffix(".nb.html").exists()
-        ):
-            raise SystemExit(
-                f"Please export your {filepath.suffix} file as an html file here"
-                f" {filepath.with_suffix('.html')}"
-            )
-        if (
-            filepath.with_suffix(".html").exists()
-            and filepath.with_suffix(".nb.html").exists()
-        ):
-            raise SystemExit(
-                f"Please delete one of\n - {filepath.with_suffix('.html')}\n -"
-                f" {filepath.with_suffix('.nb.html')}"
-            )
-
     if registry is None:
+        suffixes_transform = {
+            "py": {".py", ".ipynb"},
+            "R": {".R", ".qmd", ".Rmd"},
+        }
         registry = (
             "transform"
-            if filepath.suffix
-            in suffixes_transform["py"].union(suffixes_transform["R"])
+            if objpath.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
             else "artifact"
         )
 
@@ -123,7 +103,7 @@ def save_from_filepath_cli(
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
         artifact = ln.Artifact(
-            filepath, key=key, description=description, revises=revises
+            objpath, key=key, description=description, revises=revises
         ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
@@ -136,12 +116,31 @@ def save_from_filepath_cli(
             slug = ln_setup.settings.instance.slug
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
-    elif registry == "transform":
-        with open(filepath) as file:
+
+    if registry == "transform":
+        if objpath.suffix in {".qmd", ".Rmd"}:
+            if not (
+                objpath.with_suffix(".html").exists()
+                or objpath.with_suffix(".nb.html").exists()
+            ):
+                raise SystemExit(
+                    f"Please export your {objpath.suffix} file as an html file here"
+                    f" {objpath.with_suffix('.html')}"
+                )
+            if (
+                objpath.with_suffix(".html").exists()
+                and objpath.with_suffix(".nb.html").exists()
+            ):
+                raise SystemExit(
+                    f"Please delete one of\n - {objpath.with_suffix('.html')}\n -"
+                    f" {objpath.with_suffix('.nb.html')}"
+                )
+
+        with objpath.open() as file:
             content = file.read()
-        uid = parse_uid_from_code(content, filepath.suffix)
+        uid = parse_uid_from_code(content, objpath.suffix)
         if uid is not None:
-            logger.important(f"mapped '{filepath}' on uid '{uid}'")
+            logger.important(f"mapped '{objpath}' on uid '{uid}'")
             transform = ln.Transform.filter(uid=uid).one_or_none()
             if transform is None:
                 logger.error(
@@ -162,13 +161,13 @@ def save_from_filepath_cli(
             # TODO: build in the logic that queries for relative file paths
             # we have in Context; add tests for multiple versions
             transform = ln.Transform.filter(
-                key=filepath.name, is_latest=True
+                key=objpath.name, is_latest=True
             ).one_or_none()
             if transform is None:
                 transform = ln.Transform(
-                    description=filepath.name,
-                    key=filepath.name,
-                    type="script" if filepath.suffix in {".R", ".py"} else "notebook",
+                    description=objpath.name,
+                    key=objpath.name,
+                    type="script" if objpath.suffix in {".R", ".py"} else "notebook",
                     revises=revises,
                 ).save()
                 logger.important(f"created Transform('{transform.uid}')")
@@ -193,7 +192,7 @@ def save_from_filepath_cli(
         return_code = save_context_core(
             run=run,
             transform=transform,
-            filepath=filepath,
+            filepath=objpath,
             from_cli=True,
         )
         return return_code

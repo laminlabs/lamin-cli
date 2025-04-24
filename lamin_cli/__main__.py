@@ -8,7 +8,6 @@ import warnings
 from collections import OrderedDict
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from lamindb_setup._init_instance import (
@@ -17,6 +16,7 @@ from lamindb_setup._init_instance import (
     DOC_MODULES,
     DOC_STORAGE_ARG,
 )
+from upath import UPath
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -309,7 +309,7 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
 
 
 @main.command()
-@click.argument("path", type=click.Path(exists=True, dir_okay=True, file_okay=True))
+@click.argument("path", type=str)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
 @click.option("--stem-uid", type=str, default=None, help="The stem uid of the artifact or transform.")
@@ -328,9 +328,11 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, reg
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli._save import save_from_filepath_cli
+    objpath = UPath(path)
 
-    if save_from_filepath_cli(path, key, description, stem_uid, project, registry) is not None:
+    from lamin_cli._save import save_from_path_cli
+
+    if save_from_path_cli(path, key, description, stem_uid, project, registry) is not None:
         sys.exit(1)
 
 
@@ -354,13 +356,13 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     """
     from lamin_cli.compute.modal import Runner
 
-    default_mount_dir = Path('./modal_mount_dir')
+    default_mount_dir = UPath('./modal_mount_dir')
     if not default_mount_dir.is_dir():
         default_mount_dir.mkdir(parents=True, exist_ok=True)
 
     shutil.copy(filepath, default_mount_dir)
 
-    filepath_in_mount_dir = default_mount_dir / Path(filepath).name
+    filepath_in_mount_dir = default_mount_dir / UPath(filepath).name
 
     package_list = []
     if packages:
