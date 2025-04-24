@@ -5,9 +5,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from lamin_utils import logger
-
-if TYPE_CHECKING:
-    from upath import UPath
+from upath import UPath
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -53,7 +51,10 @@ def save_from_path_cli(
     project: str | None,
     registry: str | None,
 ) -> str | None:
+    assert isinstance(objpath, UPath)
+
     import lamindb_setup as ln_setup
+    from lamindb_setup.core.upath import LocalPathClasses
 
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
@@ -88,6 +89,8 @@ def save_from_path_cli(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
 
+    is_cloud_path = not isinstance(objpath, LocalPathClasses)
+
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
@@ -99,9 +102,15 @@ def save_from_path_cli(
             )
             if revises is None:
                 raise ln.errors.InvalidArgument("The stem uid is not found.")
+
+        if is_cloud_path:
+            if key is not None:
+                logger.error("Do not pass a key for cloud paths")
+                return "key-with-cloud-path"
         elif key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
+
         artifact = ln.Artifact(
             objpath, key=key, description=description, revises=revises
         ).save()
@@ -118,6 +127,10 @@ def save_from_path_cli(
         return None
 
     if registry == "transform":
+        if is_cloud_path:
+            logger.error("Can not register a transform from a cloud path")
+            return "transform-with-cloud-path"
+
         if objpath.suffix in {".qmd", ".Rmd"}:
             html_file_exists = objpath.with_suffix(".html").exists()
             nb_html_file_exists = objpath.with_suffix(".nb.html").exists()

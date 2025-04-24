@@ -329,6 +329,8 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, reg
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
     objpath = UPath(path)
+    if not objpath.exists():
+        raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
 
     from lamin_cli._save import save_from_path_cli
 
