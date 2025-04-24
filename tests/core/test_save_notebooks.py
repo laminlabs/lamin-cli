@@ -91,6 +91,7 @@ def test_save_consecutive():
     assert transform.latest_run.report is None
     assert transform.source_code is None
     assert transform.latest_run.environment is None
+    assert not transform.is_latest
 
     # and save again
     result = subprocess.run(
@@ -102,6 +103,7 @@ def test_save_consecutive():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
+    assert transform.is_latest
 
     # now, we have the associated artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
