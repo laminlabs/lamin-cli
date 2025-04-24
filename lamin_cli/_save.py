@@ -4,8 +4,11 @@ import re
 import sys
 from typing import TYPE_CHECKING
 
+import click
 from lamin_utils import logger
-from upath import UPath
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -44,17 +47,15 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
 
 
 def save_from_path_cli(
-    path: UPath,
+    path: Path | str,
     key: str | None,
     description: str | None,
     stem_uid: str | None,
     project: str | None,
     registry: str | None,
 ) -> str | None:
-    assert isinstance(path, UPath)
-
     import lamindb_setup as ln_setup
-    from lamindb_setup.core.upath import LocalPathClasses
+    from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
     # this will be gone once we get rid of lamin load or enable loading multiple
     # instances sequentially
@@ -68,6 +69,14 @@ def save_from_path_cli(
     from lamindb._finish import save_context_core
 
     ln_setup.settings.auto_connect = auto_connect_state
+
+    # this allows to have the correct treatment of credentials in case of cloud paths
+    path = create_path(path)
+    # isinstance is needed to cast the type of path to UPath
+    # to avoid mypy erors
+    assert isinstance(path, UPath)
+    if not path.exists():
+        raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
 
     if registry is None:
         suffixes_transform = {

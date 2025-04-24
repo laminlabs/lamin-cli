@@ -7,7 +7,7 @@ import lamindb_setup as ln_setup
 test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
 
 
-def test_save_file():
+def test_save_local_file():
     filepath = test_file
 
     # neither key nor description
@@ -64,3 +64,19 @@ def test_save_file():
         in result.stderr.decode()
     )
     assert result.returncode == 1
+
+
+def test_save_cloud_file():
+    # should be no key for cloud paths
+    result = subprocess.run(
+        "lamin save s3://lamindb-ci/lndb-storage/testfile.hdf5 --key filekey.h5ad",
+        shell=True,
+        check=False,
+    )
+    assert result.returncode == 1
+
+    result = subprocess.run(
+        "lamin save s3://lamindb-ci/lndb-storage/testfile.hdf5",
+        shell=True,
+        check=True,
+    )
