@@ -105,7 +105,7 @@ def save_from_path_cli(
 
         if is_cloud_path:
             if key is not None:
-                logger.error("Do not pass a key for cloud paths")
+                logger.error("Do not pass --key for cloud paths")
                 return "key-with-cloud-path"
         elif key is None and description is None:
             logger.error("Please pass a key or description via --key or --description")
