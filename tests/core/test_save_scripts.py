@@ -13,15 +13,18 @@ def test_save_without_uid():
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-and-finish.py"
 
+    ln.Project(name="test_project").save()
+
     # attempt to save the script without it yet being run
     result = subprocess.run(
-        f"lamin save {filepath}",
+        f"lamin save {filepath} --project test_project",
         shell=True,
         capture_output=True,
     )
     # print(result.stdout.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
+    assert "labeled with project: test_project" in result.stdout.decode()
 
 
 def test_run_save_cache_with_git_and_uid():
@@ -178,7 +181,7 @@ if __name__ == "__main__":
     assert result.returncode == 1
     assert "already works on this draft" in result.stderr.decode()
 
-    # try to get the the source code via command line
+    # try to get the source code via command line
     result = subprocess.run(
         "yes | lamin load"
         f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",

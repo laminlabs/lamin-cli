@@ -46,8 +46,8 @@ def save_from_filepath_cli(
     filepath: str | Path,
     key: str | None,
     description: str | None,
-    project: str | None,
     stem_uid: str | None,
+    project: str | None,
     registry: str | None,
 ) -> str | None:
     import lamindb_setup as ln_setup
@@ -131,7 +131,7 @@ def save_from_filepath_cli(
             logger.important(f"storage url: {artifact.path.to_url()}")
         if project is not None:
             artifact.projects.add(project_record)
-            logger.important(f"labeled with project '{project_record.name}'")
+            logger.important(f"labeled with project: {project_record.name}")
         if ln_setup.settings.instance.is_remote:
             slug = ln_setup.settings.instance.slug
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
@@ -174,7 +174,7 @@ def save_from_filepath_cli(
                 logger.important(f"created Transform('{transform.uid}')")
             if project is not None:
                 transform.projects.add(project_record)
-                logger.important(f"labeled with project '{project_record.name}'")
+                logger.important(f"labeled with project: {project_record.name}")
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run is not None and run.created_by.id != ln_setup.settings.user.id:

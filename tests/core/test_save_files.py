@@ -35,7 +35,7 @@ def test_save_file():
     print(result.stderr.decode())
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
-    assert "labeled with project:" in result.stdout.decode()
+    assert "labeled with project: test_project" in result.stdout.decode()
     assert result.returncode == 0
 
     # test passing the registry and saving the same file
