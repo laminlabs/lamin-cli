@@ -224,14 +224,6 @@ print("my consecutive cell")
     transform = ln.Transform.get("hlsFXswrJjtt0001")
     assert "new_name.ipynb" in transform.key
 
-
-def test_run_new_name_notebook_nbconvert():
-    notebook_path = Path(
-        f"{notebook_dir}with-title-and-initialized-consecutive.ipynb"
-    ).resolve()
-    new_path = notebook_path.with_name("new_name.ipynb")
-    # assert new_path.exists()
-
     # edit the notebook
     nb = read_notebook(new_path)
     nb.cells[-1]["source"] = ["ln.finish()"]
