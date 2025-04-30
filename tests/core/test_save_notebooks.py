@@ -73,9 +73,9 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
     assert result.returncode == 0
-    assert "Did not find uid 'hlsFXswrJjtt0000'" in result.stdout.decode()
+    assert "created Transform('ZW6kM31iHDw10000')" in result.stdout.decode()
+    assert "found no run, creating" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run
     result = subprocess.run(
