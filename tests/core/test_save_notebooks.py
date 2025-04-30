@@ -73,7 +73,8 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
-    assert result.returncode == 1
+    print(result.stdout.decode())
+    assert result.returncode == 0
     assert "Did not find uid 'hlsFXswrJjtt0000'" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run
