@@ -240,7 +240,10 @@ def test_run_new_name_notebook_nbconvert():
         capture_output=True,
     )
     print(result.stdout.decode())
-    assert "--inplace is missing" in result.stderr.decode()
+    assert (
+        "Please execute notebook 'nbconvert' by passing option '--inplace'."
+        in result.stderr.decode()
+    )
     assert result.returncode == 1
 
     result = subprocess.run(
