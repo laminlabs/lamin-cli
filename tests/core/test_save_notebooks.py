@@ -222,7 +222,7 @@ print("my consecutive cell")
     assert "new_name.ipynb" in transform.key
 
 
-def test_rerun_new_name_notebook():
+def test_run_new_name_notebook_nbconvert():
     notebook_path = Path(
         f"{notebook_dir}with-title-and-initialized-consecutive.ipynb"
     ).resolve()
@@ -233,6 +233,15 @@ def test_rerun_new_name_notebook():
     nb = read_notebook(new_path)
     nb.cells[-1]["source"] = ["ln.finish()"]
     write_notebook(nb, new_path)
+
+    result = subprocess.run(
+        f"jupyter nbconvert --to notebook --execute {new_path}",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    assert "--inplace is missing" in result.stderr.decode()
+    assert result.returncode == 1
 
     result = subprocess.run(
         f"jupyter nbconvert --to notebook --inplace --execute {new_path}",
