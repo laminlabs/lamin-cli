@@ -102,6 +102,7 @@ def test_save_consecutive():
         env=env,
     )
     print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
     assert (
         "created Transform('hlsFXswrJjtt0001'), started new" in result.stdout.decode()
