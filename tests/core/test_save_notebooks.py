@@ -74,8 +74,6 @@ def test_save_consecutive_user_passes_uid():
         env=env,
     )
     assert result.returncode == 0
-    print(result.stdout.decode())
-    print(result.stderr.decode())
     assert "created Transform('hlsFXswrJjtt0000')" in result.stdout.decode()
     assert "found no run, creating" in result.stdout.decode()
 
@@ -95,8 +93,6 @@ def test_save_consecutive_user_passes_uid():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
     assert result.returncode == 0
     assert (
         "loaded Transform('hlsFXswrJjtt0000'), started new Run"
@@ -224,7 +220,7 @@ print("my consecutive cell")
     )
     print(result.stdout.decode())
     assert result.returncode == 0
-    transform = ln.Transform.get("hlsFXswrJjtt0002")
+    transform = ln.Transform.get("hlsFXswrJjtt0001")
     assert "new_name.ipynb" in transform.key
 
 
