@@ -194,9 +194,17 @@ def save_from_path_cli(
             if revises is None:
                 raise ln.errors.InvalidArgument("The stem uid is not found.")
         if transform is None:
+            if path.suffix == ".ipynb":
+                from nbproject.dev import read_notebook
+                from nbproject.dev._meta_live import get_title
+
+                nb = read_notebook(path)
+                description = get_title(nb)
+            else:
+                description = None
             transform = ln.Transform(
                 uid=uid,
-                description=path.name,
+                description=description,
                 key=path.name,
                 type="script" if path.suffix in {".R", ".py"} else "notebook",
                 revises=revises,
