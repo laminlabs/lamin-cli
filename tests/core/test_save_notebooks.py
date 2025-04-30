@@ -101,11 +101,10 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
     assert result.returncode == 0
     assert (
-        "created Transform('hlsFXswrJjtt0001'), started new" in result.stdout.decode()
+        "created Transform('hlsFXswrJjtt0001'), started new"
+        in notebook_path.read_text()
     )
 
     # now, there is a transform record, but we're missing all artifacts because ln.finish() wasn't called
