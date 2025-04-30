@@ -137,7 +137,8 @@ def test_save_consecutive():
 import lamindb as ln
 
 # %%
-ln.track("hlsFXswrJjtt0000")
+# pass full uid, will be updated to stem uid during tests
+ln.track("hlsFXswrJjtt")
 
 # %%
 print("my consecutive cell")
