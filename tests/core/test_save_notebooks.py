@@ -230,6 +230,7 @@ def test_run_new_name_notebook_nbconvert():
         f"{notebook_dir}with-title-and-initialized-consecutive.ipynb"
     ).resolve()
     new_path = notebook_path.with_name("new_name.ipynb")
+    os.system(f"cp {notebook_path} {new_path}")
     assert new_path.exists()
 
     # edit the notebook
