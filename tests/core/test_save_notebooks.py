@@ -229,6 +229,7 @@ print("my consecutive cell")
     nb.cells[-1]["source"] = ["ln.finish()"]
     write_notebook(nb, new_path)
 
+    # run omitting the `--inplace` flag
     result = subprocess.run(
         f"jupyter nbconvert --to notebook --execute {new_path}",
         shell=True,
