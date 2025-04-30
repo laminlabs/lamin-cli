@@ -104,6 +104,7 @@ def test_save_consecutive_user_passes_uid():
     notebook_path.write_text(
         notebook_path.read_text().replace("hlsFXswrJjtt0000", "hlsFXswrJjtt")
     )
+    assert r"ln.track(\"hlsFXswrJjtt\")" in notebook_path.read_text()
 
     nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
     assert (
@@ -195,7 +196,7 @@ print("my consecutive cell")
     # get the the source code via command line
     result = subprocess.run(
         "yes | lamin load"
-        f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0000",
+        f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0001",
         shell=True,
         capture_output=True,
     )
