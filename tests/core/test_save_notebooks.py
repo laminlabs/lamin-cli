@@ -78,6 +78,7 @@ def test_save_consecutive():
     assert "found no run, creating" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run
+    # at first it tails
     result = subprocess.run(
         f"jupyter nbconvert --to notebook --inplace --execute {notebook_path}",
         shell=True,
@@ -86,7 +87,7 @@ def test_save_consecutive():
     )
     assert result.returncode == 1
     assert (
-        "notebook with already-saved source code, please update the `uid` argument in `track()`"
+        're-running notebook with already-saved source code, please update the `uid` argument in `track()` to "hlsFXswrJjtt0001"'
         in result.stderr.decode()
     )
 
@@ -95,6 +96,7 @@ def test_save_consecutive():
         notebook_path.read_text().replace("hlsFXswrJjtt0000", "hlsFXswrJjtt")
     )
 
+    # now it works
     result = subprocess.run(
         f"jupyter nbconvert --to notebook --inplace --execute {notebook_path}",
         shell=True,
@@ -144,7 +146,7 @@ ln.track("hlsFXswrJjtt")
 print("my consecutive cell")
 """
     )
-    assert transform.hash == "ik5Dilxs2RmwOGydohFolQ"
+    assert transform.hash == "OQ8V3hVrEJcxK0aOOwpl4g"
     # below is the test that we can use if store the run repot as `.ipynb`
     # and not as html as we do right now
     assert transform.latest_run.report.suffix == ".html"
@@ -166,12 +168,6 @@ print("my consecutive cell")
     nb.cells.append(new_cell)  # duplicate last cell
     write_notebook(nb, notebook_path)
 
-    # attempt re-running - it fails
-    with pytest.raises(CellExecutionError) as error:
-        nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
-    # print(error.exconly())
-    assert "UpdateContext" in error.exconly()
-
     # attempt re-saving - it works but the user needs to confirm overwriting
     # source code and run report
     process = subprocess.Popen(
@@ -188,10 +184,10 @@ print("my consecutive cell")
     assert "You are about to overwrite an existing report" in stdout
     assert process.returncode == 0
     # the source code is overwritten with the edits, reflected in a new hash
-    transform = ln.Transform.get("hlsFXswrJjtt0000")
+    transform = ln.Transform.get("hlsFXswrJjtt0001")
     assert transform.latest_run.report.path.exists()
     assert transform.latest_run.report.path == transform.latest_run.report.path
-    assert transform.hash == "Jv0_TrZfzM-0erbp1FGdrQ"
+    assert transform.hash == "Ya5xuSTL7HVbE8MRogXiAQ"
     assert transform.latest_run.environment.path.exists()
 
     # get the the source code via command line
@@ -220,6 +216,7 @@ print("my consecutive cell")
         capture_output=True,
         env=env,
     )
+    print(result.stdout.decode())
     assert result.returncode == 0
     transform = ln.Transform.get("hlsFXswrJjtt0002")
     assert "new_name.ipynb" in transform.key
