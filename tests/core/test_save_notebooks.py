@@ -99,7 +99,8 @@ def test_save_consecutive_user_passes_uid():
     print(result.stderr.decode())
     assert result.returncode == 0
     assert (
-        "loaded Transform('hlsFXswrJjtt0000'), started new" in notebook_path.read_text()
+        "loaded Transform('hlsFXswrJjtt0000'), started new Run"
+        in notebook_path.read_text()
     )
 
     # now let's simulate the interactive use case and use nbproject_test again
