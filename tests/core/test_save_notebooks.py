@@ -256,6 +256,9 @@ import lamindb as ln
 ln.track("hlsFXswrJjtt")
 
 # %%
+print("my consecutive cell")
+
+# %%
 ln.finish()
 """
     )
@@ -263,3 +266,5 @@ ln.finish()
     # and not as html as we do right now
     assert transform.latest_run.report.suffix == ".html"
     assert transform.latest_run.environment.path.exists()
+    os.system(f"cp {transform.latest_run.report.cache()} ./my_report.html")
+    quit()
