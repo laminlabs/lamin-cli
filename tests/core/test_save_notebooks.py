@@ -239,7 +239,6 @@ def test_rerun_new_name_notebook():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
     assert result.returncode == 0
     transform = ln.Transform.get("hlsFXswrJjtt")
     assert "new_name.ipynb" in transform.key
@@ -262,9 +261,18 @@ print("my consecutive cell")
 ln.finish()
 """
     )
-    # below is the test that we can use if store the run repot as `.ipynb`
-    # and not as html as we do right now
-    assert transform.latest_run.report.suffix == ".html"
+    assert transform.latest_run.report is None
     assert transform.latest_run.environment.path.exists()
-    os.system(f"cp {transform.latest_run.report.cache()} ./my_report.html")
-    quit()
+    result = subprocess.run(
+        f"lamin save {new_path}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert transform.latest_run.report.path.exists()
+    assert (
+        "to save the notebook html, run: lamin save"
+        in transform.latest_run.report.path.read_text()
+    )
+    # for manual inspection
+    # os.system(f"cp {transform.latest_run.report.path} ./my_report.html")
