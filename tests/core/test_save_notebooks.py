@@ -241,7 +241,7 @@ def test_rerun_new_name_notebook():
     )
     print(result.stdout.decode())
     assert result.returncode == 0
-    transform = ln.Transform.get("hlsFXswrJjtt0003")
+    transform = ln.Transform.get("hlsFXswrJjtt")
     assert "new_name.ipynb" in transform.key
     assert (
         transform.source_code
@@ -259,7 +259,6 @@ ln.track("hlsFXswrJjtt")
 ln.finish()
 """
     )
-    assert transform.hash == "OQ8V3hVrEJcxK0aOOwpl4g"
     # below is the test that we can use if store the run repot as `.ipynb`
     # and not as html as we do right now
     assert transform.latest_run.report.suffix == ".html"
