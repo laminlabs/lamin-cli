@@ -74,7 +74,6 @@ def test_save_consecutive():
         env=env,
     )
     assert result.returncode == 0
-    print(result.stdout.decode())
     assert "created Transform('hlsFXswrJjtt0000')" in result.stdout.decode()
     assert "found no run, creating" in result.stdout.decode()
 
@@ -85,7 +84,28 @@ def test_save_consecutive():
         capture_output=True,
         env=env,
     )
+    assert result.returncode == 1
+    assert (
+        "notebook with already-saved source code, please update the `uid` argument in `track()`"
+        in result.stderr.decode()
+    )
+
+    # use the stem uid instead
+    notebook_path.write_text(
+        notebook_path.read_text().replace("hlsFXswrJjtt0000", "hlsFXswrJjtt")
+    )
+
+    result = subprocess.run(
+        f"jupyter nbconvert --to notebook --inplace --execute {notebook_path}",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+    print(result.stdout.decode())
     assert result.returncode == 0
+    assert (
+        "created Transform('hlsFXswrJjtt0001'), started new" in result.stdout.decode()
+    )
 
     # now, there is a transform record, but we're missing all artifacts
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
