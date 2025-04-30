@@ -54,7 +54,7 @@ def test_save_non_consecutive():
     assert process.returncode == 0
 
 
-def test_save_consecutive():
+def test_save_consecutive_user_passes_uid():
     notebook_path = Path(
         f"{notebook_dir}with-title-and-initialized-consecutive.ipynb"
     ).resolve()
@@ -220,3 +220,47 @@ print("my consecutive cell")
     assert result.returncode == 0
     transform = ln.Transform.get("hlsFXswrJjtt0002")
     assert "new_name.ipynb" in transform.key
+
+
+def test_rerun_new_name_notebook():
+    notebook_path = Path(
+        f"{notebook_dir}with-title-and-initialized-consecutive.ipynb"
+    ).resolve()
+    new_path = notebook_path.with_name("new_name.ipynb")
+    assert new_path.exists()
+
+    # edit the notebook
+    nb = read_notebook(new_path)
+    nb.cells[-1]["source"] = ["ln.finish()"]
+    write_notebook(nb, new_path)
+
+    result = subprocess.run(
+        f"jupyter nbconvert --to notebook --inplace --execute {new_path}",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    assert result.returncode == 0
+    transform = ln.Transform.get("hlsFXswrJjtt0003")
+    assert "new_name.ipynb" in transform.key
+    assert (
+        transform.source_code
+        == """# %% [markdown]
+#
+
+# %%
+import lamindb as ln
+
+# %%
+# pass full uid, will be updated to stem uid during tests
+ln.track("hlsFXswrJjtt")
+
+# %%
+ln.finish()
+"""
+    )
+    assert transform.hash == "OQ8V3hVrEJcxK0aOOwpl4g"
+    # below is the test that we can use if store the run repot as `.ipynb`
+    # and not as html as we do right now
+    assert transform.latest_run.report.suffix == ".html"
+    assert transform.latest_run.environment.path.exists()
