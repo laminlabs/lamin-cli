@@ -74,36 +74,41 @@ def test_save_consecutive_user_passes_uid():
         env=env,
     )
     assert result.returncode == 0
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert "created Transform('hlsFXswrJjtt0000')" in result.stdout.decode()
     assert "found no run, creating" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run
-    # at first it tails
+    # this mimics the interactive execution in an editor
+    with pytest.raises(CellExecutionError) as error:
+        nbproject_test.execute_notebooks(notebook_path)
+    assert (
+        're-running notebook with already-saved source code, please update the `uid` argument in `track()` to "hlsFXswrJjtt0001"'
+        in error.exconly()
+    )
+
+    # because nbconvert is recognized as non-interactive execution, the execution works out
     result = subprocess.run(
         f"jupyter nbconvert --to notebook --inplace --execute {notebook_path}",
         shell=True,
         capture_output=True,
         env=env,
     )
-    assert result.returncode == 1
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
     assert (
-        're-running notebook with already-saved source code, please update the `uid` argument in `track()` to "hlsFXswrJjtt0001"'
-        in result.stderr.decode()
+        "loaded Transform('hlsFXswrJjtt0000'), started new" in notebook_path.read_text()
     )
 
-    # use the stem uid instead
+    # now let's simulate the interactive use case and use nbproject_test again
+    # use the stem uid instead and it will bump the version
     notebook_path.write_text(
         notebook_path.read_text().replace("hlsFXswrJjtt0000", "hlsFXswrJjtt")
     )
 
-    # now it works
-    result = subprocess.run(
-        f"jupyter nbconvert --to notebook --inplace --execute {notebook_path}",
-        shell=True,
-        capture_output=True,
-        env=env,
-    )
-    assert result.returncode == 0
+    nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
     assert (
         "created Transform('hlsFXswrJjtt0001'), started new"
         in notebook_path.read_text()
