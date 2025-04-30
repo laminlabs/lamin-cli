@@ -14,18 +14,18 @@ if TYPE_CHECKING:
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
     if suffix == ".py":
         track_pattern = re.compile(
-            r'ln\.track\(\s*(?:transform\s*=\s*)?(["\'])([a-zA-Z0-9]{16})\1'
+            r'ln\.track\(\s*(?:transform\s*=\s*)?(["\'])([a-zA-Z0-9]{12,16})\1'
         )
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*["\']([^"\']+)["\']')
     elif suffix == ".ipynb":
         track_pattern = re.compile(
-            r'ln\.track\(\s*(?:transform\s*=\s*)?(?:\\"|\')([a-zA-Z0-9]{16})(?:\\"|\')'
+            r'ln\.track\(\s*(?:transform\s*=\s*)?(?:\\"|\')([a-zA-Z0-9]{12,16})(?:\\"|\')'
         )
         # backward compat
         uid_pattern = re.compile(r'\.context\.uid\s*=\s*\\["\']([^"\']+)\\["\']')
     elif suffix in {".R", ".qmd", ".Rmd"}:
         track_pattern = re.compile(
-            r'track\(\s*(?:transform\s*=\s*)?([\'"])([a-zA-Z0-9]{16})\1'
+            r'track\(\s*(?:transform\s*=\s*)?([\'"])([a-zA-Z0-9]{12,16})\1'
         )
         uid_pattern = None
     else:
@@ -162,38 +162,57 @@ def save_from_path_cli(
         uid = parse_uid_from_code(content, path.suffix)
 
         if uid is not None:
-            logger.important(f"mapped '{path}' on uid '{uid}'")
-            transform = ln.Transform.filter(uid=uid).one_or_none()
-            if transform is None:
-                logger.error(
-                    f"Did not find uid '{uid}'"
-                    " in Transform registry. Did you run `ln.track()`?"
-                )
-                return "not-tracked-in-transform-registry"
-        else:
-            revises = None
-            if stem_uid is not None:
-                revises = (
-                    ln.Transform.filter(uid__startswith=stem_uid)
+            logger.important(f"mapped '{path.name}' on uid '{uid}'")
+            if len(uid) == 16:
+                # is full uid
+                transform = ln.Transform.filter(uid=uid).one_or_none()
+            else:
+                # is stem uid
+                if stem_uid is not None:
+                    assert stem_uid == uid, (
+                        "passed stem uid and parsed stem uid do not match"
+                    )
+                else:
+                    stem_uid = uid
+                transform = (
+                    ln.Transform.filter(uid__startswith=uid)
                     .order_by("-created_at")
                     .first()
                 )
-                if revises is None:
-                    raise ln.errors.InvalidArgument("The stem uid is not found.")
-            # TODO: build in the logic that queries for relative file paths
-            # we have in Context; add tests for multiple versions
+                if transform is None:
+                    uid = f"{stem_uid}0000"
+        else:
+            # query via key
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
-            if transform is None:
-                transform = ln.Transform(
-                    description=path.name,
-                    key=path.name,
-                    type="script" if path.suffix in {".R", ".py"} else "notebook",
-                    revises=revises,
-                ).save()
-                logger.important(f"created Transform('{transform.uid}')")
-            if project is not None:
-                transform.projects.add(project_record)
-                logger.important(f"labeled with project: {project_record.name}")
+        revises = None
+        if stem_uid is not None:
+            revises = (
+                ln.Transform.filter(uid__startswith=stem_uid)
+                .order_by("-created_at")
+                .first()
+            )
+            if revises is None:
+                raise ln.errors.InvalidArgument("The stem uid is not found.")
+        if transform is None:
+            if path.suffix == ".ipynb":
+                from nbproject.dev import read_notebook
+                from nbproject.dev._meta_live import get_title
+
+                nb = read_notebook(path)
+                description = get_title(nb)
+            else:
+                description = None
+            transform = ln.Transform(
+                uid=uid,
+                description=description,
+                key=path.name,
+                type="script" if path.suffix in {".R", ".py"} else "notebook",
+                revises=revises,
+            ).save()
+            logger.important(f"created Transform('{transform.uid}')")
+        if project is not None:
+            transform.projects.add(project_record)
+            logger.important(f"labeled with project: {project_record.name}")
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run is not None and run.created_by.id != ln_setup.settings.user.id:

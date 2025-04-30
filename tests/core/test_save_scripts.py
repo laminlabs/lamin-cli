@@ -38,9 +38,12 @@ def test_run_save_cache_with_git_and_uid():
         shell=True,
         capture_output=True,
     )
-    # print(result.stdout.decode())
-    assert result.returncode == 1
-    assert "Did you run `ln.track()`?" in result.stdout.decode()
+    assert result.returncode == 0
+    assert (
+        "mapped 'run-track-and-finish-sync-git.py' on uid 'm5uCHTTpJnjQ0000'"
+        in result.stdout.decode()
+    )
+    assert "created Transform('m5uCHTTpJnjQ0000')" in result.stdout.decode()
 
     # run the script
     result = subprocess.run(
@@ -51,7 +54,7 @@ def test_run_save_cache_with_git_and_uid():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert "created Transform" in result.stdout.decode()
+    assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
     assert "started new Run" in result.stdout.decode()
 

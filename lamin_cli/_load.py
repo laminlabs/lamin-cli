@@ -78,7 +78,9 @@ def load(
                     )
         if bump_revision:
             uid = transform.uid
-            if uid in new_content:
+            if (
+                uid in new_content
+            ):  # this only hits if it has the full uid, not for the stem uid
                 new_uid = f"{uid[:-4]}{increment_base62(uid[-4:])}"
                 new_content = new_content.replace(uid, new_uid)
                 logger.important(f"updated uid: {uid} → {new_uid}")
