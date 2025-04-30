@@ -182,7 +182,7 @@ def save_from_path_cli(
                 if transform is None:
                     uid = f"{stem_uid}0000"
         else:
-            # query via key
+            # TODO: account for folders and hash equivalence as we do in ln.track()
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
         revises = None
         if stem_uid is not None:
