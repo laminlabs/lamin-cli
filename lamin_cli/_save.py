@@ -162,7 +162,7 @@ def save_from_path_cli(
         uid = parse_uid_from_code(content, path.suffix)
 
         if uid is not None:
-            logger.important(f"mapped '{path}' on uid '{uid}'")
+            logger.important(f"mapped '{path.name}' on uid '{uid}'")
             if len(uid) == 16:
                 # is full uid
                 transform = ln.Transform.filter(uid=uid).one_or_none()
@@ -179,6 +179,8 @@ def save_from_path_cli(
                     .order_by("-created_at")
                     .first()
                 )
+                if transform is None:
+                    uid = f"{stem_uid}0000"
         else:
             # query via key
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
@@ -193,6 +195,7 @@ def save_from_path_cli(
                 raise ln.errors.InvalidArgument("The stem uid is not found.")
         if transform is None:
             transform = ln.Transform(
+                uid=uid,
                 description=path.name,
                 key=path.name,
                 type="script" if path.suffix in {".R", ".py"} else "notebook",

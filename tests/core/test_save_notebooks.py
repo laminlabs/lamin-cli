@@ -74,7 +74,8 @@ def test_save_consecutive():
         env=env,
     )
     assert result.returncode == 0
-    assert "created Transform('ZW6kM31iHDw10000')" in result.stdout.decode()
+    print(result.stdout.decode())
+    assert "created Transform('hlsFXswrJjtt0000')" in result.stdout.decode()
     assert "found no run, creating" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run
