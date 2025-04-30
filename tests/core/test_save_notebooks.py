@@ -107,8 +107,8 @@ def test_save_consecutive():
         "created Transform('hlsFXswrJjtt0001'), started new" in result.stdout.decode()
     )
 
-    # now, there is a transform record, but we're missing all artifacts
-    transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
+    # now, there is a transform record, but we're missing all artifacts because ln.finish() wasn't called
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt0001").one_or_none()
     assert transform is not None
     assert transform.latest_run.report is None
     assert transform.source_code is None
@@ -126,7 +126,7 @@ def test_save_consecutive():
     assert result.returncode == 0
 
     # now, we have the associated artifacts
-    transform = ln.Transform.filter(uid="hlsFXswrJjtt0000").one_or_none()
+    transform = ln.Transform.filter(uid="hlsFXswrJjtt0001").one_or_none()
     assert transform is not None
     assert (
         transform.source_code
@@ -220,5 +220,5 @@ print("my consecutive cell")
         env=env,
     )
     assert result.returncode == 0
-    transform = ln.Transform.get("hlsFXswrJjtt0001")
+    transform = ln.Transform.get("hlsFXswrJjtt0002")
     assert "new_name.ipynb" in transform.key
