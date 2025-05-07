@@ -69,14 +69,14 @@ def test_save_local_file():
 def test_save_cloud_file():
     # should be no key for cloud paths
     result = subprocess.run(
-        "lamin save s3://lamindb-ci/lndb-storage/testfile.hdf5 --key filekey.h5ad",
+        "lamin save s3://lamindb-ci/test-lamin-cli/testfile.hdf5 --key wrongkey.h5ad",
         shell=True,
         check=False,
     )
     assert result.returncode == 1
 
     result = subprocess.run(
-        "lamin save s3://lamindb-ci/lndb-storage/testfile.hdf5",
+        "lamin save s3://lamindb-ci/test-lamin-cli/testfile.hdf5",
         shell=True,
         check=True,
     )
