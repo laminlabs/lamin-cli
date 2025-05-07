@@ -10,10 +10,6 @@ def pytest_sessionstart(session: pytest.Session):
         storage="./default_storage_cli",
         name="lamin-cli-unit-tests",
     )
-    ln.settings.storage = (
-        "s3://lamindb-ci/test-lamin-cli"  # register as valid storage location
-    )
-    ln.settings.storage = "./default_storage_cli"
     ln.setup.settings.auto_connect = True
 
 
