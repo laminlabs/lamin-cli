@@ -187,7 +187,7 @@ if __name__ == "__main__":
     # try to get the source code via command line
     result = subprocess.run(
         "yes | lamin load"
-        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",
+        f" https://lamin.ai/{settings.user.handle}/lamin-cli-unit-tests/transform/m5uCHTTpJnjQ0000",
         shell=True,
         capture_output=True,
     )
