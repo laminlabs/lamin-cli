@@ -196,7 +196,7 @@ print("my consecutive cell")
     # get the the source code via command line
     result = subprocess.run(
         "yes | lamin load"
-        f" https://lamin.ai/{ln.setup.settings.user.handle}/laminci-unit-tests/transform/hlsFXswrJjtt0001",
+        f" https://lamin.ai/{ln.setup.settings.user.handle}/lamin-cli-unit-tests/transform/hlsFXswrJjtt0001",
         shell=True,
         capture_output=True,
     )
