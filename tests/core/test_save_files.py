@@ -25,7 +25,7 @@ def test_save_local_file():
     assert result.returncode == 1
 
     project = ln.Project(name="test_project").save()
-    # cannot define Space with regular user
+    # cannot define Space with regular user, is defined in lamindb/tests/permissions
     branch = ln.Branch(name="contrib1").save()
 
     result = subprocess.run(
