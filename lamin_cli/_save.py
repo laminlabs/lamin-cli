@@ -52,6 +52,8 @@ def save_from_path_cli(
     description: str | None,
     stem_uid: str | None,
     project: str | None,
+    space: str | None,
+    branch: str | None,
     registry: str | None,
 ) -> str | None:
     import lamindb_setup as ln_setup
@@ -97,6 +99,20 @@ def save_from_path_cli(
             raise ln.errors.InvalidArgument(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
+    if space is not None:
+        space_record = ln.Space.filter(ln.Q(name=space) | ln.Q(uid=space)).one_or_none()
+        if space_record is None:
+            raise ln.errors.InvalidArgument(
+                f"Space '{space}' not found, either create it on LaminHub or fix typos."
+            )
+    if branch is not None:
+        branch_record = ln.Branch.filter(
+            ln.Q(name=branch) | ln.Q(uid=branch)
+        ).one_or_none()
+        if branch_record is None:
+            raise ln.errors.InvalidArgument(
+                f"Branch '{branch}' not found, either create it with `ln.Branch(name='...').save()` or fix typos."
+            )
 
     is_cloud_path = not isinstance(path, LocalPathClasses)
 
@@ -120,9 +136,12 @@ def save_from_path_cli(
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
 
-        artifact = ln.Artifact(
-            path, key=key, description=description, revises=revises
-        ).save()
+        artifact = ln.Artifact(path, key=key, description=description, revises=revises)
+        if space is not None:
+            artifact.space = space_record
+        if branch is not None:
+            artifact.branch = branch_record
+        artifact.save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if ln_setup.settings.storage.type == "s3":
@@ -208,7 +227,12 @@ def save_from_path_cli(
                 key=path.name,
                 type="script" if path.suffix in {".R", ".py"} else "notebook",
                 revises=revises,
-            ).save()
+            )
+            if space is not None:
+                transform.space = space_record
+            if branch is not None:
+                transform.branch = branch_record
+            transform.save()
             logger.important(f"created Transform('{transform.uid}')")
         if project is not None:
             transform.projects.add(project_record)

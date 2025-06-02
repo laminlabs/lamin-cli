@@ -24,10 +24,12 @@ def test_save_local_file():
     )
     assert result.returncode == 1
 
-    ln.Project(name="test_project").save()
+    project = ln.Project(name="test_project").save()
+    # cannot define Space with regular user
+    branch = ln.Branch(name="contrib1").save()
 
     result = subprocess.run(
-        f"lamin save {filepath} --key mytest --project test_project",
+        f"lamin save {filepath} --key mytest --project test_project --branch contrib1",
         shell=True,
         capture_output=True,
     )
@@ -37,6 +39,10 @@ def test_save_local_file():
     assert "storage path:" in result.stdout.decode()
     assert "labeled with project: test_project" in result.stdout.decode()
     assert result.returncode == 0
+
+    artifact = ln.Artifact.get(key="mytest")
+    assert artifact.branch == branch
+    assert project in artifact.projects.all()
 
     # test passing the registry and saving the same file
     result = subprocess.run(
