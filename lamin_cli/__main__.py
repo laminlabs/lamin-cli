@@ -314,8 +314,10 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
 @click.option("--stem-uid", type=str, default=None, help="The stem uid of the artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--space", type=str, default=None, help="A valid space name or uid.")
+@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
 @click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
-def save(path: str, key: str, description: str, stem_uid: str, project: str, registry: str):
+def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
     """Save a file or folder.
 
     Example: Given a valid project name "my_project".
@@ -324,13 +326,16 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, reg
     lamin save my_table.csv --key my_tables/my_table.csv --project my_project
     ```
 
+    By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
+    If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
+
     Note: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
     from lamin_cli._save import save_from_path_cli
 
-    if save_from_path_cli(path, key, description, stem_uid, project, registry) is not None:
+    if save_from_path_cli(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
 
