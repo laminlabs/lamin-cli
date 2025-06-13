@@ -195,7 +195,7 @@ def connect(instance: str):
     from lamindb_setup import settings as settings_
 
     settings_.auto_connect = True
-    return connect_(instance, _reload_lamindb=False)
+    return connect_(instance, _reload_lamindb=False, _write_settings=True)
 
 
 @main.command()
@@ -270,7 +270,7 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
         #     f"! please use: lamin connect {entity}"
         # )
         settings_.auto_connect = True
-        return connect(entity, _reload_lamindb=False)
+        return connect(entity, _reload_lamindb=False, _write_settings=True)
     else:
         from lamin_cli._load import load as load_
 
