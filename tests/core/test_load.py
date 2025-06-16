@@ -39,6 +39,8 @@ def test_load_transform():
     assert path1.exists()
     assert path2.exists()
 
+    subprocess.run("lamin connect laminlabs/lamin-dev", shell=True)
+
     # below will fail because it will say "these files already exist"
     result = subprocess.run(
         "lamin load transform --uid VFYCIuaw2GsX --with-env",
@@ -76,6 +78,8 @@ def test_get_load_artifact():
         capture_output=True,
     )
     assert result.returncode == 0
+
+    subprocess.run("lamin connect laminlabs/lamin-site-assets", shell=True)
 
     # partial uid
     result = subprocess.run(
