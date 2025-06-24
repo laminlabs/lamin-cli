@@ -4,7 +4,7 @@ from pathlib import Path
 
 import lamindb as ln
 
-scripts_dir = Path(__file__).parent.resolve() / "scripts"
+scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def test_run_save_cache():
@@ -55,7 +55,7 @@ def test_run_save_cache():
     # print(result.stdout.decode())
     # print(result.stderr.decode())
     assert result.returncode == 1
-    assert "Please export your" in result.stderr.decode()
+    assert "Please export your" in result.stdout.decode()
 
     filepath.with_suffix(".html").write_text("dummy html")
 

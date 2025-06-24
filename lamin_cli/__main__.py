@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import inspect
 import os
+import shutil
 import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+from lamindb_setup._init_instance import (
+    DOC_DB,
+    DOC_INSTANCE_NAME,
+    DOC_MODULES,
+    DOC_STORAGE_ARG,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -41,12 +50,7 @@ else:
         "lamin": [
             {
                 "name": "Connect to an instance",
-                "commands": [
-                    "connect",
-                    "disconnect",
-                    "info",
-                    "init",
-                ],
+                "commands": ["connect", "disconnect", "info", "init", "run"],
             },
             {
                 "name": "Read & write data",
@@ -155,23 +159,19 @@ def schema_to_modules_callback(ctx, param, value):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, help="Local directory, s3://bucket_name, gs://bucket_name.")
-@click.option("--db", type=str, default=None, help="Postgres database connection URL, do not pass for SQLite.")
-@click.option("--modules", type=str, default=None, help="Comma-separated string of schema modules.")
-@click.option("--name", type=str, default=None, help="The instance name.")
-@click.option("--schema", type=str, default=None, help="[DEPRECATED] Use --modules instead.", callback=schema_to_modules_callback)
+@click.option("--storage", type=str, default = ".", help=DOC_STORAGE_ARG)
+@click.option("--name", type=str, default=None, help=DOC_INSTANCE_NAME)
+@click.option("--db", type=str, default=None, help=DOC_DB)
+@click.option("--modules", type=str, default=None, help=DOC_MODULES)
 # fmt: on
 def init(
     storage: str,
+    name: str | None,
     db: str | None,
     modules: str | None,
-    name: str | None,
-    schema: str | None,
 ):
     """Init an instance."""
     from lamindb_setup._init_instance import init as init_
-
-    modules = modules if modules is not None else schema
 
     return init_(storage=storage, db=db, modules=modules, name=name)
 
@@ -188,12 +188,14 @@ def connect(instance: str):
     `lamin connect` switches
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
     auto-connect in a Python session upon importing `lamindb`.
+
+    For manually connecting in a Python session, use {func}`~lamindb.connect`.
     """
     from lamindb_setup import connect as connect_
     from lamindb_setup import settings as settings_
 
     settings_.auto_connect = True
-    return connect_(instance, _reload_lamindb=False)
+    return connect_(instance, _reload_lamindb=False, _write_settings=True)
 
 
 @main.command()
@@ -268,7 +270,7 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
         #     f"! please use: lamin connect {entity}"
         # )
         settings_.auto_connect = True
-        return connect(entity, _reload_lamindb=False)
+        return connect(entity, _reload_lamindb=False, _write_settings=True)
     else:
         from lamin_cli._load import load as load_
 
@@ -279,44 +281,111 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
 @click.argument("entity", type=str)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
-@click.option(
-    "--with-env", is_flag=True, help="Also return the environment for a tranform."
-)
-def get(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
+def get(entity: str, uid: str | None = None, key: str | None = None):
     """Query metadata about an entity.
 
-    Currently only works for artifact & transform and behaves like `lamin load`.
+    Currently only works for artifact.
     """
-    from lamin_cli._load import load as load_
+    import lamindb_setup as ln_setup
 
-    click.echo(f"! to load a file or folder, please use: lamin load {entity}")
-    return load_(entity, uid=uid, key=key, with_env=with_env)
+    from ._load import decompose_url
+
+    if entity.startswith("https://") and "lamin" in entity:
+        url = entity
+        instance, entity, uid = decompose_url(url)
+    elif entity not in {"artifact"}:
+        raise SystemExit("Entity has to be a laminhub URL or 'artifact'")
+    else:
+        instance = ln_setup.settings.instance.slug
+
+    ln_setup.connect(instance)
+    import lamindb as ln
+
+    if uid is not None:
+        artifact = ln.Artifact.get(uid)
+    else:
+        artifact = ln.Artifact.get(key=key)
+    artifact.describe()
 
 
 @main.command()
-@click.argument("filepath", type=click.Path(exists=True, dir_okay=True, file_okay=True))
-@click.option("--key", type=str, default=None)
-@click.option("--description", type=str, default=None)
-@click.option("--registry", type=str, default=None)
-def save(filepath: str, key: str, description: str, registry: str):
+@click.argument("path", type=str)
+@click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
+@click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
+@click.option("--stem-uid", type=str, default=None, help="The stem uid of the artifact or transform.")
+@click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--space", type=str, default=None, help="A valid space name or uid.")
+@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
+@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
+def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
     """Save a file or folder.
 
-    Defaults to saving `.py` and `.ipynb` as {class}`~lamindb.Transform` and
-    other file types and folders as {class}`~lamindb.Artifact`.
+    Example: Given a valid project name "my_project".
 
-    You can save a `.py` or `.ipynb` file as an {class}`~lamindb.Artifact` by
-    passing `--registry artifact`.
+    ```
+    lamin save my_table.csv --key my_tables/my_table.csv --project my_project
+    ```
+
+    By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
+    If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
+
+    Note: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
+    other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
+    an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli._save import save_from_filepath_cli
+    from lamin_cli._save import save_from_path_cli
 
-    if save_from_filepath_cli(filepath, key, description, registry) is not None:
+    if save_from_path_cli(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
+
+
+@main.command()
+@click.argument("filepath", type=str)
+@click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
+@click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
+@click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
+@click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
+@click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
+def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
+    """Run a compute job in the cloud.
+
+    This is an EXPERIMENTAL feature that enables to run a script on Modal.
+
+    Example: Given a valid project name "my_project".
+
+    ```
+    lamin run my_script.py --project my_project
+    ```
+    """
+    from lamin_cli.compute.modal import Runner
+
+    default_mount_dir = Path('./modal_mount_dir')
+    if not default_mount_dir.is_dir():
+        default_mount_dir.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy(filepath, default_mount_dir)
+
+    filepath_in_mount_dir = default_mount_dir / Path(filepath).name
+
+    package_list = []
+    if packages:
+        package_list = [package.strip() for package in packages.split(',')]
+
+    runner = Runner(
+        local_mount_dir=default_mount_dir,
+        app_name=project,
+        packages=package_list,
+        image_url=image_url,
+        cpu=cpu,
+        gpu=gpu
+    )
+
+    runner.run(filepath_in_mount_dir)
 
 
 main.add_command(settings)
 main.add_command(cache)
 main.add_command(migrate)
-
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84

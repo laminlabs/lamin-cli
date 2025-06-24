@@ -5,7 +5,7 @@ from pathlib import Path
 import lamindb as ln
 from lamindb_setup import settings
 
-scripts_dir = Path(__file__).parent.resolve() / "scripts"
+scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def test_save_without_uid():
@@ -13,15 +13,18 @@ def test_save_without_uid():
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-and-finish.py"
 
+    ln.Project(name="test_project").save()
+
     # attempt to save the script without it yet being run
     result = subprocess.run(
-        f"lamin save {filepath}",
+        f"lamin save {filepath} --project test_project",
         shell=True,
         capture_output=True,
     )
     # print(result.stdout.decode())
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
+    assert "labeled with project: test_project" in result.stdout.decode()
 
 
 def test_run_save_cache_with_git_and_uid():
@@ -35,9 +38,12 @@ def test_run_save_cache_with_git_and_uid():
         shell=True,
         capture_output=True,
     )
-    # print(result.stdout.decode())
-    assert result.returncode == 1
-    assert "Did you run `ln.track()`?" in result.stdout.decode()
+    assert result.returncode == 0
+    assert (
+        "mapped 'run-track-and-finish-sync-git.py' on uid 'm5uCHTTpJnjQ0000'"
+        in result.stdout.decode()
+    )
+    assert "created Transform('m5uCHTTpJnjQ0000')" in result.stdout.decode()
 
     # run the script
     result = subprocess.run(
@@ -48,7 +54,7 @@ def test_run_save_cache_with_git_and_uid():
     print(result.stdout.decode())
     print(result.stderr.decode())
     assert result.returncode == 0
-    assert "created Transform" in result.stdout.decode()
+    assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
     assert "started new Run" in result.stdout.decode()
 
@@ -178,10 +184,10 @@ if __name__ == "__main__":
     assert result.returncode == 1
     assert "already works on this draft" in result.stderr.decode()
 
-    # try to get the the source code via command line
+    # try to get the source code via command line
     result = subprocess.run(
         "yes | lamin load"
-        f" https://lamin.ai/{settings.user.handle}/laminci-unit-tests/transform/m5uCHTTpJnjQ0000",
+        f" https://lamin.ai/{settings.user.handle}/lamin-cli-unit-tests/transform/m5uCHTTpJnjQ0000",
         shell=True,
         capture_output=True,
     )
