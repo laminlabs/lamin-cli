@@ -57,7 +57,6 @@ def save_from_path_cli(
     registry: str | None,
 ) -> str | None:
     import lamindb as ln
-    import lamindb_setup as ln_setup
     from lamindb._finish import save_context_core
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
@@ -133,13 +132,13 @@ def save_from_path_cli(
         artifact.save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
-        if ln_setup.settings.storage.type == "s3":
+        if ln.setup.settings.storage.type == "s3":
             logger.important(f"storage url: {artifact.path.to_url()}")
         if project is not None:
             artifact.projects.add(project_record)
             logger.important(f"labeled with project: {project_record.name}")
-        if ln_setup.settings.instance.is_remote:
-            slug = ln_setup.settings.instance.slug
+        if ln.setup.settings.instance.is_remote:
+            slug = ln.setup.settings.instance.slug
             logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
         return None
 
@@ -228,7 +227,7 @@ def save_from_path_cli(
             logger.important(f"labeled with project: {project_record.name}")
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
-        if run is not None and run.created_by.id != ln_setup.settings.user.id:
+        if run is not None and run.created_by.id != ln.setup.settings.user.id:
             response = input(
                 "You are trying to save a transform created by another user: Source"
                 " and report files will be tagged with *your* user id. Proceed?"
