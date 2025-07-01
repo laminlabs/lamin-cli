@@ -10,7 +10,6 @@ def pytest_sessionstart(session: pytest.Session):
         storage="./default_storage_cli",
         name="lamin-cli-unit-tests",
     )
-    ln.setup.settings.auto_connect = True
 
 
 def pytest_sessionfinish(session: pytest.Session):
