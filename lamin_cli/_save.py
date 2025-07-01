@@ -56,21 +56,10 @@ def save_from_path_cli(
     branch: str | None,
     registry: str | None,
 ) -> str | None:
-    import lamindb_setup as ln_setup
-    from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
-
-    # this will be gone once we get rid of lamin load or enable loading multiple
-    # instances sequentially
-    auto_connect_state = ln_setup.settings.auto_connect
-    ln_setup.settings.auto_connect = True
-
     import lamindb as ln
-
-    if not ln.setup.core.django.IS_SETUP:
-        sys.exit(-1)
+    import lamindb_setup as ln_setup
     from lamindb._finish import save_context_core
-
-    ln_setup.settings.auto_connect = auto_connect_state
+    from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
     # this allows to have the correct treatment of credentials in case of cloud paths
     path = create_path(path)

@@ -181,20 +181,19 @@ def init(
 @click.argument("instance", type=str)
 # fmt: on
 def connect(instance: str):
-    """Connect to an instance.
+    """Configure an instance for auto-connect.
 
     Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
-    `lamin connect` switches
-    {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
-    auto-connect in a Python session upon importing `lamindb`.
+    `lamin connect` configures a current instance in your local user environment
+    to which you auto-connect in subsequent CLI operations, Python, or R sessions.
 
-    For manually connecting in a Python session, use {func}`~lamindb.connect`.
+    Alternatively, you can connect to a Python session via {func}`~lamindb.connect`
+    without changing the current instance.
     """
     from lamindb_setup import connect as connect_
     from lamindb_setup import settings as settings_
 
-    settings_.auto_connect = True
     return connect_(instance, _reload_lamindb=False, _write_settings=True)
 
 
@@ -269,7 +268,6 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
         # click.echo(
         #     f"! please use: lamin connect {entity}"
         # )
-        settings_.auto_connect = True
         return connect(entity, _reload_lamindb=False, _write_settings=True)
     else:
         from lamin_cli._load import load as load_
