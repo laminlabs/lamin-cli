@@ -21,6 +21,17 @@ def test_load_transform():
     import lamindb_setup as ln_setup
 
     print(ln_setup.settings.instance.slug)
+
+    # check via a renamed instance
+    result = subprocess.run(
+        "lamin load"
+        " 'https://lamin.ai/laminlabs/lamin-dev1072025/transform/EWKgIa9dJB0n'"
+        " --with-env",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
     result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-dev/transform/VFYCIuaw2GsX0000'"
