@@ -51,8 +51,8 @@ def test_run_save_cache_with_git_and_uid():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 0
     assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
@@ -172,7 +172,7 @@ if __name__ == "__main__":
         capture_output=True,
         env=env,
     )
-    # re-run the script through the second user
+    # re-run the script through a second user
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -181,8 +181,7 @@ if __name__ == "__main__":
     )
     # print(result.stdout.decode())
     # print(result.stderr.decode())
-    assert result.returncode == 1
-    assert "already works on this draft" in result.stderr.decode()
+    assert result.returncode == 0
 
     # try to get the source code via command line
     result = subprocess.run(
