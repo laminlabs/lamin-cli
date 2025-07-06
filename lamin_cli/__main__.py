@@ -9,7 +9,7 @@ from collections import OrderedDict
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from lamindb_setup._init_instance import (
     DOC_DB,
@@ -58,7 +58,7 @@ else:
             },
             {
                 "name": "Configure",
-                "commands": ["cache", "settings", "migrate"],
+                "commands": ["checkout", "switch", "cache", "settings", "migrate"],
             },
             {
                 "name": "Auth",
@@ -207,6 +207,42 @@ def disconnect():
     from lamindb_setup import close as close_
 
     return close_()
+
+
+# fmt: off
+@main.command()
+@click.argument("entity", type=Literal["branch"])
+@click.option("--name", type=str, default=None, help="A valid branch name.")
+# fmt: on
+def create(entity: Literal["branch"], name: str | None = None):
+    """Create a record for an entity.
+
+    Currently only supports creating a branch.
+
+    ```
+    lamin create branch --name my_branch
+    ```
+    """
+    assert entity == "branch", "Currently only supports creating a branch."
+
+    from lamindb.models import Branch
+
+    Branch(name=name).save()
+
+
+# fmt: off
+@main.command()
+@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
+@click.option("--space", type=str, default=None, help="A valid branch name or uid.")
+# fmt: on
+def switch(branch: str | None = None, space: str | None = None):
+    """Switch between branches or spaces.
+
+    Currently only supports creating a branch.
+    """
+    from lamindb.setup import switch as switch_
+
+    switch_(branch=branch, space=space)
 
 
 @main.command()
