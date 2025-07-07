@@ -302,10 +302,11 @@ def delete(entity: str, name: str | None = None, slug: str | None = None, force:
     lamin delete branch --name my_branch
     ```
     """
-    from lamindb import Branch
     from lamindb_setup._delete import delete
 
     if entity == "branch":
+        from lamindb import Branch
+
         Branch.get(name=name).delete()
     elif entity == "instance":
         return delete(slug, force=force)
