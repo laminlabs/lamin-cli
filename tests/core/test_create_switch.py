@@ -1,5 +1,6 @@
 import os
 
+import lamindb as ln
 import lamindb_setup as ln_setup
 
 
@@ -10,6 +11,10 @@ def test_branch():
     exit_status = os.system("lamin switch --branch main")
     assert exit_status == 0
     assert ln_setup.settings.branch.uid == 12 * "m"
+    exit_status = os.system("lamin create branch --name testbranch")
+    exit_status = os.system("lamin switch --branch testbranch")
+    assert exit_status == 0
+    ln.Branch.get(name="testbranch").delete()
 
 
 def test_space():

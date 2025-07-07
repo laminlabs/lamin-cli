@@ -11,6 +11,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from lamin_utils import logger
 from lamindb_setup._init_instance import (
     DOC_DB,
     DOC_INSTANCE_NAME,
@@ -54,7 +55,7 @@ else:
             },
             {
                 "name": "Read & write data",
-                "commands": ["load", "save", "get", "delete"],
+                "commands": ["load", "save", "get", "delete", "create", "list"],
             },
             {
                 "name": "Configure",
@@ -211,8 +212,8 @@ def disconnect():
 
 # fmt: off
 @main.command()
-@click.argument("entity", type=Literal["branch"])
-@click.option("--name", type=str, default=None, help="A valid branch name.")
+@click.argument("entity", type=str)
+@click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
 def create(entity: Literal["branch"], name: str | None = None):
     """Create a record for an entity.
@@ -227,7 +228,31 @@ def create(entity: Literal["branch"], name: str | None = None):
 
     from lamindb.models import Branch
 
-    Branch(name=name).save()
+    branch = Branch(name=name).save()
+    logger.important(f"created branch: {branch.name}")
+
+
+# fmt: off
+@main.command(name="list")
+@click.argument("entity", type=str)
+@click.option("--name", type=str, default=None, help="A name.")
+# fmt: on
+def list_(entity: Literal["branch"], name: str | None = None):
+    """List records for an entity.
+
+    ```
+    lamin list branch
+    lamin list space
+    ```
+    """
+    assert entity in {"branch", "space"}, "Currently only supports listing branches and spaces."
+
+    from lamindb.models import Branch, Space
+
+    if entity == "branch":
+        print(Branch.df())
+    else:
+        print(Space.df())
 
 
 # fmt: off
@@ -262,17 +287,30 @@ def info(schema: bool):
 
 # fmt: off
 @main.command()
-@click.argument("instance", type=str, default=None)
-@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation.")
+@click.argument("entity", type=str)
+@click.option("--name", type=str, default=None)
+@click.option("--slug", type=str, default=None)
+@click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(instance: str, force: bool = False):
+def delete(entity: str, name: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
-    Currently only supports instance deletion.
+    Currently supported: `branch` and `instance`.
+
+    ```
+    lamin delete instance --slug account/name
+    lamin delete branch --name my_branch
+    ```
     """
+    from lamindb import Branch
     from lamindb_setup._delete import delete
 
-    return delete(instance, force=force)
+    if entity == "branch":
+        Branch.get(name=name).delete()
+    elif entity == "instance":
+        return delete(slug, force=force)
+    else:  # backwars compatibility
+        return delete(entity, force=force)
 
 
 @main.command()
