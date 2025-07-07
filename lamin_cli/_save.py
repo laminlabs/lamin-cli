@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import click
 from lamin_utils import logger
+from lamindb_setup.core.hashing import hash_file
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -155,6 +156,10 @@ def save_from_path_cli(
         return None
 
     if registry == "transform":
+        if key is not None:
+            logger.warning(
+                "key is ignored for transforms, the transform key is determined by the filename"
+            )
         if is_cloud_path:
             logger.error("Can not register a transform from a cloud path")
             return "transform-with-cloud-path"
@@ -201,8 +206,19 @@ def save_from_path_cli(
                 if transform is None:
                     uid = f"{stem_uid}0000"
         else:
-            # TODO: account for folders and hash equivalence as we do in ln.track()
+            # TODO: account for folders as we do in ln.track()
+            transform_hash, _ = hash_file(path)
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
+            if transform is not None and transform.hash is not None:
+                if transform.hash == transform_hash:
+                    logger.important(
+                        f"found existing Transform('{uid}') with matching hash"
+                    )
+                    return None
+                else:
+                    # we need to create a new version
+                    stem_uid = transform.uid[:12]
+                    transform = None
         revises = None
         if stem_uid is not None:
             revises = (
