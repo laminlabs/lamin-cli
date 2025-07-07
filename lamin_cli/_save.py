@@ -156,6 +156,10 @@ def save_from_path_cli(
         return None
 
     if registry == "transform":
+        if key is not None:
+            logger.warning(
+                "key is ignored for transforms, the transform key is determined by the filename"
+            )
         if is_cloud_path:
             logger.error("Can not register a transform from a cloud path")
             return "transform-with-cloud-path"
@@ -205,7 +209,7 @@ def save_from_path_cli(
             # TODO: account for folders as we do in ln.track()
             transform_hash, _ = hash_file(path)
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
-            if transform.hash is not None:
+            if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
                     logger.important(
                         f"found existing Transform('{uid}') with matching hash"

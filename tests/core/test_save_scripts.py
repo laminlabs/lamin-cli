@@ -8,6 +8,27 @@ from lamindb_setup import settings
 scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
+def test_save_resave_script_no_uids():
+    filepath = scripts_dir / "testscript.py"
+    filepath.write_text("print('hello')")
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "created Transform" in result.stdout.decode()
+    filepath.write_text("print('hello')\nprint('world')\n")
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "created Transform" in result.stdout.decode()
+    assert ln.Transform.filter(key=filepath.name).count() == 2
+
+
 def test_save_without_uid():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
