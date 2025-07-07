@@ -18,6 +18,7 @@ def test_branch():
     assert exit_status == 0
     exit_status = os.system("lamin delete branch --name testbranch")
     assert exit_status == 0
+    exit_status = os.system("lamin switch --branch main")
 
 
 def test_space():
