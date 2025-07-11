@@ -296,7 +296,7 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
-    Currently supported: `branch` and `instance`.
+    Currently supported: `branch`, `artifact`, and `instance`.
 
     ```
     lamin delete instance --slug account/name
