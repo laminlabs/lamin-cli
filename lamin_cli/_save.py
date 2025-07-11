@@ -145,7 +145,7 @@ def save_from_path_cli(
         artifact.save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
-        if ln_setup.settings.storage.type == "s3":
+        if artifact.storage.type == "s3":
             logger.important(f"storage url: {artifact.path.to_url()}")
         if project is not None:
             artifact.projects.add(project_record)
