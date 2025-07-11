@@ -289,10 +289,11 @@ def info(schema: bool):
 @main.command()
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
+@click.option("--uid", type=str, default=None)
 @click.option("--slug", type=str, default=None)
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, slug: str | None = None, force: bool = False):
+def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
     Currently supported: `branch` and `instance`.
@@ -305,9 +306,15 @@ def delete(entity: str, name: str | None = None, slug: str | None = None, force:
     from lamindb_setup._delete import delete
 
     if entity == "branch":
+        assert name is not None, "You have to pass a name for deleting a branch."
         from lamindb import Branch
 
         Branch.get(name=name).delete()
+    elif entity == "artifact":
+        assert uid is not None, "You have to pass a uid for deleting an artifact."
+        from lamindb import Artifact
+
+        Artifact.get(uid).delete()
     elif entity == "instance":
         return delete(slug, force=force)
     else:  # backwars compatibility
