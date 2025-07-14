@@ -163,10 +163,11 @@ def load(
 
             # we don't use .get here because DoesNotExist is hard to catch
             # due to private django API
+            # we use `.objects` here because we don't want to exclude kind = __lamindb_run__ artifacts
             if query_by_uid:
-                entities = EntityClass.filter(uid__startswith=uid)
+                entities = EntityClass.objects.filter(uid__startswith=uid)
             else:
-                entities = EntityClass.filter(key=key)
+                entities = EntityClass.objects.filter(key=key)
 
             if (n_entities := len(entities)) == 0:
                 err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
