@@ -192,11 +192,17 @@ def connect(instance: str):
 
     For manually connecting in a Python session, use {func}`~lamindb.connect`.
     """
-    from lamindb_setup import connect as connect_
     from lamindb_setup import settings as settings_
+    from lamindb_setup._connect_instance import (
+        _connect_instance,
+        get_owner_name_from_identifier,
+    )
 
     settings_.auto_connect = True
-    return connect_(instance, _reload_lamindb=False, _write_settings=True)
+    owner, name = get_owner_name_from_identifier(instance)
+    isettings = _connect_instance(owner, name)
+    isettings._persist(write_to_disk=True)
+    return None
 
 
 @main.command()
