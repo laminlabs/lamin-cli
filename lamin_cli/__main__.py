@@ -435,13 +435,11 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
     """Annotate an artifact.
 
-    Example: Given a valid project name "my_project".
+    You can annotate with projects and valid features & values.
 
     ```
-    lamin annotate --key my_tables/my_table.csv --project my_project
+    lamin annotate --key rawdata/sample.fastq --project my_project --features perturbation=IFNG,DMSO cell_line=HEK297
     ```
-
-    By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
     """
     import lamindb as ln
 
