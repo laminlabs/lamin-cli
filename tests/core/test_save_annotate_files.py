@@ -100,18 +100,17 @@ def test_save_and_annotate_local_file():
     print(result.stderr.decode())
     assert result.returncode == 0
 
+    artifact = ln.Artifact.get(key="mytest")
+    features = artifact.features.get_values()
+    assert features["perturbation"] == {"DMSO", "IFNG"}
+    assert project in artifact.projects.all()
+
     result = subprocess.run(
         "lamin describe --key mytest",
         shell=True,
         capture_output=True,
     )
-    result_str = result.stdout.decode()
-    ansi_escape = re.compile(r"\x1b(?:\[[0-9;]*[a-zA-Z]|\(B)")
-    result_stripped = ansi_escape.sub("", result_str)
-    annotations = "cat[ULabel[Perturbation]]            DMSO, IFNG"
-    print(result_stripped)
-    print(annotations)
-    assert annotations in result_stripped
+    assert result.returncode == 0
 
 
 def test_save_cloud_file():
