@@ -192,6 +192,7 @@ def connect(instance: str):
 
     For manually connecting in a Python session, use {func}`~lamindb.connect`.
     """
+    from lamindb_setup import connect as connect_instance_
     from lamindb_setup import settings as settings_
     from lamindb_setup._connect_instance import (
         _connect_instance,
@@ -202,7 +203,14 @@ def connect(instance: str):
     owner, name = get_owner_name_from_identifier(instance)
     isettings = _connect_instance(owner, name)
     isettings._persist(write_to_disk=True)
-    logger.important(f"connected lamindb: {isettings.slug}")
+    if not isettings.is_on_hub or isettings._is_cloud_sqlite:
+        # there are two reasons to call the full-blown connect
+        # (1) if the instance is not on the hub, we need to register
+        # potential users through register_user()
+        # (2) if the instance is cloud sqlite, we need to lock it
+        connect_instance_(_write_settings=False)
+    else:
+        logger.important(f"connected lamindb: {isettings.slug}")
     return None
 
 
