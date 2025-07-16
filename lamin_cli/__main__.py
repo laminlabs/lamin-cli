@@ -192,26 +192,8 @@ def connect(instance: str):
 
     For manually connecting in a Python session, use {func}`~lamindb.connect`.
     """
-    from lamindb_setup import connect as connect_instance_
-    from lamindb_setup import settings as settings_
-    from lamindb_setup._connect_instance import (
-        _connect_instance,
-        get_owner_name_from_identifier,
-    )
-
-    settings_.auto_connect = True
-    owner, name = get_owner_name_from_identifier(instance)
-    isettings = _connect_instance(owner, name)
-    isettings._persist(write_to_disk=True)
-    if not isettings.is_on_hub or isettings._is_cloud_sqlite:
-        # there are two reasons to call the full-blown connect
-        # (1) if the instance is not on the hub, we need to register
-        # potential users through register_user()
-        # (2) if the instance is cloud sqlite, we need to lock it
-        connect_instance_(_write_settings=False)
-    else:
-        logger.important(f"connected lamindb: {isettings.slug}")
-    return None
+    from lamindb_setup._connect_instance import _connect_cli
+    return _connect_cli(instance)
 
 
 @main.command()
@@ -359,15 +341,9 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
     """
     is_slug = entity.count("/") == 1
     if is_slug:
-        from lamindb_setup import connect
-        from lamindb_setup import settings as settings_
-
-        # can decide whether we want to actually deprecate
-        # click.echo(
-        #     f"! please use: lamin connect {entity}"
-        # )
-        settings_.auto_connect = True
-        return connect(entity, _reload_lamindb=False, _write_settings=True)
+        from lamindb_setup._connect_instance import _connect_cli
+        # for backward compat and convenience, connect to the instance
+        return _connect_cli(entity)
     else:
         from lamin_cli._load import load as load_
 
