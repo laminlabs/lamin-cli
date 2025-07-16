@@ -194,7 +194,7 @@ def connect(instance: str):
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
     auto-connect in a Python session upon importing `lamindb`.
 
-    Alternatively, you can also connect in a Python session via {func}`~lamindb.connect`.
+    Alternatively, you can connect in a Python session via {func}`~lamindb.connect`.
     """
     from lamindb_setup._connect_instance import _connect_cli
     return _connect_cli(instance)
