@@ -50,12 +50,16 @@ else:
     COMMAND_GROUPS = {
         "lamin": [
             {
-                "name": "Connect to an instance",
-                "commands": ["connect", "disconnect", "info", "init", "run"],
+                "name": "Manage connections",
+                "commands": ["connect", "info", "init", "disconnect"],
             },
             {
-                "name": "Read & write data",
-                "commands": ["load", "save", "get", "delete", "create", "list"],
+                "name": "Load, save, create & delete data",
+                "commands": ["load", "save", "create", "delete"],
+            },
+            {
+                "name": "Describe, annotate & list data",
+                "commands": ["describe", "annotate", "list"],
             },
             {
                 "name": "Configure",
@@ -104,7 +108,7 @@ except PackageNotFoundError:
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
-    """Configure LaminDB and perform simple actions."""
+    """Manage data with LaminDB instances."""
     silence_loggers()
 
 
@@ -326,7 +330,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def load(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
-    """Load a file or folder.
+    """Load a file or folder into the cache or working directory.
 
     Pass a URL, `artifact`, or `transform`. For example:
 
