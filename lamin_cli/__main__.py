@@ -22,6 +22,34 @@ from lamindb_setup._init_instance import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+COMMAND_GROUPS = {
+    "lamin": [
+        {
+            "name": "Manage connections",
+            "commands": ["connect", "info", "init", "disconnect"],
+        },
+        {
+            "name": "Load, save, create & delete data",
+            "commands": ["load", "save", "create", "delete"],
+        },
+        {
+            "name": "Describe, annotate & list data",
+            "commands": ["describe", "annotate", "list"],
+        },
+        {
+            "name": "Configure",
+            "commands": ["checkout", "switch", "cache", "settings", "migrate"],
+        },
+        {
+            "name": "Auth",
+            "commands": [
+                "login",
+                "logout",
+            ],
+        },
+    ]
+}
+
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
@@ -46,34 +74,6 @@ if os.environ.get("NO_RICH"):
 
 else:
     import rich_click as click
-
-    COMMAND_GROUPS = {
-        "lamin": [
-            {
-                "name": "Manage connections",
-                "commands": ["connect", "info", "init", "disconnect"],
-            },
-            {
-                "name": "Load, save, create & delete data",
-                "commands": ["load", "save", "create", "delete"],
-            },
-            {
-                "name": "Describe, annotate & list data",
-                "commands": ["describe", "annotate", "list"],
-            },
-            {
-                "name": "Configure",
-                "commands": ["checkout", "switch", "cache", "settings", "migrate"],
-            },
-            {
-                "name": "Auth",
-                "commands": [
-                    "login",
-                    "logout",
-                ],
-            },
-        ]
-    }
 
     def lamin_group_decorator(f):
         @click.rich_config(
@@ -194,7 +194,7 @@ def connect(instance: str):
     {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
     auto-connect in a Python session upon importing `lamindb`.
 
-    For manually connecting in a Python session, use {func}`~lamindb.connect`.
+    Alternatively, you can also connect in a Python session via {func}`~lamindb.connect`.
     """
     from lamindb_setup._connect_instance import _connect_cli
     return _connect_cli(instance)
@@ -274,7 +274,7 @@ def switch(branch: str | None = None, space: str | None = None):
 @main.command()
 @click.option("--schema", is_flag=True, help="View database schema.")
 def info(schema: bool):
-    """Show info about current instance."""
+    """Show info about the environment, instance, branch, space, and user."""
     if schema:
         from lamindb_setup._schema import view
 
@@ -378,12 +378,16 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 
 
 @main.command()
-@click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
-def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    """Describe an entity."""
-    _describe(entity=entity, uid=uid, key=key)
+def describe(uid: str | None = None, key: str | None = None):
+    """Describe an artifact.
+
+    ```
+    lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
+    ```
+    """
+    _describe(entity="artifact", uid=uid, key=key)
 
 
 @main.command()
@@ -431,18 +435,20 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 
 
 @main.command()
-@click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
-@click.option("--uid", type=str, default=None, help="The stem uid of the artifact or transform.")
+@click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
+@click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
+@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on key suffix.")
 def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
-    """Annotate an artifact.
+    """Annotate an artifact or a transform.
 
     You can annotate with projects and valid features & values.
 
     ```
-    lamin annotate --key rawdata/sample.fastq --project my_project --features perturbation=IFNG,DMSO cell_line=HEK297
+    lamin annotate --key raw/sample.fastq --project "My Project"
+    lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
+    lamin annotate --key my-notebook.ipynb --project "My Project"
     ```
     """
     import lamindb as ln
