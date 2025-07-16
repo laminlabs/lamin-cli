@@ -1,15 +1,29 @@
 from __future__ import annotations
 
+import os
 import re
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
 from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
-if TYPE_CHECKING:
-    from pathlib import Path
+
+def infer_registry_from_path(path: Path | str) -> str:
+    suffixes_transform = {
+        "py": {".py", ".ipynb"},
+        "R": {".R", ".qmd", ".Rmd"},
+    }
+    if isinstance(path, str):
+        path = Path(path)
+    registry = (
+        "transform"
+        if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
+        else "artifact"
+    )
+    return registry
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -82,15 +96,7 @@ def save_from_path_cli(
         raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
 
     if registry is None:
-        suffixes_transform = {
-            "py": {".py", ".ipynb"},
-            "R": {".R", ".qmd", ".Rmd"},
-        }
-        registry = (
-            "transform"
-            if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
-            else "artifact"
-        )
+        registry = infer_registry_from_path(path)
 
     if project is not None:
         project_record = ln.Project.filter(
@@ -256,11 +262,14 @@ def save_from_path_cli(
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run is not None and run.created_by.id != ln_setup.settings.user.id:
-            response = input(
-                "You are trying to save a transform created by another user: Source"
-                " and report files will be tagged with *your* user id. Proceed?"
-                " (y/n)"
-            )
+            if os.environ.get("LAMIN_TESTING") == "true":
+                response = "y"
+            else:
+                response = input(
+                    "You are trying to save a transform created by another user: Source"
+                    " and report files will be tagged with *your* user id. Proceed?"
+                    " (y/n)"
+                )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
         if run is None and transform.key.endswith(".ipynb"):
