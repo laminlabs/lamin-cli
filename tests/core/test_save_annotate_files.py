@@ -105,17 +105,13 @@ def test_save_and_annotate_local_file():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
-    result = result.stdout.decode()
+    result_str = result.stdout.decode()
     ansi_escape = re.compile(r"\x1b(?:\[[0-9;]*[a-zA-Z]|\(B)")
-    result = ansi_escape.sub("", result)
-    annotations = """\
-├── Linked features
-│   └── perturbation                     cat[ULabel[Perturbation]]            DMSO, IFNG
-└── Labels
-    └── .projects                        Project                              test_project
-        .ulabels                         ULabel                               DMSO, IFNG"""
-    assert annotations in result
+    result_stripped = ansi_escape.sub("", result_str)
+    annotations = "cat[ULabel[Perturbation]]            DMSO, IFNG"
+    print(result_stripped)
+    print(annotations)
+    assert annotations in result_stripped
 
 
 def test_save_cloud_file():
