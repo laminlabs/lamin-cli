@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -261,11 +262,14 @@ def save_from_path_cli(
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run is not None and run.created_by.id != ln_setup.settings.user.id:
-            response = input(
-                "You are trying to save a transform created by another user: Source"
-                " and report files will be tagged with *your* user id. Proceed?"
-                " (y/n)"
-            )
+            if os.environ.get("LAMIN_TESTING") == "true":
+                response = "y"
+            else:
+                response = input(
+                    "You are trying to save a transform created by another user: Source"
+                    " and report files will be tagged with *your* user id. Proceed?"
+                    " (y/n)"
+                )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
         if run is None and transform.key.endswith(".ipynb"):
