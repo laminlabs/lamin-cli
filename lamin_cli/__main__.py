@@ -202,6 +202,7 @@ def connect(instance: str):
     owner, name = get_owner_name_from_identifier(instance)
     isettings = _connect_instance(owner, name)
     isettings._persist(write_to_disk=True)
+    logger.important(f"connected lamindb: {isettings.slug}")
     return None
 
 
