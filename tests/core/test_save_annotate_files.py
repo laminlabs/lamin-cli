@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import lamindb_setup as ln_setup
 test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
 
 
-def test_save_local_file():
+def test_save_and_annotate_local_file():
     filepath = test_file
 
     # neither key nor description
@@ -70,6 +71,51 @@ def test_save_local_file():
         in result.stderr.decode()
     )
     assert result.returncode == 1
+
+    result = subprocess.run(
+        f"lamin save {filepath} --key mytest --registry artifact",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert "returning existing artifact with same hash" in result.stdout.decode()
+    assert "key='mytest'" in result.stdout.decode()
+    assert "storage path:" in result.stdout.decode()
+    assert result.returncode == 0
+
+    artifact.projects.remove(project)
+
+    ml_split_type = ln.ULabel(name="Perturbation", is_type=True).save()
+    ln.ULabel(name="DMSO", type=ml_split_type).save()
+    ln.ULabel(name="IFNG", type=ml_split_type).save()
+    ln.Feature(name="perturbation", dtype=ml_split_type).save()
+
+    result = subprocess.run(
+        "lamin annotate --key mytest --project test_project --features perturbation=DMSO,IFNG",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+
+    result = subprocess.run(
+        "lamin describe --key mytest",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    result = result.stdout.decode()
+    ansi_escape = re.compile(r"\x1b(?:\[[0-9;]*[a-zA-Z]|\(B)")
+    result = ansi_escape.sub("", result)
+    annotations = """\
+├── Linked features
+│   └── perturbation                     cat[ULabel[Perturbation]]            DMSO, IFNG
+└── Labels
+    └── .projects                        Project                              test_project
+        .ulabels                         ULabel                               DMSO, IFNG"""
+    assert annotations in result
 
 
 def test_save_cloud_file():

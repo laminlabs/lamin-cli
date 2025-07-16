@@ -350,15 +350,7 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
         return load_(entity, uid=uid, key=key, with_env=with_env)
 
 
-@main.command()
-@click.argument("entity", type=str)
-@click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
-def get(entity: str, uid: str | None = None, key: str | None = None):
-    """Query metadata about an entity.
-
-    Currently only works for artifact.
-    """
+def _describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
     import lamindb_setup as ln_setup
 
     from ._load import decompose_url
@@ -379,6 +371,28 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
     else:
         artifact = ln.Artifact.get(key=key)
     artifact.describe()
+
+
+@main.command()
+@click.argument("entity", type=str, default="artifact")
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
+def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+    """Describe an entity."""
+    _describe(entity=entity, uid=uid, key=key)
+
+
+@main.command()
+@click.argument("entity", type=str, default="artifact")
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
+def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+    """Query metadata about an entity.
+
+    Currently still equivalent to `lamin describe`.
+    """
+    logger.warning("please use `lamin describe` instead of `lamin get` to describe")
+    _describe(entity=entity, uid=uid, key=key)
 
 
 @main.command()
@@ -410,6 +424,66 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 
     if save_from_path_cli(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
+
+
+@main.command()
+@click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
+@click.option("--uid", type=str, default=None, help="The stem uid of the artifact or transform.")
+@click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
+@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
+def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
+    """Annotate an artifact.
+
+    Example: Given a valid project name "my_project".
+
+    ```
+    lamin annotate --key my_tables/my_table.csv --project my_project
+    ```
+
+    By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
+    """
+    import lamindb as ln
+
+    from lamin_cli._annotate import _parse_features_list
+    from lamin_cli._save import infer_registry_from_path
+
+    if registry is None:
+        if key is not None:
+            registry = infer_registry_from_path(key)
+        else:
+            registry = "artifact"
+    if registry == "artifact":
+        model = ln.Artifact
+    else:
+        model = ln.Transform
+
+    # Get the artifact
+    if key is not None:
+        artifact = model.get(key=key)
+    elif uid is not None:
+        artifact = model.get(uid=uid)
+    else:
+        raise ln.errors.InvalidArgument("Either --key or --uid must be provided")
+
+    # Handle project annotation
+    if project is not None:
+        project_record = ln.Project.filter(
+            ln.Q(name=project) | ln.Q(uid=project)
+        ).one_or_none()
+        if project_record is None:
+            raise ln.errors.InvalidArgument(
+                f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
+            )
+        artifact.projects.add(project_record)
+
+    # Handle feature annotations
+    if features:
+        feature_dict = _parse_features_list(features)
+        artifact.features.add_values(feature_dict)
+
+    artifact_rep = artifact.key if artifact.key else artifact.description if artifact.description else artifact.uid
+    logger.important(f"annotated {registry}: {artifact_rep}")
 
 
 @main.command()

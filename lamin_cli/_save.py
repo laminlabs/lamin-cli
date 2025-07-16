@@ -2,14 +2,27 @@ from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
 from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
-if TYPE_CHECKING:
-    from pathlib import Path
+
+def infer_registry_from_path(path: Path | str) -> str:
+    suffixes_transform = {
+        "py": {".py", ".ipynb"},
+        "R": {".R", ".qmd", ".Rmd"},
+    }
+    if isinstance(path, str):
+        path = Path(path)
+    registry = (
+        "transform"
+        if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
+        else "artifact"
+    )
+    return registry
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -82,15 +95,7 @@ def save_from_path_cli(
         raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
 
     if registry is None:
-        suffixes_transform = {
-            "py": {".py", ".ipynb"},
-            "R": {".R", ".qmd", ".Rmd"},
-        }
-        registry = (
-            "transform"
-            if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
-            else "artifact"
-        )
+        registry = infer_registry_from_path(path)
 
     if project is not None:
         project_record = ln.Project.filter(
