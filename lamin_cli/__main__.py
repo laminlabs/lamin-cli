@@ -381,16 +381,18 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 
 
 @main.command()
+@click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
-def describe(uid: str | None = None, key: str | None = None):
+def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
     """Describe an artifact.
 
     ```
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
+    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
     ```
     """
-    _describe(entity="artifact", uid=uid, key=key)
+    _describe(entity=entity, uid=uid, key=key)
 
 
 @main.command()
