@@ -264,7 +264,10 @@ def list_(entity: Literal["branch"], name: str | None = None):
 def switch(branch: str | None = None, space: str | None = None):
     """Switch between branches or spaces.
 
-    Currently only supports creating a branch.
+    ```
+    lamin switch --branch my_branch
+    lamin switch --space our_space
+    ```
     """
     from lamindb.setup import switch as switch_
 
