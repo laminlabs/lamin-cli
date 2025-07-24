@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import lamindb as ln
 import lamindb_setup as ln_setup
@@ -7,10 +8,22 @@ import lamindb_setup as ln_setup
 def test_branch():
     exit_status = os.system("lamin switch --branch archive")
     assert exit_status == 0
-    assert ln_setup.settings.branch.uid == 12 * "a"
+    result = subprocess.run(
+        "lamin settings get branch",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.stdout.strip() == "archive"
     exit_status = os.system("lamin switch --branch main")
     assert exit_status == 0
-    assert ln_setup.settings.branch.uid == 12 * "m"
+    result = subprocess.run(
+        "lamin settings get branch",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.stdout.strip() == "main"
     exit_status = os.system("lamin create branch --name testbranch")
     exit_status = os.system("lamin switch --branch testbranch")
     assert exit_status == 0

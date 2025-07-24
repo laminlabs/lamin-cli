@@ -40,3 +40,23 @@ def set(setting: str, value: bool):
         settings_.auto_connect = value
     if setting == "private-django-api":
         settings_.private_django_api = value
+
+
+@settings.command("get")
+@click.argument(
+    "setting",
+    type=click.Choice(
+        ["auto-connect", "private-django-api", "space", "branch"], case_sensitive=False
+    ),
+)
+def get(setting: str):
+    """Get a setting."""
+    from lamindb_setup import settings as settings_
+
+    if setting == "branch":
+        _, value = settings_._read_branch_idlike_name()
+    elif setting == "space":
+        _, value = settings_._read_space_idlike_name()
+    else:
+        value = getattr(settings_, setting.replace("-", "_"))
+    click.echo(value)
