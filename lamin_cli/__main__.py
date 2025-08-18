@@ -19,6 +19,8 @@ from lamindb_setup._init_instance import (
     DOC_STORAGE_ARG,
 )
 
+from .urls import decompose_url
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -307,7 +309,12 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     lamin delete branch --name my_branch
     ```
     """
-    from lamindb_setup._delete import delete
+    from lamindb_setup import connect, delete
+
+    if entity.startswith("https://") and "lamin" in entity:
+        url = entity
+        instance, entity, uid = decompose_url(url)
+        connect(instance)
 
     if entity == "branch":
         assert name is not None, "You have to pass a name for deleting a branch."
