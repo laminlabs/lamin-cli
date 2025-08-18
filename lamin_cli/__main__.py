@@ -302,15 +302,17 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
-    Currently supported: `branch`, `artifact`, and `instance`.
+    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`.
 
     ```
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
     lamin delete instance --slug account/name
     lamin delete branch --name my_branch
     ```
     """
     from lamindb_setup import connect, delete
 
+    # TODO: refactor to abstract getting and deleting across entities
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
@@ -326,6 +328,16 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
         from lamindb import Artifact
 
         Artifact.get(uid).delete()
+    elif entity == "transform":
+        assert uid is not None, "You have to pass a uid for deleting an transform."
+        from lamindb import Transform
+
+        Transform.get(uid).delete()
+    elif entity == "collection":
+        assert uid is not None, "You have to pass a uid for deleting an collection."
+        from lamindb import Collection
+
+        Collection.get(uid).delete()
     elif entity == "instance":
         return delete(slug, force=force)
     else:  # backwars compatibility
