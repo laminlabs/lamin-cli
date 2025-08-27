@@ -48,7 +48,8 @@ def load(
             else:
                 new_content = transform.source_code
         else:  # R notebook
-            current_title = parse_title_r_notebook(transform.source_code)
+            new_content = transform.source_code
+            current_title = parse_title_r_notebook(new_content)
             if current_title is not None and current_title != transform.description:
                 pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
                 replacement = f'\\1"{transform.description}"\\3'
