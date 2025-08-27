@@ -6,6 +6,7 @@ from pathlib import Path
 
 from lamin_utils import logger
 
+from ._save import parse_title_r_notebook
 from .urls import decompose_url
 
 
@@ -47,27 +48,21 @@ def load(
             else:
                 new_content = transform.source_code
         else:  # R notebook
-            # Pattern to match title only within YAML header section
-            title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
-            title_match = re.search(
-                title_pattern, transform.source_code, flags=re.DOTALL | re.MULTILINE
-            )
             new_content = transform.source_code
-            if title_match:
-                current_title = title_match.group(1)
-                if current_title != transform.description:
-                    pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
-                    replacement = f'\\1"{transform.description}"\\3'
-                    new_content = re.sub(
-                        pattern,
-                        replacement,
-                        new_content,
-                        flags=re.DOTALL | re.MULTILINE,
-                    )
-                    logger.important(
-                        f"updated title to match description: {current_title} →"
-                        f" {transform.description}"
-                    )
+            current_title = parse_title_r_notebook(new_content)
+            if current_title is not None and current_title != transform.description:
+                pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
+                replacement = f'\\1"{transform.description}"\\3'
+                new_content = re.sub(
+                    pattern,
+                    replacement,
+                    new_content,
+                    flags=re.DOTALL | re.MULTILINE,
+                )
+                logger.important(
+                    f"updated title to match description: {current_title} →"
+                    f" {transform.description}"
+                )
         if bump_revision:
             uid = transform.uid
             if (

@@ -61,6 +61,16 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
+def parse_title_r_notebook(content: str) -> str | None:
+    # Pattern to match title only within YAML header section
+    title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
+    title_match = re.search(title_pattern, content, flags=re.DOTALL | re.MULTILINE)
+    if title_match:
+        return title_match.group(1)
+    else:
+        return None
+
+
 def save_from_path_cli(
     path: Path | str,
     key: str | None,
@@ -187,8 +197,7 @@ def save_from_path_cli(
                 )
                 return "delete-html-or-nb-html"
 
-        with path.open() as file:
-            content = file.read()
+        content = path.read_text()
         uid = parse_uid_from_code(content, path.suffix)
 
         if uid is not None:
@@ -218,7 +227,7 @@ def save_from_path_cli(
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
                     logger.important(
-                        f"found existing Transform('{uid}') with matching hash"
+                        f"found existing Transform('{transform.uid}') with matching hash"
                     )
                     return None
                 else:
@@ -241,6 +250,8 @@ def save_from_path_cli(
 
                 nb = read_notebook(path)
                 description = get_title(nb)
+            elif path.suffix in {".qmd", ".Rmd"}:
+                description = parse_title_r_notebook(content)
             else:
                 description = None
             transform = ln.Transform(
