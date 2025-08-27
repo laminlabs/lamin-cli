@@ -197,8 +197,7 @@ def save_from_path_cli(
                 )
                 return "delete-html-or-nb-html"
 
-        with path.open() as file:
-            content = file.read()
+        content = path.read_text()
         uid = parse_uid_from_code(content, path.suffix)
 
         if uid is not None:
@@ -252,7 +251,7 @@ def save_from_path_cli(
                 nb = read_notebook(path)
                 description = get_title(nb)
             elif path.suffix in {".qmd", ".Rmd"}:
-                description = parse_title_r_notebook(path.read_text())
+                description = parse_title_r_notebook(content)
             else:
                 description = None
             transform = ln.Transform(
