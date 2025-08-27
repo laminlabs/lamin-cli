@@ -218,7 +218,7 @@ def save_from_path_cli(
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
                     logger.important(
-                        f"found existing Transform('{uid}') with matching hash"
+                        f"found existing Transform('{transform.uid}') with matching hash"
                     )
                     return None
                 else:
