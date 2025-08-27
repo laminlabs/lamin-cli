@@ -61,6 +61,16 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
+def parse_title_r_notebook(content: str) -> str | None:
+    # Pattern to match title only within YAML header section
+    title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
+    title_match = re.search(title_pattern, content, flags=re.DOTALL | re.MULTILINE)
+    if title_match:
+        return title_match.group(1)
+    else:
+        return None
+
+
 def save_from_path_cli(
     path: Path | str,
     key: str | None,
@@ -241,6 +251,8 @@ def save_from_path_cli(
 
                 nb = read_notebook(path)
                 description = get_title(nb)
+            elif path.suffix in {".qmd", ".Rmd"}:
+                description = parse_title_r_notebook(path.read_text())
             else:
                 description = None
             transform = ln.Transform(
