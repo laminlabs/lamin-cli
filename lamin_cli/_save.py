@@ -226,10 +226,14 @@ def save_from_path_cli(
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
-                    logger.important(
-                        f"found existing Transform('{transform.uid}') with matching hash"
+                    if transform.type != "notebook":
+                        return None
+                    response = input(
+                        f"Found an existing Transform('{transform.uid}') with matching hash.\n"
+                        "Do you want to update it? (y/n) "
                     )
-                    return None
+                    if response != "y":
+                        return None
                 else:
                     # we need to create a new version
                     stem_uid = transform.uid[:12]
@@ -279,11 +283,11 @@ def save_from_path_cli(
                 response = input(
                     "You are trying to save a transform created by another user: Source"
                     " and report files will be tagged with *your* user id. Proceed?"
-                    " (y/n)"
+                    " (y/n) "
                 )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
-        if run is None and transform.key.endswith(".ipynb"):
+        if run is None and transform.type == "notebook":
             run = ln.Run(transform=transform).save()
             logger.important(
                 f"found no run, creating Run('{run.uid}') to display the html"
