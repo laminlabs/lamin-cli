@@ -228,10 +228,13 @@ def save_from_path_cli(
                 if transform.hash == transform_hash:
                     if transform.type != "notebook":
                         return None
-                    response = input(
-                        f"Found an existing Transform('{transform.uid}') with matching hash.\n"
-                        "Do you want to update it? (y/n) "
-                    )
+                    if os.getenv("LAMIN_TESTING") == "true":
+                        response = "y"
+                    else:
+                        response = input(
+                            f"Found an existing Transform('{transform.uid}') with matching hash.\n"
+                            "Do you want to update it? (y/n) "
+                        )
                     if response != "y":
                         return None
                 else:
@@ -277,7 +280,7 @@ def save_from_path_cli(
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run is not None and run.created_by.id != ln_setup.settings.user.id:
-            if os.environ.get("LAMIN_TESTING") == "true":
+            if os.getenv("LAMIN_TESTING") == "true":
                 response = "y"
             else:
                 response = input(
