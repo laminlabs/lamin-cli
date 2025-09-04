@@ -226,10 +226,18 @@ def save_from_path_cli(
             transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
-                    logger.important(
-                        f"found existing Transform('{transform.uid}') with matching hash"
-                    )
-                    return None
+                    if transform.type != "notebook":
+                        return None
+                    if os.getenv("LAMIN_TESTING") == "true":
+                        response = "y"
+                    else:
+                        response = input(
+                            f"Found an existing Transform('{transform.uid}') "
+                            "with matching source code hash.\n"
+                            "Do you want to update it? (y/n) "
+                        )
+                    if response != "y":
+                        return None
                 else:
                     # we need to create a new version
                     stem_uid = transform.uid[:12]
@@ -273,17 +281,17 @@ def save_from_path_cli(
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
         if run is not None and run.created_by.id != ln_setup.settings.user.id:
-            if os.environ.get("LAMIN_TESTING") == "true":
+            if os.getenv("LAMIN_TESTING") == "true":
                 response = "y"
             else:
                 response = input(
                     "You are trying to save a transform created by another user: Source"
                     " and report files will be tagged with *your* user id. Proceed?"
-                    " (y/n)"
+                    " (y/n) "
                 )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
-        if run is None and transform.key.endswith(".ipynb"):
+        if run is None and transform.type == "notebook":
             run = ln.Run(transform=transform).save()
             logger.important(
                 f"found no run, creating Run('{run.uid}') to display the html"
