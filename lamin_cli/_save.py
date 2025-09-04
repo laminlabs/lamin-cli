@@ -232,7 +232,8 @@ def save_from_path_cli(
                         response = "y"
                     else:
                         response = input(
-                            f"Found an existing Transform('{transform.uid}') with matching hash.\n"
+                            f"Found an existing Transform('{transform.uid}') "
+                            "with matching source code hash.\n"
                             "Do you want to update it? (y/n) "
                         )
                     if response != "y":
