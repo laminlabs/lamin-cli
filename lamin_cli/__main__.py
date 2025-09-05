@@ -116,8 +116,9 @@ def main():
 
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
-@click.option("--key", type=str, default=None, help="The legacy API key.")
+@click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
+    # note that the docstring needs to be synced with ln.setup.login()
     """Log into LaminHub.
 
     `lamin login` prompts for your API key unless you set it via environment variable `LAMIN_API_KEY`.
@@ -125,24 +126,12 @@ def login(user: str, key: str | None):
     You can create your API key in your account settings on LaminHub (top right corner).
 
     After authenticating once, you can re-authenticate and switch between accounts via `lamin login myhandle`.
+
+    See also: Login in a Python session via {func}`~lamindb.setup.login`.
     """
     from lamindb_setup._setup_user import login as login_
 
-    if user is None:
-        if "LAMIN_API_KEY" in os.environ:
-            api_key = os.environ["LAMIN_API_KEY"]
-        else:
-            api_key = input("Your API key: ")
-    else:
-        api_key = None
-
-    if key is not None:
-        click.echo(
-            "--key is deprecated and will be removed in the future, "
-            "use `lamin login` and enter your API key."
-        )
-
-    return login_(user, key=key, api_key=api_key)
+    return login_(user, key=key)
 
 
 @main.command()
@@ -177,7 +166,10 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Init an instance."""
+    """Init a LaminDB instance.
+
+    See also: Init in a Python session via {func}`~lamindb.setup.init`.
+    """
     from lamindb_setup._init_instance import init as init_
 
     return init_(storage=storage, db=db, modules=modules, name=name)
@@ -188,15 +180,13 @@ def init(
 @click.argument("instance", type=str)
 # fmt: on
 def connect(instance: str):
-    """Connect to an instance.
+    """Configure default instance for connections.
+
+    Python/R sessions and CLI commands will then auto-connect to the configured instance.
 
     Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
-    `lamin connect` switches
-    {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
-    auto-connect in a Python session upon importing `lamindb`.
-
-    Alternatively, you can connect in a Python session via {func}`~lamindb.connect`.
+    See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
     from lamindb_setup._connect_instance import _connect_cli
     return _connect_cli(instance)
@@ -204,13 +194,13 @@ def connect(instance: str):
 
 @main.command()
 def disconnect():
-    """Disconnect from an instance.
+    """Clear default instance configuration.
 
-    Is the opposite of connecting to an instance.
+    See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
-    from lamindb_setup import close as close_
+    from lamindb_setup import disconnect as disconnect_
 
-    return close_()
+    return disconnect_()
 
 
 # fmt: off
@@ -279,7 +269,10 @@ def switch(branch: str | None = None, space: str | None = None):
 @main.command()
 @click.option("--schema", is_flag=True, help="View database schema.")
 def info(schema: bool):
-    """Show info about the environment, instance, branch, space, and user."""
+    """Show info about the environment, instance, branch, space, and user.
+
+    See also: Print the instance settings in a Python session via {func}`~lamindb.setup.settings`.
+    """
     if schema:
         from lamindb_setup._schema import view
 
@@ -302,12 +295,12 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
-    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`.
+    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin delete instance --slug account/name
     lamin delete branch --name my_branch
+    lamin delete instance --slug account/name
     ```
     """
     from lamindb_setup import connect, delete
@@ -406,10 +399,14 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
     """Describe an artifact.
 
+    Examples:
+
     ```
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
     ```
+
+    See also: Describe an artifact in a Python session via {func}`~lamindb.Artifact.describe`.
     """
     _describe(entity=entity, uid=uid, key=key)
 
@@ -421,7 +418,7 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
 def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
     """Query metadata about an entity.
 
-    Currently still equivalent to `lamin describe`.
+    Currently equivalent to `lamin describe`.
     """
     logger.warning("please use `lamin describe` instead of `lamin get` to describe")
     _describe(entity=entity, uid=uid, key=key)
@@ -439,7 +436,7 @@ def get(entity: str = "artifact", uid: str | None = None, key: str | None = None
 def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
     """Save a file or folder.
 
-    Example: Given a valid project name "my_project".
+    Example: Given a valid project name "my_project",
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv --project my_project
@@ -467,7 +464,7 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
     """Annotate an artifact or a transform.
 
-    You can annotate with projects and valid features & values.
+    You can annotate with projects and valid features & values. For example,
 
     ```
     lamin annotate --key raw/sample.fastq --project "My Project"
@@ -530,7 +527,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
     This is an EXPERIMENTAL feature that enables to run a script on Modal.
 
-    Example: Given a valid project name "my_project".
+    Example: Given a valid project name "my_project",
 
     ```
     lamin run my_script.py --project my_project
