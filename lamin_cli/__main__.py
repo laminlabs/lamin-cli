@@ -295,7 +295,7 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
-    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`.
+    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
@@ -399,6 +399,8 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
     """Describe an artifact.
 
+    Examples:
+
     ```
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
@@ -434,7 +436,7 @@ def get(entity: str = "artifact", uid: str | None = None, key: str | None = None
 def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
     """Save a file or folder.
 
-    Example: Given a valid project name "my_project".
+    Example: Given a valid project name "my_project",
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv --project my_project
@@ -462,7 +464,7 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
     """Annotate an artifact or a transform.
 
-    You can annotate with projects and valid features & values.
+    You can annotate with projects and valid features & values. For example,
 
     ```
     lamin annotate --key raw/sample.fastq --project "My Project"
