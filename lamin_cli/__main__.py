@@ -118,6 +118,7 @@ def main():
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
+    # note that the docstring needs to be synced with ln.setup.login()
     """Log into LaminHub.
 
     `lamin login` prompts for your API key unless you set it via environment variable `LAMIN_API_KEY`.
@@ -125,6 +126,8 @@ def login(user: str, key: str | None):
     You can create your API key in your account settings on LaminHub (top right corner).
 
     After authenticating once, you can re-authenticate and switch between accounts via `lamin login myhandle`.
+
+    See also: login in a Python session via {func}`~lamindb.setup.login`.
     """
     from lamindb_setup._setup_user import login as login_
 
