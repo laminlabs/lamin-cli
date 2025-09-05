@@ -116,7 +116,7 @@ def main():
 
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
-@click.option("--key", type=str, default=None, help="The legacy API key.")
+@click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
     """Log into LaminHub.
 
@@ -128,21 +128,7 @@ def login(user: str, key: str | None):
     """
     from lamindb_setup._setup_user import login as login_
 
-    if user is None:
-        if "LAMIN_API_KEY" in os.environ:
-            api_key = os.environ["LAMIN_API_KEY"]
-        else:
-            api_key = input("Your API key: ")
-    else:
-        api_key = None
-
-    if key is not None:
-        click.echo(
-            "--key is deprecated and will be removed in the future, "
-            "use `lamin login` and enter your API key."
-        )
-
-    return login_(user, key=key, api_key=api_key)
+    return login_(user, key=key)
 
 
 @main.command()
