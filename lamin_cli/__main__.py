@@ -449,9 +449,9 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli._save import save_from_path_cli
+    from lamin_cli import save as save_
 
-    if save_from_path_cli(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
+    if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
 

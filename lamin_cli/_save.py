@@ -71,7 +71,7 @@ def parse_title_r_notebook(content: str) -> str | None:
         return None
 
 
-def save_from_path_cli(
+def save(
     path: Path | str,
     key: str | None,
     description: str | None,
