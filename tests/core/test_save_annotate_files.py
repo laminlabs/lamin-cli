@@ -90,7 +90,7 @@ def test_save_and_annotate_local_file():
     ln.ULabel(name="DMSO", type=ml_split_type).save()
     ln.ULabel(name="IFNG", type=ml_split_type).save()
     ln.Feature(name="perturbation", dtype=ml_split_type).save()
-
+    # can't find by key here because the artifact is not in the main branch
     result = subprocess.run(
         f"lamin annotate --uid {artifact.uid} --project test_project --features perturbation=DMSO,IFNG",
         shell=True,
@@ -104,9 +104,9 @@ def test_save_and_annotate_local_file():
     features = artifact.features.get_values()
     assert features["perturbation"] == {"DMSO", "IFNG"}
     assert project in artifact.projects.all()
-
+    # can't find by key here because the artifact is not in the main branch
     result = subprocess.run(
-        "lamin describe --key mytest",
+        f"lamin describe --uid {artifact.uid}",
         shell=True,
         capture_output=True,
     )
