@@ -41,7 +41,7 @@ def test_save_and_annotate_local_file():
     assert "labeled with project: test_project" in result.stdout.decode()
     assert result.returncode == 0
 
-    artifact = ln.Artifact.get(key="mytest")
+    artifact = ln.Artifact.get(key="mytest", branch=branch)
     assert artifact.branch == branch
     assert project in artifact.projects.all()
 
