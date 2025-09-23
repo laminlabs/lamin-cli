@@ -92,7 +92,7 @@ def test_save_and_annotate_local_file():
     ln.Feature(name="perturbation", dtype=ml_split_type).save()
 
     result = subprocess.run(
-        "lamin annotate --key mytest --project test_project --features perturbation=DMSO,IFNG",
+        f"lamin annotate --uid {artifact.uid} --project test_project --features perturbation=DMSO,IFNG",
         shell=True,
         capture_output=True,
     )
@@ -100,7 +100,7 @@ def test_save_and_annotate_local_file():
     print(result.stderr.decode())
     assert result.returncode == 0
 
-    artifact = ln.Artifact.get(key="mytest")
+    artifact = ln.Artifact.get(key="mytest", branch=branch)
     features = artifact.features.get_values()
     assert features["perturbation"] == {"DMSO", "IFNG"}
     assert project in artifact.projects.all()
