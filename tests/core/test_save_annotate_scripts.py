@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -8,7 +9,28 @@ from lamindb_setup import settings
 scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
-def test_save_without_uid():
+def test_save_resave_script_no_uids():
+    filepath = scripts_dir / "testscript.py"
+    filepath.write_text("print('hello')")
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "created Transform" in result.stdout.decode()
+    filepath.write_text("print('hello')\nprint('world')\n")
+    result = subprocess.run(
+        f"lamin save {filepath}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "created Transform" in result.stdout.decode()
+    assert ln.Transform.filter(key=filepath.name).count() == 2
+
+
+def test_save_and_annotate_without_uid():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-and-finish.py"
@@ -25,6 +47,15 @@ def test_save_without_uid():
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "labeled with project: test_project" in result.stdout.decode()
+
+    result = subprocess.run(
+        "lamin annotate --key run-track-and-finish.py --project test_project",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
 
 
 def test_run_save_cache_with_git_and_uid():
@@ -51,8 +82,8 @@ def test_run_save_cache_with_git_and_uid():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
+    # print(result.stdout.decode())
+    # print(result.stderr.decode())
     assert result.returncode == 0
     assert "loaded Transform" in result.stdout.decode()
     assert "m5uCHTTp" in result.stdout.decode()
@@ -172,7 +203,7 @@ if __name__ == "__main__":
         capture_output=True,
         env=env,
     )
-    # re-run the script through the second user
+    # re-run the script through a second user
     result = subprocess.run(
         f"python {filepath}",
         shell=True,
@@ -181,8 +212,7 @@ if __name__ == "__main__":
     )
     # print(result.stdout.decode())
     # print(result.stderr.decode())
-    assert result.returncode == 1
-    assert "already works on this draft" in result.stderr.decode()
+    assert result.returncode == 0
 
     # try to get the source code via command line
     result = subprocess.run(
