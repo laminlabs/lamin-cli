@@ -11,6 +11,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup._init_instance import (
     DOC_DB,
@@ -18,6 +19,13 @@ from lamindb_setup._init_instance import (
     DOC_MODULES,
     DOC_STORAGE_ARG,
 )
+
+from lamin_cli import connect as connect_
+from lamin_cli import disconnect as disconnect_
+from lamin_cli import init as init_
+from lamin_cli import login as login_
+from lamin_cli import logout as logout_
+from lamin_cli import save as save_
 
 from .urls import decompose_url
 
@@ -129,16 +137,12 @@ def login(user: str, key: str | None):
 
     See also: Login in a Python session via {func}`~lamindb.setup.login`.
     """
-    from lamindb_setup._setup_user import login as login_
-
     return login_(user, key=key)
 
 
 @main.command()
 def logout():
     """Log out of LaminHub."""
-    from lamindb_setup import logout as logout_
-
     return logout_()
 
 
@@ -170,8 +174,6 @@ def init(
 
     See also: Init in a Python session via {func}`~lamindb.setup.init`.
     """
-    from lamindb_setup._init_instance import init as init_
-
     return init_(storage=storage, db=db, modules=modules, name=name)
 
 
@@ -188,8 +190,7 @@ def connect(instance: str):
 
     See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
-    from lamindb_setup._connect_instance import _connect_cli
-    return _connect_cli(instance)
+    return connect_(instance)
 
 
 @main.command()
@@ -198,8 +199,6 @@ def disconnect():
 
     See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
-    from lamindb_setup import disconnect as disconnect_
-
     return disconnect_()
 
 
@@ -303,38 +302,9 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     lamin delete instance --slug account/name
     ```
     """
-    from lamindb_setup import connect, delete
+    from lamin_cli._delete import delete as delete_
 
-    # TODO: refactor to abstract getting and deleting across entities
-    if entity.startswith("https://") and "lamin" in entity:
-        url = entity
-        instance, entity, uid = decompose_url(url)
-        connect(instance)
-
-    if entity == "branch":
-        assert name is not None, "You have to pass a name for deleting a branch."
-        from lamindb import Branch
-
-        Branch.get(name=name).delete()
-    elif entity == "artifact":
-        assert uid is not None, "You have to pass a uid for deleting an artifact."
-        from lamindb import Artifact
-
-        Artifact.get(uid).delete()
-    elif entity == "transform":
-        assert uid is not None, "You have to pass a uid for deleting an transform."
-        from lamindb import Transform
-
-        Transform.get(uid).delete()
-    elif entity == "collection":
-        assert uid is not None, "You have to pass a uid for deleting an collection."
-        from lamindb import Collection
-
-        Collection.get(uid).delete()
-    elif entity == "instance":
-        return delete(slug, force=force)
-    else:  # backwars compatibility
-        return delete(entity, force=force)
+    return delete_(entity=entity, name=name, uid=uid, slug=slug, force=force)
 
 
 @main.command()
@@ -370,10 +340,6 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
 
 
 def _describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    import lamindb_setup as ln_setup
-
-    from ._load import decompose_url
-
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
@@ -449,8 +415,6 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli import save as save_
-
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
