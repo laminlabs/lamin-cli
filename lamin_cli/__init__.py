@@ -7,6 +7,9 @@ The interface is defined in `__main__.py`. The root API here is used by LaminR t
 
 __version__ = "1.7.2"
 
+from lamindb_setup._connect_instance import _connect_cli as connect
+from lamindb_setup._init_instance import init
+
 from ._save import save
 
-__all__ = ["save"]
+__all__ = ["save", "init", "connect"]

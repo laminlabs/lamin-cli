@@ -19,6 +19,10 @@ from lamindb_setup._init_instance import (
     DOC_STORAGE_ARG,
 )
 
+from lamin_cli import connect as connect_
+from lamin_cli import init as init_
+from lamin_cli import save as save_
+
 from .urls import decompose_url
 
 if TYPE_CHECKING:
@@ -170,8 +174,6 @@ def init(
 
     See also: Init in a Python session via {func}`~lamindb.setup.init`.
     """
-    from lamindb_setup._init_instance import init as init_
-
     return init_(storage=storage, db=db, modules=modules, name=name)
 
 
@@ -188,8 +190,7 @@ def connect(instance: str):
 
     See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
-    from lamindb_setup._connect_instance import _connect_cli
-    return _connect_cli(instance)
+    return connect_(instance)
 
 
 @main.command()
@@ -449,8 +450,6 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli import save as save_
-
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
