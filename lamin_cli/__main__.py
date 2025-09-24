@@ -242,9 +242,9 @@ def list_(entity: Literal["branch"], name: str | None = None):
     from lamindb.models import Branch, Space
 
     if entity == "branch":
-        print(Branch.df())
+        print(Branch.to_dataframe())
     else:
-        print(Space.df())
+        print(Space.to_dataframe())
 
 
 # fmt: off
