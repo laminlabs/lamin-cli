@@ -5,6 +5,11 @@ import lamindb as ln
 import lamindb_setup as ln_setup
 
 
+def test_create_project():
+    exit_status = os.system("lamin create project --name testproject")
+    assert exit_status == 0
+
+
 def test_branch():
     exit_status = os.system("lamin switch --branch archive")
     assert exit_status == 0
