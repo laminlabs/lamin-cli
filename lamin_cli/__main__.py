@@ -210,18 +210,22 @@ def disconnect():
 def create(entity: Literal["branch"], name: str | None = None):
     """Create a record for an entity.
 
-    Currently only supports creating a branch.
+    Currently only supports creating branches and projects.
 
     ```
     lamin create branch --name my_branch
+    lamin create project --name my_project
     ```
     """
-    assert entity == "branch", "Currently only supports creating a branch."
+    from lamindb.models import Branch, Project
 
-    from lamindb.models import Branch
-
-    branch = Branch(name=name).save()
-    logger.important(f"created branch: {branch.name}")
+    if entity == "branch":
+        record = Branch(name=name).save()
+    elif entity == "project":
+        record = Project(name=name).save()
+    else:
+        raise NotImplementedError(f"Creating {entity} is not implemented.")
+    logger.important(f"created {entity}: {record.name}")
 
 
 # fmt: off
