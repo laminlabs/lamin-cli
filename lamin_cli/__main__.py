@@ -210,18 +210,22 @@ def disconnect():
 def create(entity: Literal["branch"], name: str | None = None):
     """Create a record for an entity.
 
-    Currently only supports creating a branch.
+    Currently only supports creating branches and projects.
 
     ```
     lamin create branch --name my_branch
+    lamin create project --name my_project
     ```
     """
-    assert entity == "branch", "Currently only supports creating a branch."
+    from lamindb.models import Branch, Project
 
-    from lamindb.models import Branch
-
-    branch = Branch(name=name).save()
-    logger.important(f"created branch: {branch.name}")
+    if entity == "branch":
+        record = Branch(name=name).save()
+    elif entity == "project":
+        record = Project(name=name).save()
+    else:
+        raise NotImplementedError(f"Creating {entity} is not implemented.")
+    logger.important(f"created {entity}: {record.name}")
 
 
 # fmt: off
@@ -320,9 +324,9 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
     Pass a URL, `artifact`, or `transform`. For example:
 
     ```
-    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
     lamin load artifact --key mydatasets/mytable.parquet
-    lamin load artifact --uid e2G7k9EVul4JbfsEYAy5
+    lamin load artifact --uid e2G7k9EVul4JbfsE
     lamin load transform --key analysis.ipynb
     lamin load transform --uid Vul4JbfsEYAy5
     lamin load transform --uid Vul4JbfsEYAy5 --with-env
