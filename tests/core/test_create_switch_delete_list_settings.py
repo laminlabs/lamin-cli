@@ -1,5 +1,6 @@
 import os
 import subprocess
+from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
@@ -45,3 +46,38 @@ def test_space():
     exit_status = os.system("lamin switch --space all")
     assert exit_status == 0
     assert ln_setup.settings.space.uid == 12 * "a"
+
+
+def test_work_dir():
+    # default work-dir is None
+    result = subprocess.run(
+        "lamin settings get work-dir",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.stdout.strip() == "None"
+    assert ln_setup.settings.work_dir is None
+    # set work-dir to tmp_path
+    this_path = Path(__file__).resolve()
+    exit_status = os.system(f"lamin settings set work-dir {this_path.parent}")
+    assert exit_status == 0
+    result = subprocess.run(
+        "lamin settings get work-dir",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.stdout.strip() == str(this_path.parent)
+    assert ln_setup.settings.work_dir == this_path.parent
+    # unset work-dir
+    exit_status = os.system("lamin settings set work-dir none")
+    assert exit_status == 0
+    result = subprocess.run(
+        "lamin settings get work-dir",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.stdout.strip() == "None"
+    assert ln_setup.settings.work_dir is None
