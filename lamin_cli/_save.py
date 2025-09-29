@@ -80,7 +80,7 @@ def save(
     space: str | None = None,
     branch: str | None = None,
     registry: str | None = None,
-) -> str | None = None:
+) -> str | None:
     import lamindb as ln
     from lamindb._finish import save_context_core
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
