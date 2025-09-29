@@ -73,14 +73,14 @@ def parse_title_r_notebook(content: str) -> str | None:
 
 def save(
     path: Path | str,
-    key: str | None,
-    description: str | None,
-    stem_uid: str | None,
-    project: str | None,
-    space: str | None,
-    branch: str | None,
-    registry: str | None,
-) -> str | None:
+    key: str | None = None,
+    description: str | None = None,
+    stem_uid: str | None = None,
+    project: str | None = None,
+    space: str | None = None,
+    branch: str | None = None,
+    registry: str | None = None,
+) -> str | None = None:
     import lamindb as ln
     from lamindb._finish import save_context_core
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
