@@ -94,10 +94,8 @@ def test_save_consecutive_user_passes_uid():
         env=env,
     )
     assert result.returncode == 0
-    assert (
-        "loaded Transform('hlsFXswrJjtt0000'), started new Run"
-        in notebook_path.read_text()
-    )
+    assert "loaded Transform('hlsFXswrJjtt0000'" in notebook_path.read_text()
+    assert "started new Run" in notebook_path.read_text()
 
     # now let's simulate the interactive use case and use nbproject_test again
     # use the stem uid instead and it will bump the version
@@ -107,10 +105,8 @@ def test_save_consecutive_user_passes_uid():
     assert r"ln.track(\"hlsFXswrJjtt\")" in notebook_path.read_text()
 
     nbproject_test.execute_notebooks(notebook_path, print_outputs=True)
-    assert (
-        "created Transform('hlsFXswrJjtt0001'), started new"
-        in notebook_path.read_text()
-    )
+    assert "created Transform('hlsFXswrJjtt0001'" in notebook_path.read_text()
+    assert "started new Run" in notebook_path.read_text()
 
     # now, there is a transform record, but we're missing all artifacts because ln.finish() wasn't called
     transform = ln.Transform.filter(uid="hlsFXswrJjtt0001").one_or_none()
