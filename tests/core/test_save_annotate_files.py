@@ -45,9 +45,10 @@ def test_save_and_annotate_local_file():
     assert artifact.branch == branch
     assert project in artifact.projects.all()
 
-    # test passing the registry and saving the same file
+    # test passing the registry and saving the same file on the main branch
+    # it should recognize the file on the contrib1 branch
     result = subprocess.run(
-        f"lamin save {filepath} --key mytest --registry artifact --branch contrib1",
+        f"lamin save {filepath} --key mytest --registry artifact",
         shell=True,
         capture_output=True,
     )
@@ -73,7 +74,7 @@ def test_save_and_annotate_local_file():
     assert result.returncode == 1
 
     result = subprocess.run(
-        f"lamin save {filepath} --key mytest --registry artifact --branch contrib1",
+        f"lamin save {filepath} --key mytest --registry artifact",
         shell=True,
         capture_output=True,
     )
