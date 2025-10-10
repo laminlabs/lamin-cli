@@ -47,7 +47,7 @@ def test_save_and_annotate_local_file():
 
     # test passing the registry and saving the same file
     result = subprocess.run(
-        f"lamin save {filepath} --key mytest --registry artifact",
+        f"lamin save {filepath} --key mytest --registry artifact --branch contrib1",
         shell=True,
         capture_output=True,
     )
@@ -73,7 +73,7 @@ def test_save_and_annotate_local_file():
     assert result.returncode == 1
 
     result = subprocess.run(
-        f"lamin save {filepath} --key mytest --registry artifact",
+        f"lamin save {filepath} --key mytest --registry artifact --branch contrib1",
         shell=True,
         capture_output=True,
     )

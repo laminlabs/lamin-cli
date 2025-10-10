@@ -104,12 +104,14 @@ def save(
             raise ln.errors.InvalidArgument(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
+    space_record = None
     if space is not None:
         space_record = ln.Space.filter(ln.Q(name=space) | ln.Q(uid=space)).one_or_none()
         if space_record is None:
             raise ln.errors.InvalidArgument(
                 f"Space '{space}' not found, either create it on LaminHub or fix typos."
             )
+    branch_record = None
     if branch is not None:
         branch_record = ln.Branch.filter(
             ln.Q(name=branch) | ln.Q(uid=branch)
@@ -141,12 +143,14 @@ def save(
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
 
-        artifact = ln.Artifact(path, key=key, description=description, revises=revises)
-        if space is not None:
-            artifact.space = space_record
-        if branch is not None:
-            artifact.branch = branch_record
-        artifact.save()
+        artifact = ln.Artifact(
+            path,
+            key=key,
+            description=description,
+            revises=revises,
+            branch=branch_record,
+            space=space_record,
+        ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if artifact.storage.type == "s3":
