@@ -467,7 +467,7 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
     if key is not None:
         artifact = model.get(key=key)
     elif uid is not None:
-        artifact = model.get(uid)
+        artifact = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
     else:
         raise ln.errors.InvalidArgument("Either --key or --uid must be provided")
 
