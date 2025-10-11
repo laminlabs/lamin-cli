@@ -424,7 +424,7 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 
 
 @main.command()
-@click.argument("entity", type=str, default=None)
+@click.argument("entity", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
