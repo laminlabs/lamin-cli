@@ -424,13 +424,15 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 
 
 @main.command()
+@click.argument("entity", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on key suffix.")
-def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
-    """Annotate an artifact or a transform.
+def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
+    """Annotate an artifact or transform.
+
+    Entity is either 'artifact' or 'transform'. If not passed, chooses based on key suffix.
 
     You can annotate with projects and valid features & values. For example,
 
@@ -445,11 +447,17 @@ def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
     from lamin_cli._annotate import _parse_features_list
     from lamin_cli._save import infer_registry_from_path
 
-    if registry is None:
+    # once we enable passing the URL as entity, then we don't need to throw this error
+    if not ln.setup.settings._instance_exists:
+        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
+
+    if entity is None:
         if key is not None:
             registry = infer_registry_from_path(key)
         else:
             registry = "artifact"
+    else:
+        registry = entity
     if registry == "artifact":
         model = ln.Artifact
     else:
@@ -459,7 +467,7 @@ def annotate(key: str, uid: str, project: str, registry: str, features: tuple):
     if key is not None:
         artifact = model.get(key=key)
     elif uid is not None:
-        artifact = model.get(uid=uid)
+        artifact = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
     else:
         raise ln.errors.InvalidArgument("Either --key or --uid must be provided")
 
