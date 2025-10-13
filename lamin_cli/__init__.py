@@ -5,7 +5,7 @@ This is the command line interface for interacting with LaminDB & LaminHub.
 The interface is defined in `__main__.py`. The root API here is used by LaminR to replicate the CLI functionality.
 """
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 from lamindb_setup import disconnect, logout
 from lamindb_setup._connect_instance import _connect_cli as connect
