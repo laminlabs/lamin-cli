@@ -180,8 +180,9 @@ def init(
 # fmt: off
 @main.command()
 @click.argument("instance", type=str)
+@click.option("--use_proxy_db", is_flag=True, help="Use proxy database connection.")
 # fmt: on
-def connect(instance: str):
+def connect(instance: str, use_proxy_db: bool):
     """Configure default instance for connections.
 
     Python/R sessions and CLI commands will then auto-connect to the configured instance.
@@ -190,7 +191,7 @@ def connect(instance: str):
 
     See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
-    return connect_(instance)
+    return connect_(instance, use_proxy_db=use_proxy_db)
 
 
 @main.command()
