@@ -54,7 +54,7 @@ def test_save_and_annotate_local_file():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert "returning existing artifact with same hash" in result.stdout.decode()
+    assert "returning artifact with same hash" in result.stdout.decode()
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
     assert result.returncode == 0
@@ -80,7 +80,7 @@ def test_save_and_annotate_local_file():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert "returning existing artifact with same hash" in result.stdout.decode()
+    assert "returning artifact with same hash" in result.stdout.decode()
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
     assert result.returncode == 0
