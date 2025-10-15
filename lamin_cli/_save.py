@@ -160,7 +160,8 @@ def save(
             logger.important(f"labeled with project: {project_record.name}")
         if ln.setup.settings.instance.is_remote:
             slug = ln.setup.settings.instance.slug
-            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
+            ui_url = ln.setup.settings.instance.ui_url
+            logger.important(f"go to: {ui_url}/{slug}/artifact/{artifact.uid}")
         return None
 
     if registry == "transform":
