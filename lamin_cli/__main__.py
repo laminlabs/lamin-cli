@@ -201,9 +201,10 @@ def connect(instance: str, use_proxy_db: bool):
 def clone(
     instance: str, copy_suffix: str | None
 ):
-    """Load a remote SQLite clone.
+    """Load an instance as a clone.
 
-    This function is the main building block for loading remote clones.
+    A clone is a complete SQLite copy of a remote postgres instance.
+    It works without an AWS RDS connection, allowing use behind firewalls.
 
     Args:
         instance: Instance slug in the form `account/name` (e.g., `laminlabs/privatedata-local`).
