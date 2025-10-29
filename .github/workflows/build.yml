@@ -27,7 +27,7 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          BASE_GROUPS=$(jq -n -c '["core", "integration"]')
+          BASE_GROUPS=$(jq -n -c '[]')
 
           if [[ "${{ github.event_name }}" == "push" || "${{ steps.changes.outputs.modal }}" == "true" ]]; then
             # Run everything on push or when modal paths change
