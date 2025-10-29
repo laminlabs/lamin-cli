@@ -15,4 +15,4 @@ from lamindb_setup._setup_user import login
 from ._delete import delete
 from ._save import save
 
-__all__ = ["save", "init", "connect", "delete", "login", "disconnect"]
+__all__ = ["save", "init", "connect", "clone", "delete", "login", "disconnect"]

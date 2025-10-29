@@ -13,6 +13,17 @@ from .urls import decompose_url
 def load(
     entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False
 ):
+    """Load artifact, collection, or transform from LaminDB.
+
+    Args:
+        entity: URL containing 'lamin', or 'artifact', 'collection', or 'transform'
+        uid: Unique identifier (prefix matching supported)
+        key: Key identifier
+        with_env: If True, also load environment requirements file for transforms
+
+    Returns:
+        Path to loaded transform, or None for artifacts/collections
+    """
     import lamindb_setup as ln_setup
 
     if entity.startswith("https://") and "lamin" in entity:
