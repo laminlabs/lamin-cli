@@ -194,6 +194,26 @@ def connect(instance: str, use_proxy_db: bool):
     return connect_(instance, use_proxy_db=use_proxy_db)
 
 
+# fmt: off
+@click.argument("instance", type=str)
+@click.argument("copy_suffix", type=str)
+# fmt: on
+def clone(
+    instance: str, copy_suffix: str | None
+):
+    """Load a remote SQLite clone.
+
+    This function is the main building block for loading remote clones.
+
+    Args:
+        instance: Instance slug in the form `account/name` (e.g., `laminlabs/privatedata-local`).
+        copy_suffix: Optional suffix of the local clone.
+    """
+    import lamindb_setup as ln_setup
+
+    ln_setup.core._clone.connect_remote_sqlite(instance=instance, copy_suffix=copy_suffix)
+
+
 @main.command()
 def disconnect():
     """Clear default instance configuration.
