@@ -13,7 +13,7 @@ def test_run_save_cache():
     filepath = scripts_dir / "run-track.R"
 
     transform = ln.Transform(
-        uid="EPnfDtJz8qbE0000", name="run-track.R", key="run-track.R", type="script"
+        uid="EPnfDtJz8qbE0000", key="run-track.R", type="script"
     ).save()
     ln.Run(transform=transform).save()
 
@@ -38,7 +38,6 @@ def test_run_save_cache():
 
     transform = ln.Transform(
         uid="HPnfDtJz8qbE0000",
-        name="run-track.qmd",
         key="run-track.qmd",
         type="notebook",
     ).save()

@@ -11,6 +11,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup._init_instance import (
     DOC_DB,
@@ -19,8 +20,45 @@ from lamindb_setup._init_instance import (
     DOC_STORAGE_ARG,
 )
 
+from lamin_cli import connect as connect_
+from lamin_cli import disconnect as disconnect_
+from lamin_cli import init as init_
+from lamin_cli import login as login_
+from lamin_cli import logout as logout_
+from lamin_cli import save as save_
+
+from .urls import decompose_url
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+COMMAND_GROUPS = {
+    "lamin": [
+        {
+            "name": "Manage connections",
+            "commands": ["connect", "info", "init", "disconnect"],
+        },
+        {
+            "name": "Load, save, create & delete data",
+            "commands": ["load", "save", "create", "delete"],
+        },
+        {
+            "name": "Describe, annotate & list data",
+            "commands": ["describe", "annotate", "list"],
+        },
+        {
+            "name": "Configure",
+            "commands": ["checkout", "switch", "cache", "settings", "migrate"],
+        },
+        {
+            "name": "Auth",
+            "commands": [
+                "login",
+                "logout",
+            ],
+        },
+    ]
+}
 
 # https://github.com/ewels/rich-click/issues/19
 # Otherwise rich-click takes over the formatting.
@@ -46,30 +84,6 @@ if os.environ.get("NO_RICH"):
 
 else:
     import rich_click as click
-
-    COMMAND_GROUPS = {
-        "lamin": [
-            {
-                "name": "Connect to an instance",
-                "commands": ["connect", "disconnect", "info", "init", "run"],
-            },
-            {
-                "name": "Read & write data",
-                "commands": ["load", "save", "get", "delete", "create", "list"],
-            },
-            {
-                "name": "Configure",
-                "commands": ["checkout", "switch", "cache", "settings", "migrate"],
-            },
-            {
-                "name": "Auth",
-                "commands": [
-                    "login",
-                    "logout",
-                ],
-            },
-        ]
-    }
 
     def lamin_group_decorator(f):
         @click.rich_config(
@@ -104,14 +118,15 @@ except PackageNotFoundError:
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb")
 def main():
-    """Configure LaminDB and perform simple actions."""
+    """Manage data with LaminDB instances."""
     silence_loggers()
 
 
 @main.command()
 @click.argument("user", type=str, default=None, required=False)
-@click.option("--key", type=str, default=None, help="The legacy API key.")
+@click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
+    # note that the docstring needs to be synced with ln.setup.login()
     """Log into LaminHub.
 
     `lamin login` prompts for your API key unless you set it via environment variable `LAMIN_API_KEY`.
@@ -119,31 +134,15 @@ def login(user: str, key: str | None):
     You can create your API key in your account settings on LaminHub (top right corner).
 
     After authenticating once, you can re-authenticate and switch between accounts via `lamin login myhandle`.
+
+    See also: Login in a Python session via {func}`~lamindb.setup.login`.
     """
-    from lamindb_setup._setup_user import login as login_
-
-    if user is None:
-        if "LAMIN_API_KEY" in os.environ:
-            api_key = os.environ["LAMIN_API_KEY"]
-        else:
-            api_key = input("Your API key: ")
-    else:
-        api_key = None
-
-    if key is not None:
-        click.echo(
-            "--key is deprecated and will be removed in the future, "
-            "use `lamin login` and enter your API key."
-        )
-
-    return login_(user, key=key, api_key=api_key)
+    return login_(user, key=key)
 
 
 @main.command()
 def logout():
     """Log out of LaminHub."""
-    from lamindb_setup import logout as logout_
-
     return logout_()
 
 
@@ -171,43 +170,37 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Init an instance."""
-    from lamindb_setup._init_instance import init as init_
+    """Init a LaminDB instance.
 
+    See also: Init in a Python session via {func}`~lamindb.setup.init`.
+    """
     return init_(storage=storage, db=db, modules=modules, name=name)
 
 
 # fmt: off
 @main.command()
 @click.argument("instance", type=str)
+@click.option("--use_proxy_db", is_flag=True, help="Use proxy database connection.")
 # fmt: on
-def connect(instance: str):
-    """Connect to an instance.
+def connect(instance: str, use_proxy_db: bool):
+    """Configure default instance for connections.
+
+    Python/R sessions and CLI commands will then auto-connect to the configured instance.
 
     Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
-    `lamin connect` switches
-    {attr}`~lamindb.setup.core.SetupSettings.auto_connect` to `True` so that you
-    auto-connect in a Python session upon importing `lamindb`.
-
-    For manually connecting in a Python session, use {func}`~lamindb.connect`.
+    See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
-    from lamindb_setup import connect as connect_
-    from lamindb_setup import settings as settings_
-
-    settings_.auto_connect = True
-    return connect_(instance, _reload_lamindb=False, _write_settings=True)
+    return connect_(instance, use_proxy_db=use_proxy_db)
 
 
 @main.command()
 def disconnect():
-    """Disconnect from an instance.
+    """Clear default instance configuration.
 
-    Is the opposite of connecting to an instance.
+    See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
-    from lamindb_setup import close as close_
-
-    return close_()
+    return disconnect_()
 
 
 # fmt: off
@@ -218,18 +211,22 @@ def disconnect():
 def create(entity: Literal["branch"], name: str | None = None):
     """Create a record for an entity.
 
-    Currently only supports creating a branch.
+    Currently only supports creating branches and projects.
 
     ```
     lamin create branch --name my_branch
+    lamin create project --name my_project
     ```
     """
-    assert entity == "branch", "Currently only supports creating a branch."
+    from lamindb.models import Branch, Project
 
-    from lamindb.models import Branch
-
-    branch = Branch(name=name).save()
-    logger.important(f"created branch: {branch.name}")
+    if entity == "branch":
+        record = Branch(name=name).save()
+    elif entity == "project":
+        record = Project(name=name).save()
+    else:
+        raise NotImplementedError(f"Creating {entity} is not implemented.")
+    logger.important(f"created {entity}: {record.name}")
 
 
 # fmt: off
@@ -250,9 +247,9 @@ def list_(entity: Literal["branch"], name: str | None = None):
     from lamindb.models import Branch, Space
 
     if entity == "branch":
-        print(Branch.df())
+        print(Branch.to_dataframe())
     else:
-        print(Space.df())
+        print(Space.to_dataframe())
 
 
 # fmt: off
@@ -263,7 +260,10 @@ def list_(entity: Literal["branch"], name: str | None = None):
 def switch(branch: str | None = None, space: str | None = None):
     """Switch between branches or spaces.
 
-    Currently only supports creating a branch.
+    ```
+    lamin switch --branch my_branch
+    lamin switch --space our_space
+    ```
     """
     from lamindb.setup import switch as switch_
 
@@ -273,7 +273,10 @@ def switch(branch: str | None = None, space: str | None = None):
 @main.command()
 @click.option("--schema", is_flag=True, help="View database schema.")
 def info(schema: bool):
-    """Show info about current instance."""
+    """Show info about the environment, instance, branch, space, and user.
+
+    See also: Print the instance settings in a Python session via {func}`~lamindb.setup.settings`.
+    """
     if schema:
         from lamindb_setup._schema import view
 
@@ -296,29 +299,17 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
     """Delete an entity.
 
-    Currently supported: `branch`, `artifact`, and `instance`.
+    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
-    lamin delete instance --slug account/name
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
     lamin delete branch --name my_branch
+    lamin delete instance --slug account/name
     ```
     """
-    from lamindb_setup._delete import delete
+    from lamin_cli._delete import delete as delete_
 
-    if entity == "branch":
-        assert name is not None, "You have to pass a name for deleting a branch."
-        from lamindb import Branch
-
-        Branch.get(name=name).delete()
-    elif entity == "artifact":
-        assert uid is not None, "You have to pass a uid for deleting an artifact."
-        from lamindb import Artifact
-
-        Artifact.get(uid).delete()
-    elif entity == "instance":
-        return delete(slug, force=force)
-    else:  # backwars compatibility
-        return delete(entity, force=force)
+    return delete_(entity=entity, name=name, uid=uid, slug=slug, force=force)
 
 
 @main.command()
@@ -329,14 +320,14 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def load(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
-    """Load a file or folder.
+    """Load a file or folder into the cache or working directory.
 
     Pass a URL, `artifact`, or `transform`. For example:
 
     ```
-    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
     lamin load artifact --key mydatasets/mytable.parquet
-    lamin load artifact --uid e2G7k9EVul4JbfsEYAy5
+    lamin load artifact --uid e2G7k9EVul4JbfsE
     lamin load transform --key analysis.ipynb
     lamin load transform --uid Vul4JbfsEYAy5
     lamin load transform --uid Vul4JbfsEYAy5 --with-env
@@ -344,34 +335,16 @@ def load(entity: str, uid: str | None = None, key: str | None = None, with_env: 
     """
     is_slug = entity.count("/") == 1
     if is_slug:
-        from lamindb_setup import connect
-        from lamindb_setup import settings as settings_
-
-        # can decide whether we want to actually deprecate
-        # click.echo(
-        #     f"! please use: lamin connect {entity}"
-        # )
-        settings_.auto_connect = True
-        return connect(entity, _reload_lamindb=False, _write_settings=True)
+        from lamindb_setup._connect_instance import _connect_cli
+        # for backward compat and convenience, connect to the instance
+        return _connect_cli(entity)
     else:
         from lamin_cli._load import load as load_
 
         return load_(entity, uid=uid, key=key, with_env=with_env)
 
 
-@main.command()
-@click.argument("entity", type=str)
-@click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
-def get(entity: str, uid: str | None = None, key: str | None = None):
-    """Query metadata about an entity.
-
-    Currently only works for artifact.
-    """
-    import lamindb_setup as ln_setup
-
-    from ._load import decompose_url
-
+def _describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
@@ -391,6 +364,38 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
 
 
 @main.command()
+@click.argument("entity", type=str, default="artifact")
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
+def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+    """Describe an artifact.
+
+    Examples:
+
+    ```
+    lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
+    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
+    ```
+
+    See also: Describe an artifact in a Python session via {func}`~lamindb.Artifact.describe`.
+    """
+    _describe(entity=entity, uid=uid, key=key)
+
+
+@main.command()
+@click.argument("entity", type=str, default="artifact")
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity.")
+def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+    """Query metadata about an entity.
+
+    Currently equivalent to `lamin describe`.
+    """
+    logger.warning("please use `lamin describe` instead of `lamin get` to describe")
+    _describe(entity=entity, uid=uid, key=key)
+
+
+@main.command()
 @click.argument("path", type=str)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
@@ -402,7 +407,7 @@ def get(entity: str, uid: str | None = None, key: str | None = None):
 def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
     """Save a file or folder.
 
-    Example: Given a valid project name "my_project".
+    Example: Given a valid project name "my_project",
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv --project my_project
@@ -415,10 +420,76 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
     """
-    from lamin_cli._save import save_from_path_cli
-
-    if save_from_path_cli(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
+    if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
+
+
+@main.command()
+@click.argument("entity", type=str, default=None, required=False)
+@click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
+@click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
+@click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
+def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
+    """Annotate an artifact or transform.
+
+    Entity is either 'artifact' or 'transform'. If not passed, chooses based on key suffix.
+
+    You can annotate with projects and valid features & values. For example,
+
+    ```
+    lamin annotate --key raw/sample.fastq --project "My Project"
+    lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
+    lamin annotate --key my-notebook.ipynb --project "My Project"
+    ```
+    """
+    import lamindb as ln
+
+    from lamin_cli._annotate import _parse_features_list
+    from lamin_cli._save import infer_registry_from_path
+
+    # once we enable passing the URL as entity, then we don't need to throw this error
+    if not ln.setup.settings._instance_exists:
+        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
+
+    if entity is None:
+        if key is not None:
+            registry = infer_registry_from_path(key)
+        else:
+            registry = "artifact"
+    else:
+        registry = entity
+    if registry == "artifact":
+        model = ln.Artifact
+    else:
+        model = ln.Transform
+
+    # Get the artifact
+    if key is not None:
+        artifact = model.get(key=key)
+    elif uid is not None:
+        artifact = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
+    else:
+        raise ln.errors.InvalidArgument("Either --key or --uid must be provided")
+
+    # Handle project annotation
+    if project is not None:
+        project_record = ln.Project.filter(
+            ln.Q(name=project) | ln.Q(uid=project)
+        ).one_or_none()
+        if project_record is None:
+            raise ln.errors.InvalidArgument(
+                f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
+            )
+        artifact.projects.add(project_record)
+
+    # Handle feature annotations
+    if features:
+        feature_dict = _parse_features_list(features)
+        artifact.features.add_values(feature_dict)
+
+    artifact_rep = artifact.key if artifact.key else artifact.description if artifact.description else artifact.uid
+    logger.important(f"annotated {registry}: {artifact_rep}")
 
 
 @main.command()
@@ -433,7 +504,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
     This is an EXPERIMENTAL feature that enables to run a script on Modal.
 
-    Example: Given a valid project name "my_project".
+    Example: Given a valid project name "my_project",
 
     ```
     lamin run my_script.py --project my_project
