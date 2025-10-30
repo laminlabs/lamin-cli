@@ -48,36 +48,36 @@ def test_space():
     assert ln_setup.settings.space.uid == 12 * "a"
 
 
-def test_work_dir():
-    # default work-dir is None
+def test_dev_dir():
+    # default dev-dir is None
     result = subprocess.run(
-        "lamin settings get work-dir",
+        "lamin settings get dev-dir",
         capture_output=True,
         text=True,
         shell=True,
     )
     assert result.stdout.strip() == "None"
-    assert ln_setup.settings.work_dir is None
-    # set work-dir to tmp_path
+    assert ln_setup.settings.dev_dir is None
+    # set dev-dir to tmp_path
     this_path = Path(__file__).resolve()
-    exit_status = os.system(f"lamin settings set work-dir {this_path.parent}")
+    exit_status = os.system(f"lamin settings set dev-dir {this_path.parent}")
     assert exit_status == 0
     result = subprocess.run(
-        "lamin settings get work-dir",
+        "lamin settings get dev-dir",
         capture_output=True,
         text=True,
         shell=True,
     )
     assert result.stdout.strip() == str(this_path.parent)
-    assert ln_setup.settings.work_dir == this_path.parent
-    # unset work-dir
-    exit_status = os.system("lamin settings set work-dir none")
+    assert ln_setup.settings.dev_dir == this_path.parent
+    # unset dev-dir
+    exit_status = os.system("lamin settings set dev-dir none")
     assert exit_status == 0
     result = subprocess.run(
-        "lamin settings get work-dir",
+        "lamin settings get dev-dir",
         capture_output=True,
         text=True,
         shell=True,
     )
     assert result.stdout.strip() == "None"
-    assert ln_setup.settings.work_dir is None
+    assert ln_setup.settings.dev_dir is None
