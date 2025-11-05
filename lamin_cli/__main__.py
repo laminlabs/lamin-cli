@@ -36,7 +36,7 @@ COMMAND_GROUPS = {
     "lamin": [
         {
             "name": "Manage connections",
-            "commands": ["connect", "info", "init", "disconnect"],
+            "commands": ["connect", "info", "init", "clone", "disconnect"],
         },
         {
             "name": "Load, save, create & delete data",
@@ -195,6 +195,7 @@ def connect(instance: str, use_proxy_db: bool):
 
 
 # fmt: off
+@main.command()
 @click.argument("instance", type=str, help="Instance slug in the form `account/name` (e.g., `laminlabs/cellxgene`).")
 @click.option("--overwrite", is_flag=True, default=False, help="Whether to overwrite existing clones.")
 # fmt: on
@@ -202,14 +203,14 @@ def clone(
     instance: str,
     overwrite: bool
 ):
-    """Load an instance as a clone.
+    """Load an instance as a local copy - a clone.
 
     A clone is a complete SQLite copy of a remote postgres instance.
     It works without an AWS RDS connection, allowing use behind firewalls.
 
-    Args:
-        instance: Instance slug in the form `account/name` (e.g., `laminlabs/privatedata-local`).
-        overwrite: Whether to overwrite existing clones.
+    ```
+    lamin clone laminlabs/cellxgene
+    ```
     """
     import lamindb_setup as ln_setup
 
