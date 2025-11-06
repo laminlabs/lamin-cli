@@ -197,11 +197,9 @@ def connect(instance: str, use_proxy_db: bool):
 # fmt: off
 @main.command()
 @click.argument("instance", type=str, help="Instance slug in the form `account/name` (e.g., `laminlabs/cellxgene`).")
-@click.option("--overwrite", is_flag=True, default=False, help="Whether to overwrite existing clones.")
 # fmt: on
 def clone(
     instance: str,
-    overwrite: bool
 ):
     """Load an instance as a local copy - a clone.
 
@@ -214,7 +212,7 @@ def clone(
     """
     import lamindb_setup as ln_setup
 
-    ln_setup.core._clone.connect_remote_sqlite(instance=instance, overwrite=overwrite)
+    ln_setup.core._clone.connect_remote_sqlite(instance=instance)
 
 
 @main.command()

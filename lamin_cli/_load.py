@@ -159,8 +159,7 @@ def load(
 
             EntityClass = ln.Artifact if entity == "artifact" else ln.Collection
 
-            # we don't use .get here because DoesNotExist is hard to catch
-            # due to private django API
+            # we don't use .get here because DoesNotExist is hard to catch due to private django API
             # we use `.objects` here because we don't want to exclude kind = __lamindb_run__ artifacts
             if query_by_uid:
                 entities = EntityClass.objects.filter(uid__startswith=uid)
