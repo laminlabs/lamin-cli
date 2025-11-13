@@ -9,6 +9,7 @@ def delete(
     name: str | None = None,
     uid: str | None = None,
     slug: str | None = None,
+    permanent: bool = False,
     force: bool = False,
 ):
     # TODO: refactor to abstract getting and deleting across entities
@@ -21,22 +22,22 @@ def delete(
         assert name is not None, "You have to pass a name for deleting a branch."
         from lamindb import Branch
 
-        Branch.get(name=name).delete()
+        Branch.get(name=name).delete(permanent=permanent)
     elif entity == "artifact":
         assert uid is not None, "You have to pass a uid for deleting an artifact."
         from lamindb import Artifact
 
-        Artifact.get(uid).delete()
+        Artifact.get(uid).delete(permanent=permanent)
     elif entity == "transform":
         assert uid is not None, "You have to pass a uid for deleting an transform."
         from lamindb import Transform
 
-        Transform.get(uid).delete()
+        Transform.get(uid).delete(permanent=permanent)
     elif entity == "collection":
         assert uid is not None, "You have to pass a uid for deleting an collection."
         from lamindb import Collection
 
-        Collection.get(uid).delete()
+        Collection.get(uid).delete(permanent=permanent)
     elif entity == "instance":
         return delete_instance(slug, force=force)
     else:  # backwards compatibility

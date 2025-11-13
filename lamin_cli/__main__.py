@@ -294,22 +294,24 @@ def info(schema: bool):
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
 @click.option("--slug", type=str, default=None)
+@click.option("--permanent", is_flag=True, default=False, help="Permanently delete the entity (only relevant for artifact, transform, collection, etc.).")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
+def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool = False, force: bool = False):
     """Delete an entity.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     lamin delete branch --name my_branch
     lamin delete instance --slug account/name
     ```
     """
     from lamin_cli._delete import delete as delete_
 
-    return delete_(entity=entity, name=name, uid=uid, slug=slug, force=force)
+    return delete_(entity=entity, name=name, uid=uid, slug=slug, permanent=permanent, force=force)
 
 
 @main.command()
