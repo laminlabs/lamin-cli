@@ -74,7 +74,10 @@ def test_save_consecutive_user_passes_uid():
         env=env,
     )
     assert result.returncode == 0
-    assert "created Transform('hlsFXswrJjtt0000')" in result.stdout.decode()
+    assert (
+        "created Transform('hlsFXswrJjtt0000', key='with-title-and-initialized-consecutive.ipynb')"
+        in result.stdout.decode()
+    )
     assert "found no run, creating" in result.stdout.decode()
 
     # now, let's re-run this notebook so that `ln.track()` is actually run

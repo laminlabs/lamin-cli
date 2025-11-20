@@ -74,7 +74,10 @@ def test_run_save_cache_with_git_and_uid():
         "mapped 'run-track-and-finish-sync-git.py' on uid 'm5uCHTTpJnjQ0000'"
         in result.stdout.decode()
     )
-    assert "created Transform('m5uCHTTpJnjQ0000')" in result.stdout.decode()
+    assert (
+        "created Transform('m5uCHTTpJnjQ0000', key='run-track-and-finish-sync-git.py')"
+        in result.stdout.decode()
+    )
 
     # run the script
     result = subprocess.run(
