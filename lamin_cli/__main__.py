@@ -294,10 +294,10 @@ def info(schema: bool):
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
 @click.option("--slug", type=str, default=None)
-@click.option("--permanent", is_flag=True, default=False, help="Permanently delete the entity (only relevant for artifact, transform, collection, etc.).")
+@click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool = False, force: bool = False):
+def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an entity.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:

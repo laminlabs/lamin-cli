@@ -9,7 +9,7 @@ def delete(
     name: str | None = None,
     uid: str | None = None,
     slug: str | None = None,
-    permanent: bool = False,
+    permanent: bool | None = None,
     force: bool = False,
 ):
     # TODO: refactor to abstract getting and deleting across entities
