@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
+
 import lamindb_setup as ln_setup
 
 if os.environ.get("NO_RICH"):
@@ -18,19 +19,24 @@ def snapshot():
 
 
 @snapshot.command("create")
-@click.option("--upload/--no-upload", is_flag=True, help="Whether to upload the snapshot.", default=True)
+@click.option(
+    "--upload/--no-upload",
+    is_flag=True,
+    help="Whether to upload the snapshot.",
+    default=True,
+)
 def create(upload: bool):
     """Create a SQLite snapshot of the current instance."""
     if not ln_setup.settings._instance_exists:
-        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
-    
+        raise click.ClickException(
+            "Not connected to an instance. Please run: lamin connect account/name"
+        )
+
     instance_owner = ln_setup.settings.instance.owner
     instance_name = ln_setup.settings.instance.name
     export_dir = f"{instance_name}_export"
 
-    ln_setup.connect(
-        f"{instance_owner}/{instance_name}", use_root_db_user=True
-    )
+    ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
 
     modules_without_lamindb = ln_setup.settings.instance.modules
     modules_complete = modules_without_lamindb.copy()
@@ -61,9 +67,7 @@ connections.close_all()
 """
     subprocess.run([sys.executable, "-c", import_code], check=True)
 
-    ln_setup.connect(
-        f"{instance_owner}/{instance_name}", use_root_db_user=True
-    )
+    ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
     if upload:
         ln_setup.core._clone.upload_sqlite_clone(
             local_sqlite_path=f"{instance_name}-clone/.lamindb/lamin.db",

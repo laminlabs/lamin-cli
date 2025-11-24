@@ -48,7 +48,14 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Configure",
-            "commands": ["checkout", "switch", "cache", "settings", "migrate", "snapshot"],
+            "commands": [
+                "checkout",
+                "switch",
+                "cache",
+                "settings",
+                "migrate",
+                "snapshot",
+            ],
         },
         {
             "name": "Auth",
