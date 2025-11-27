@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import lamindb_setup as ln_setup
@@ -35,7 +35,6 @@ def create(upload: bool):
 
     instance_owner = ln_setup.settings.instance.owner
     instance_name = ln_setup.settings.instance.name
-    export_dir = f"{instance_name}_export"
 
     ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
 
@@ -45,14 +44,28 @@ def create(upload: bool):
 
     import lamindb as ln
 
-    ln.track()
-    ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
-    ln.finish()
+    with tempfile.TemporaryDirectory() as export_dir:
+        ln.track()
+        ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
+        ln.finish()
 
-    script_path = (
-        Path(__file__).parent / "clone" / "create_sqlite_clone_and_import_db.py"
-    )
-    subprocess.run([sys.executable, str(script_path)], check=True)
+        script_path = (
+            Path(__file__).parent / "clone" / "create_sqlite_clone_and_import_db.py"
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "--instance-name",
+                instance_name,
+                "--export-dir",
+                export_dir,
+                "--modules",
+                ",".join(modules_without_lamindb),
+            ],
+            check=True,
+            cwd=Path.cwd(),
+        )
 
     ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
     if upload:
@@ -60,8 +73,6 @@ def create(upload: bool):
             local_sqlite_path=f"{instance_name}-clone/.lamindb/lamin.db",
             compress=True,
         )
-
-    shutil.rmtree(export_dir)
 
     ln_setup.disconnect()
     ln_setup.connect(f"{instance_owner}/{instance_name}")
