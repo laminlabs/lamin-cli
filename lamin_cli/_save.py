@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import os
 import re
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import click
+import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
@@ -86,15 +85,15 @@ def save(
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
     # this allows to have the correct treatment of credentials in case of cloud paths
-    path = create_path(path)
+    ppath = create_path(path)
     # isinstance is needed to cast the type of path to UPath
     # to avoid mypy erors
-    assert isinstance(path, UPath)
-    if not path.exists():
-        raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
+    assert isinstance(ppath, UPath)
+    if not ppath.exists():
+        raise click.BadParameter(f"Path {ppath} does not exist", param_hint="path")
 
     if registry is None:
-        registry = infer_registry_from_path(path)
+        registry = infer_registry_from_path(ppath)
 
     if project is not None:
         project_record = ln.Project.filter(
@@ -121,7 +120,7 @@ def save(
                 f"Branch '{branch}' not found, either create it with `ln.Branch(name='...').save()` or fix typos."
             )
 
-    is_cloud_path = not isinstance(path, LocalPathClasses)
+    is_cloud_path = not isinstance(ppath, LocalPathClasses)
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
@@ -144,7 +143,7 @@ def save(
             return "missing-key-or-description"
 
         artifact = ln.Artifact(
-            path,
+            ppath,
             key=key,
             description=description,
             revises=revises,
@@ -167,34 +166,40 @@ def save(
     if registry == "transform":
         if key is not None:
             logger.warning(
-                "key is ignored for transforms, the transform key is determined by the filename"
+                "key is ignored for transforms, the transform key is determined by the filename and the development directory (dev-dir)"
             )
         if is_cloud_path:
             logger.error("Can not register a transform from a cloud path")
             return "transform-with-cloud-path"
 
-        if path.suffix in {".qmd", ".Rmd"}:
-            html_file_exists = path.with_suffix(".html").exists()
-            nb_html_file_exists = path.with_suffix(".nb.html").exists()
+        if ppath.suffix in {".qmd", ".Rmd"}:
+            html_file_exists = ppath.with_suffix(".html").exists()
+            nb_html_file_exists = ppath.with_suffix(".nb.html").exists()
 
             if not html_file_exists and not nb_html_file_exists:
                 logger.error(
-                    f"Please export your {path.suffix} file as an html file here"
-                    f" {path.with_suffix('.html')}"
+                    f"Please export your {ppath.suffix} file as an html file here"
+                    f" {ppath.with_suffix('.html')}"
                 )
                 return "export-qmd-Rmd-as-html"
             elif html_file_exists and nb_html_file_exists:
                 logger.error(
-                    f"Please delete one of\n - {path.with_suffix('.html')}\n -"
-                    f" {path.with_suffix('.nb.html')}"
+                    f"Please delete one of\n - {ppath.with_suffix('.html')}\n -"
+                    f" {ppath.with_suffix('.nb.html')}"
                 )
                 return "delete-html-or-nb-html"
 
-        content = path.read_text()
-        uid = parse_uid_from_code(content, path.suffix)
+        content = ppath.read_text()
+        uid = parse_uid_from_code(content, ppath.suffix)
+
+        ppath = ppath.resolve().expanduser()
+        if ln_setup.settings.dev_dir is not None:
+            key = ppath.relative_to(ln_setup.settings.dev_dir).as_posix()
+        else:
+            key = ppath.name
 
         if uid is not None:
-            logger.important(f"mapped '{path.name}' on uid '{uid}'")
+            logger.important(f"mapped '{ppath.name}' on uid '{uid}'")
             if len(uid) == 16:
                 # is full uid
                 transform = ln.Transform.filter(uid=uid).one_or_none()
@@ -214,12 +219,16 @@ def save(
                 if transform is None:
                     uid = f"{stem_uid}0000"
         else:
-            # TODO: account for folders as we do in ln.track()
-            transform_hash, _ = hash_file(path)
-            transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
+            transform_hash, _ = hash_file(ppath)
+            transform = ln.Transform.filter(hash=transform_hash).first()
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
                     if transform.type != "notebook":
+                        logger.important(f"transform already saved: {transform}")
+                        if transform.key != key:
+                            transform.key = key
+                            logger.important(f"updated key to '{key}'")
+                            transform.save()
                         return None
                     if os.getenv("LAMIN_TESTING") == "true":
                         response = "y"
@@ -245,21 +254,21 @@ def save(
             if revises is None:
                 raise ln.errors.InvalidArgument("The stem uid is not found.")
         if transform is None:
-            if path.suffix == ".ipynb":
+            if ppath.suffix == ".ipynb":
                 from nbproject.dev import read_notebook
                 from nbproject.dev._meta_live import get_title
 
-                nb = read_notebook(path)
+                nb = read_notebook(ppath)
                 description = get_title(nb)
-            elif path.suffix in {".qmd", ".Rmd"}:
+            elif ppath.suffix in {".qmd", ".Rmd"}:
                 description = parse_title_r_notebook(content)
             else:
                 description = None
             transform = ln.Transform(
                 uid=uid,
                 description=description,
-                key=path.name,
-                type="script" if path.suffix in {".R", ".py"} else "notebook",
+                key=key,
+                type="script" if ppath.suffix in {".R", ".py"} else "notebook",
                 revises=revises,
             )
             if space is not None:
@@ -267,7 +276,9 @@ def save(
             if branch is not None:
                 transform.branch = branch_record
             transform.save()
-            logger.important(f"created Transform('{transform.uid}')")
+            logger.important(
+                f"created Transform('{transform.uid}', key='{transform.key}')"
+            )
         if project is not None:
             transform.projects.add(project_record)
             logger.important(f"labeled with project: {project_record.name}")
@@ -292,7 +303,7 @@ def save(
         return_code = save_context_core(
             run=run,
             transform=transform,
-            filepath=path,
+            filepath=ppath,
             from_cli=True,
         )
         return return_code

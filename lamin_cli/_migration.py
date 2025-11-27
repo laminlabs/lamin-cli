@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 if os.environ.get("NO_RICH"):
     import click as click

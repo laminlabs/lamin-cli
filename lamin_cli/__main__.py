@@ -48,7 +48,14 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Configure",
-            "commands": ["checkout", "switch", "cache", "settings", "migrate"],
+            "commands": [
+                "checkout",
+                "switch",
+                "cache",
+                "settings",
+                "migrate",
+                "snapshot",
+            ],
         },
         {
             "name": "Auth",
@@ -105,6 +112,7 @@ from lamindb_setup._silence_loggers import silence_loggers
 from lamin_cli._cache import cache
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
+from lamin_cli._snapshot import snapshot
 
 if TYPE_CHECKING:
     from click import Command, Context
@@ -315,22 +323,24 @@ def info(schema: bool):
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
 @click.option("--slug", type=str, default=None)
+@click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, force: bool = False):
+def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an entity.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     lamin delete branch --name my_branch
     lamin delete instance --slug account/name
     ```
     """
     from lamin_cli._delete import delete as delete_
 
-    return delete_(entity=entity, name=name, uid=uid, slug=slug, force=force)
+    return delete_(entity=entity, name=name, uid=uid, slug=slug, permanent=permanent, force=force)
 
 
 @main.command()
@@ -560,6 +570,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 main.add_command(settings)
 main.add_command(cache)
 main.add_command(migrate)
+main.add_command(snapshot)
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
