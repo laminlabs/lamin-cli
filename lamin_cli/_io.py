@@ -19,6 +19,7 @@ def io():
     """Import and export instances."""
 
 
+# fmt: off
 @io.command("snapshot")
 @click.option(
     "--upload/--no-upload",
@@ -26,6 +27,7 @@ def io():
     help="Whether to upload the snapshot.",
     default=True,
 )
+# fmt: on
 def snapshot(upload: bool):
     """Create and optionally upload a SQLite snapshot of the current instance."""
     if not ln_setup.settings._instance_exists:
@@ -82,23 +84,13 @@ def snapshot(upload: bool):
     ln_setup.disconnect()
 
 
+# fmt: off
 @io.command("exportdb")
-@click.option(
-    "--modules",
-    type=str,
-    default=None,
-    help="Comma-separated list of modules to export (e.g., 'lamindb,bionty').",
-)
-@click.option(
-    "--output-dir", type=str, help="Output directory for exported parquet files."
-)
+@click.option("--modules", type=str, default=None, help="Comma-separated list of modules to export (e.g., 'lamindb,bionty').",)
+@click.option("--output-dir", type=str, help="Output directory for exported parquet files.")
 @click.option("--max-workers", type=int, default=8, help="Number of parallel workers.")
-@click.option(
-    "--chunk-size",
-    type=int,
-    default=500_000,
-    help="Number of rows per chunk for large tables.",
-)
+@click.option("--chunk-size", type=int, default=500_000, help="Number of rows per chunk for large tables.")
+# fmt: on
 def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size: int):
     """Export registry tables to parquet files."""
     if not ln_setup.settings._instance_exists:
@@ -115,22 +107,12 @@ def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size:
     )
 
 
+# fmt: off
 @io.command("importdb")
-@click.option(
-    "--modules",
-    type=str,
-    default=None,
-    help="Comma-separated list of modules to import (e.g., 'lamindb,bionty').",
-)
-@click.option(
-    "--input-dir", type=str, help="Input directory containing exported parquet files."
-)
-@click.option(
-    "--if-exists",
-    type=click.Choice(["fail", "replace", "append"]),
-    default="replace",
-    help="How to handle existing data.",
-)
+@click.option("--modules", type=str, default=None, help="Comma-separated list of modules to import (e.g., 'lamindb,bionty').")
+@click.option("--input-dir", type=str, help="Input directory containing exported parquet files.")
+@click.option("--if-exists", type=click.Choice(["fail", "replace", "append"]), default="replace", help="How to handle existing data.")
+# fmt: on
 def importdb(modules: str | None, input_dir: str, if_exists: str):
     """Import registry tables from parquet files."""
     if not ln_setup.settings._instance_exists:

@@ -36,7 +36,7 @@ COMMAND_GROUPS = {
     "lamin": [
         {
             "name": "Manage connections",
-            "commands": ["connect", "info", "init", "clone", "disconnect"],
+            "commands": ["connect", "info", "init", "disconnect"],
         },
         {
             "name": "Load, save, create & delete data",
