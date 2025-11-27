@@ -20,7 +20,6 @@ __all__ = [
     "save",
     "init",
     "connect",
-    "clone",
     "delete",
     "login",
     "logout",

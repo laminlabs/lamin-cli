@@ -201,27 +201,6 @@ def connect(instance: str, use_proxy_db: bool):
     return connect_(instance, use_proxy_db=use_proxy_db)
 
 
-# fmt: off
-@main.command()
-@click.argument("instance", type=str, help="Instance slug in the form `account/name` (e.g., `laminlabs/cellxgene`).")
-# fmt: on
-def clone(
-    instance: str,
-):
-    """Load an instance as a local copy - a clone.
-
-    A clone is a complete SQLite copy of a remote postgres instance.
-    It works without an AWS RDS connection, allowing use behind firewalls.
-
-    ```
-    lamin clone laminlabs/cellxgene
-    ```
-    """
-    import lamindb_setup as ln_setup
-
-    ln_setup.core._clone.connect_remote_sqlite(instance=instance)
-
-
 @main.command()
 def disconnect():
     """Clear default instance configuration.
