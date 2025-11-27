@@ -83,10 +83,64 @@ def snapshot(upload: bool):
 
 
 @io.command("exportdb")
-def exportdb():
-    pass
+@click.option(
+    "--modules",
+    type=str,
+    default=None,
+    help="Comma-separated list of modules to export (e.g., 'lamindb,bionty').",
+)
+@click.option(
+    "--output-dir", type=str, help="Output directory for exported parquet files."
+)
+@click.option("--max-workers", type=int, default=8, help="Number of parallel workers.")
+@click.option(
+    "--chunk-size",
+    type=int,
+    default=500_000,
+    help="Number of rows per chunk for large tables.",
+)
+def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size: int):
+    """Export registry tables to parquet files."""
+    if not ln_setup.settings._instance_exists:
+        raise click.ClickException(
+            "Not connected to an instance. Please run: lamin connect account/name"
+        )
+
+    module_list = modules.split(",") if modules else None
+    ln_setup.io.export_db(
+        module_names=module_list,
+        output_dir=output_dir,
+        max_workers=max_workers,
+        chunk_size=chunk_size,
+    )
 
 
 @io.command("importdb")
-def importdb():
-    pass
+@click.option(
+    "--modules",
+    type=str,
+    default=None,
+    help="Comma-separated list of modules to import (e.g., 'lamindb,bionty').",
+)
+@click.option(
+    "--input-dir", type=str, help="Input directory containing exported parquet files."
+)
+@click.option(
+    "--if-exists",
+    type=click.Choice(["fail", "replace", "append"]),
+    default="replace",
+    help="How to handle existing data.",
+)
+def importdb(modules: str | None, input_dir: str, if_exists: str):
+    """Import registry tables from parquet files."""
+    if not ln_setup.settings._instance_exists:
+        raise click.ClickException(
+            "Not connected to an instance. Please run: lamin connect account/name"
+        )
+
+    module_list = modules.split(",") if modules else None
+    ln_setup.io.import_db(
+        module_names=module_list,
+        input_dir=input_dir,
+        if_exists=if_exists,
+    )
