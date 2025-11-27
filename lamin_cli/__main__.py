@@ -36,7 +36,7 @@ COMMAND_GROUPS = {
     "lamin": [
         {
             "name": "Manage connections",
-            "commands": ["connect", "info", "init", "disconnect"],
+            "commands": ["connect", "info", "init", "clone", "disconnect"],
         },
         {
             "name": "Load, save, create & delete data",
@@ -48,7 +48,13 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Configure",
-            "commands": ["checkout", "switch", "cache", "settings", "migrate"],
+            "commands": [
+                "checkout",
+                "switch",
+                "cache",
+                "settings",
+                "migrate",
+            ],
         },
         {
             "name": "Auth",
@@ -103,6 +109,7 @@ else:
 from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._cache import cache
+from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
 
@@ -192,6 +199,27 @@ def connect(instance: str, use_proxy_db: bool):
     See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
     return connect_(instance, use_proxy_db=use_proxy_db)
+
+
+# fmt: off
+@main.command()
+@click.argument("instance", type=str, help="Instance slug in the form `account/name` (e.g., `laminlabs/cellxgene`).")
+# fmt: on
+def clone(
+    instance: str,
+):
+    """Load an instance as a local copy - a clone.
+
+    A clone is a complete SQLite copy of a remote postgres instance.
+    It works without an AWS RDS connection, allowing use behind firewalls.
+
+    ```
+    lamin clone laminlabs/cellxgene
+    ```
+    """
+    import lamindb_setup as ln_setup
+
+    ln_setup.core._clone.connect_remote_sqlite(instance=instance)
 
 
 @main.command()
@@ -541,6 +569,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 main.add_command(settings)
 main.add_command(cache)
 main.add_command(migrate)
+main.add_command(io)
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
