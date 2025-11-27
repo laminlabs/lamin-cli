@@ -21,12 +21,7 @@ def io():
 
 # fmt: off
 @io.command("snapshot")
-@click.option(
-    "--upload/--no-upload",
-    is_flag=True,
-    help="Whether to upload the snapshot.",
-    default=True,
-)
+@click.option("--upload/--no-upload", is_flag=True, help="Whether to upload the snapshot.", default=True)
 # fmt: on
 def snapshot(upload: bool):
     """Create and optionally upload a SQLite snapshot of the current instance."""
