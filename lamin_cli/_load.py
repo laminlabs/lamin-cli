@@ -102,27 +102,25 @@ def load(
                 transforms = transforms.order_by("-created_at")
             transform = transforms.first()
 
-            target_relpath = Path(transform.key)
-            if len(target_relpath.parents) > 1:
-                logger.important(
-                    "preserve the folder structure for versioning:"
-                    f" {target_relpath.parent}/"
-                )
-                target_relpath.parent.mkdir(parents=True, exist_ok=True)
-            if target_relpath.exists():
-                response = input(f"! {target_relpath} exists: replace? (y/n)")
+            target_path = Path(transform.key)
+            if ln_setup.settings.dev_dir is not None:
+                target_path = ln_setup.settings.dev_dir / target_path
+            if len(target_path.parents) > 1:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+            if target_path.exists():
+                response = input(f"! {target_path} exists: replace? (y/n)")
                 if response != "y":
                     raise SystemExit("Aborted.")
 
             if transform.source_code is not None:
-                if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
-                    script_to_notebook(transform, target_relpath, bump_revision=True)
+                if target_path.suffix in (".ipynb", ".Rmd", ".qmd"):
+                    script_to_notebook(transform, target_path, bump_revision=True)
                 else:
-                    target_relpath.write_text(transform.source_code)
+                    target_path.write_text(transform.source_code)
             else:
                 raise SystemExit("No source code available for this transform.")
 
-            logger.important(f"{transform.type} is here: {target_relpath}")
+            logger.important(f"{transform.type} is here: {target_path}")
 
             if with_env:
                 ln.settings.track_run_inputs = False
@@ -132,8 +130,7 @@ def load(
                 ):
                     filepath_env_cache = transform.latest_run.environment.cache()
                     target_env_filename = (
-                        target_relpath.parent
-                        / f"{target_relpath.stem}__requirements.txt"
+                        target_path.parent / f"{target_path.stem}__requirements.txt"
                     )
                     shutil.move(filepath_env_cache, target_env_filename)
                     logger.important(f"environment is here: {target_env_filename}")
@@ -142,7 +139,7 @@ def load(
                         "latest transform run with environment doesn't exist"
                     )
 
-            return target_relpath
+            return target_path
         case "artifact" | "collection":
             ln.settings.track_run_inputs = False
 
