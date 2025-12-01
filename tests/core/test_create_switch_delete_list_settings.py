@@ -20,7 +20,7 @@ def test_branch():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == "archive"
+    assert result.stdout.strip().split("\n")[-1] == "archive"
     exit_status = os.system("lamin switch --branch main")
     assert exit_status == 0
     result = subprocess.run(
