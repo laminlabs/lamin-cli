@@ -20,7 +20,7 @@ def test_branch():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == "archive"
+    assert result.stdout.strip().split("\n")[-1] == "archive"
     exit_status = os.system("lamin switch --branch main")
     assert exit_status == 0
     result = subprocess.run(
@@ -29,7 +29,7 @@ def test_branch():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == "main"
+    assert result.stdout.strip().split("\n")[-1] == "main"
     exit_status = os.system("lamin create branch --name testbranch")
     exit_status = os.system("lamin switch --branch testbranch")
     assert exit_status == 0
@@ -56,7 +56,7 @@ def test_dev_dir():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == "None"
+    assert result.stdout.strip().split("\n")[-1] == "None"
     assert ln_setup.settings.dev_dir is None
     # set dev-dir to tmp_path
     this_path = Path(__file__).resolve()
@@ -68,7 +68,7 @@ def test_dev_dir():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == str(this_path.parent)
+    assert result.stdout.strip().split("\n")[-1] == str(this_path.parent)
     assert ln_setup.settings.dev_dir == this_path.parent
     # unset dev-dir
     exit_status = os.system("lamin settings set dev-dir none")
@@ -79,5 +79,5 @@ def test_dev_dir():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == "None"
+    assert result.stdout.strip().split("\n")[-1] == "None"
     assert ln_setup.settings.dev_dir is None

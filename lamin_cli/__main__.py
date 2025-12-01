@@ -48,7 +48,13 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Configure",
-            "commands": ["checkout", "switch", "cache", "settings", "migrate"],
+            "commands": [
+                "checkout",
+                "switch",
+                "cache",
+                "settings",
+                "migrate",
+            ],
         },
         {
             "name": "Auth",
@@ -103,6 +109,7 @@ else:
 from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._cache import cache
+from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
 
@@ -541,6 +548,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 main.add_command(settings)
 main.add_command(cache)
 main.add_command(migrate)
+main.add_command(io)
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84

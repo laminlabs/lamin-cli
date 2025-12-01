@@ -13,6 +13,17 @@ from .urls import decompose_url
 def load(
     entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False
 ):
+    """Load artifact, collection, or transform from LaminDB.
+
+    Args:
+        entity: URL containing 'lamin', or 'artifact', 'collection', or 'transform'
+        uid: Unique identifier (prefix matching supported)
+        key: Key identifier
+        with_env: If True, also load environment requirements file for transforms
+
+    Returns:
+        Path to loaded transform, or None for artifacts/collections
+    """
     import lamindb_setup as ln_setup
 
     if entity.startswith("https://") and "lamin" in entity:
@@ -145,8 +156,7 @@ def load(
 
             EntityClass = ln.Artifact if entity == "artifact" else ln.Collection
 
-            # we don't use .get here because DoesNotExist is hard to catch
-            # due to private django API
+            # we don't use .get here because DoesNotExist is hard to catch due to private django API
             # we use `.objects` here because we don't want to exclude kind = __lamindb_run__ artifacts
             if query_by_uid:
                 entities = EntityClass.objects.filter(uid__startswith=uid)
