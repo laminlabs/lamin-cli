@@ -1,10 +1,20 @@
 import os
+import subprocess
 from datetime import datetime, timedelta, timezone
 
 from lamindb_setup.core.upath import UPath
 
 
 def test_branch():
+    env = os.environ
+    # testuser2 has write permissions on lamin-site-assets
+    _ = subprocess.run(
+        "lamin login testuser2",
+        shell=True,
+        capture_output=True,
+        env=env,
+    )
+
     exit_status = os.system("lamin connect laminlabs/lamin-site-assets")
     assert exit_status == 0
 
