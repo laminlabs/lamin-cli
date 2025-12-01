@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 import lamindb_setup as ln_setup
 
@@ -10,7 +11,7 @@ args = parser.parse_args()
 
 instance_name = args.instance_name
 export_dir = args.export_dir
-modules_without_lamindb = set(args.modules.split(","))
+modules_without_lamindb = {m for m in args.modules.split(",") if m}
 modules_complete = modules_without_lamindb.copy()
 modules_complete.add("lamindb")
 

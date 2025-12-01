@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 import lamindb_setup as ln_setup
+from lamindb._finish import save_run_logs
 
 if os.environ.get("NO_RICH"):
     import click as click
@@ -43,9 +44,9 @@ def snapshot(upload: bool):
 
     with tempfile.TemporaryDirectory() as export_dir:
         transform = ln.Transform(
-            uid="snapXYZ90pQr0001",
+            uid="snapXYZ90pQr0004",
             key="__lamindb_snapshot__",
-            type="function",
+            type="function"
         ).save()
         ln.track(transform=transform)
         ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
@@ -69,14 +70,14 @@ def snapshot(upload: bool):
             cwd=Path.cwd(),
         )
 
-    ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
-    if upload:
-        ln_setup.core._clone.upload_sqlite_clone(
-            local_sqlite_path=f"{instance_name}-clone/.lamindb/lamin.db",
-            compress=True,
-        )
+        ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
+        if upload:
+            ln_setup.core._clone.upload_sqlite_clone(
+                local_sqlite_path=f"{instance_name}-clone/.lamindb/lamin.db",
+                compress=True,
+            )
 
-    ln_setup.disconnect()
+        ln_setup.disconnect()
 
 
 # fmt: off
