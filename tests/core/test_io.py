@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from lamindb_setup.core.upath import UPath
 
 
-def test_branch():
+def test_snapshot():
     try:
         env = os.environ
         # testuser2 has write permissions on lamin-site-assets

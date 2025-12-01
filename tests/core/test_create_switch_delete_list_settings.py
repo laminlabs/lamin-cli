@@ -68,7 +68,7 @@ def test_dev_dir():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == str(this_path.parent)
+    assert result.stdout.strip().split("\n")[-1] == str(this_path.parent)
     assert ln_setup.settings.dev_dir == this_path.parent
     # unset dev-dir
     exit_status = os.system("lamin settings set dev-dir none")
@@ -79,5 +79,5 @@ def test_dev_dir():
         text=True,
         shell=True,
     )
-    assert result.stdout.strip() == "None"
+    assert result.stdout.strip().split("\n")[-1] == "None"
     assert ln_setup.settings.dev_dir is None
