@@ -43,12 +43,7 @@ def snapshot(upload: bool):
     import lamindb as ln
 
     with tempfile.TemporaryDirectory() as export_dir:
-        transform = ln.Transform(
-            uid="snapXYZ90pQr0004",
-            key="__lamindb_snapshot__",
-            type="function"
-        ).save()
-        ln.track(transform=transform)
+        ln.track()
         ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
         ln.finish()
 

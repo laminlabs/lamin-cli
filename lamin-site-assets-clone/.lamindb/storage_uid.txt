@@ -1,0 +1,5 @@
+fwjzdnsUJCNZ
+creation info:
+instance_slug=zethson/lamin-site-assets-clone
+instance_id=9f13c6394b6454cb93428a002c59b437
+instance_uid=6XzWGz7Wyct2
