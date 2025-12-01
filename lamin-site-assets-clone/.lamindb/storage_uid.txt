@@ -1,5 +1,0 @@
-C4UYCK5f26QS
-creation info:
-instance_slug=testuser2/lamin-site-assets-clone
-instance_id=8e4ba6374aab5359ad5c250bc8646a31
-instance_uid=1qxxjxvdIxHI
