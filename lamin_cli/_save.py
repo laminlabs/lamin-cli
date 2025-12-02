@@ -1,15 +1,28 @@
 from __future__ import annotations
 
+import os
 import re
-import sys
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import click
+import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
-if TYPE_CHECKING:
-    from pathlib import Path
+
+def infer_registry_from_path(path: Path | str) -> str:
+    suffixes_transform = {
+        "py": {".py", ".ipynb"},
+        "R": {".R", ".qmd", ".Rmd"},
+    }
+    if isinstance(path, str):
+        path = Path(path)
+    registry = (
+        "transform"
+        if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
+        else "artifact"
+    )
+    return registry
 
 
 def parse_uid_from_code(content: str, suffix: str) -> str | None:
@@ -47,50 +60,40 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     return uid
 
 
-def save_from_path_cli(
+def parse_title_r_notebook(content: str) -> str | None:
+    # Pattern to match title only within YAML header section
+    title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
+    title_match = re.search(title_pattern, content, flags=re.DOTALL | re.MULTILINE)
+    if title_match:
+        return title_match.group(1)
+    else:
+        return None
+
+
+def save(
     path: Path | str,
-    key: str | None,
-    description: str | None,
-    stem_uid: str | None,
-    project: str | None,
-    space: str | None,
-    branch: str | None,
-    registry: str | None,
+    key: str | None = None,
+    description: str | None = None,
+    stem_uid: str | None = None,
+    project: str | None = None,
+    space: str | None = None,
+    branch: str | None = None,
+    registry: str | None = None,
 ) -> str | None:
-    import lamindb_setup as ln_setup
+    import lamindb as ln
+    from lamindb._finish import save_context_core
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
-    # this will be gone once we get rid of lamin load or enable loading multiple
-    # instances sequentially
-    auto_connect_state = ln_setup.settings.auto_connect
-    ln_setup.settings.auto_connect = True
-
-    import lamindb as ln
-
-    if not ln.setup.core.django.IS_SETUP:
-        sys.exit(-1)
-    from lamindb._finish import save_context_core
-
-    ln_setup.settings.auto_connect = auto_connect_state
-
     # this allows to have the correct treatment of credentials in case of cloud paths
-    path = create_path(path)
+    ppath = create_path(path)
     # isinstance is needed to cast the type of path to UPath
     # to avoid mypy erors
-    assert isinstance(path, UPath)
-    if not path.exists():
-        raise click.BadParameter(f"Path {path} does not exist", param_hint="path")
+    assert isinstance(ppath, UPath)
+    if not ppath.exists():
+        raise click.BadParameter(f"Path {ppath} does not exist", param_hint="path")
 
     if registry is None:
-        suffixes_transform = {
-            "py": {".py", ".ipynb"},
-            "R": {".R", ".qmd", ".Rmd"},
-        }
-        registry = (
-            "transform"
-            if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
-            else "artifact"
-        )
+        registry = infer_registry_from_path(ppath)
 
     if project is not None:
         project_record = ln.Project.filter(
@@ -100,12 +103,14 @@ def save_from_path_cli(
             raise ln.errors.InvalidArgument(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
+    space_record = None
     if space is not None:
         space_record = ln.Space.filter(ln.Q(name=space) | ln.Q(uid=space)).one_or_none()
         if space_record is None:
             raise ln.errors.InvalidArgument(
                 f"Space '{space}' not found, either create it on LaminHub or fix typos."
             )
+    branch_record = None
     if branch is not None:
         branch_record = ln.Branch.filter(
             ln.Q(name=branch) | ln.Q(uid=branch)
@@ -115,7 +120,7 @@ def save_from_path_cli(
                 f"Branch '{branch}' not found, either create it with `ln.Branch(name='...').save()` or fix typos."
             )
 
-    is_cloud_path = not isinstance(path, LocalPathClasses)
+    is_cloud_path = not isinstance(ppath, LocalPathClasses)
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
@@ -137,12 +142,14 @@ def save_from_path_cli(
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
 
-        artifact = ln.Artifact(path, key=key, description=description, revises=revises)
-        if space is not None:
-            artifact.space = space_record
-        if branch is not None:
-            artifact.branch = branch_record
-        artifact.save()
+        artifact = ln.Artifact(
+            ppath,
+            key=key,
+            description=description,
+            revises=revises,
+            branch=branch_record,
+            space=space_record,
+        ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if artifact.storage.type == "s3":
@@ -150,43 +157,49 @@ def save_from_path_cli(
         if project is not None:
             artifact.projects.add(project_record)
             logger.important(f"labeled with project: {project_record.name}")
-        if ln_setup.settings.instance.is_remote:
-            slug = ln_setup.settings.instance.slug
-            logger.important(f"go to: https://lamin.ai/{slug}/artifact/{artifact.uid}")
+        if ln.setup.settings.instance.is_remote:
+            slug = ln.setup.settings.instance.slug
+            ui_url = ln.setup.settings.instance.ui_url
+            logger.important(f"go to: {ui_url}/{slug}/artifact/{artifact.uid}")
         return None
 
     if registry == "transform":
         if key is not None:
             logger.warning(
-                "key is ignored for transforms, the transform key is determined by the filename"
+                "key is ignored for transforms, the transform key is determined by the filename and the development directory (dev-dir)"
             )
         if is_cloud_path:
             logger.error("Can not register a transform from a cloud path")
             return "transform-with-cloud-path"
 
-        if path.suffix in {".qmd", ".Rmd"}:
-            html_file_exists = path.with_suffix(".html").exists()
-            nb_html_file_exists = path.with_suffix(".nb.html").exists()
+        if ppath.suffix in {".qmd", ".Rmd"}:
+            html_file_exists = ppath.with_suffix(".html").exists()
+            nb_html_file_exists = ppath.with_suffix(".nb.html").exists()
 
             if not html_file_exists and not nb_html_file_exists:
                 logger.error(
-                    f"Please export your {path.suffix} file as an html file here"
-                    f" {path.with_suffix('.html')}"
+                    f"Please export your {ppath.suffix} file as an html file here"
+                    f" {ppath.with_suffix('.html')}"
                 )
                 return "export-qmd-Rmd-as-html"
             elif html_file_exists and nb_html_file_exists:
                 logger.error(
-                    f"Please delete one of\n - {path.with_suffix('.html')}\n -"
-                    f" {path.with_suffix('.nb.html')}"
+                    f"Please delete one of\n - {ppath.with_suffix('.html')}\n -"
+                    f" {ppath.with_suffix('.nb.html')}"
                 )
                 return "delete-html-or-nb-html"
 
-        with path.open() as file:
-            content = file.read()
-        uid = parse_uid_from_code(content, path.suffix)
+        content = ppath.read_text()
+        uid = parse_uid_from_code(content, ppath.suffix)
+
+        ppath = ppath.resolve().expanduser()
+        if ln_setup.settings.dev_dir is not None:
+            key = ppath.relative_to(ln_setup.settings.dev_dir).as_posix()
+        else:
+            key = ppath.name
 
         if uid is not None:
-            logger.important(f"mapped '{path.name}' on uid '{uid}'")
+            logger.important(f"mapped '{ppath.name}' on uid '{uid}'")
             if len(uid) == 16:
                 # is full uid
                 transform = ln.Transform.filter(uid=uid).one_or_none()
@@ -206,15 +219,27 @@ def save_from_path_cli(
                 if transform is None:
                     uid = f"{stem_uid}0000"
         else:
-            # TODO: account for folders as we do in ln.track()
-            transform_hash, _ = hash_file(path)
-            transform = ln.Transform.filter(key=path.name, is_latest=True).one_or_none()
+            transform_hash, _ = hash_file(ppath)
+            transform = ln.Transform.filter(hash=transform_hash).first()
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
-                    logger.important(
-                        f"found existing Transform('{uid}') with matching hash"
-                    )
-                    return None
+                    if transform.type != "notebook":
+                        logger.important(f"transform already saved: {transform}")
+                        if transform.key != key:
+                            transform.key = key
+                            logger.important(f"updated key to '{key}'")
+                            transform.save()
+                        return None
+                    if os.getenv("LAMIN_TESTING") == "true":
+                        response = "y"
+                    else:
+                        response = input(
+                            f"Found an existing Transform('{transform.uid}') "
+                            "with matching source code hash.\n"
+                            "Do you want to update it? (y/n) "
+                        )
+                    if response != "y":
+                        return None
                 else:
                     # we need to create a new version
                     stem_uid = transform.uid[:12]
@@ -229,19 +254,21 @@ def save_from_path_cli(
             if revises is None:
                 raise ln.errors.InvalidArgument("The stem uid is not found.")
         if transform is None:
-            if path.suffix == ".ipynb":
+            if ppath.suffix == ".ipynb":
                 from nbproject.dev import read_notebook
                 from nbproject.dev._meta_live import get_title
 
-                nb = read_notebook(path)
+                nb = read_notebook(ppath)
                 description = get_title(nb)
+            elif ppath.suffix in {".qmd", ".Rmd"}:
+                description = parse_title_r_notebook(content)
             else:
                 description = None
             transform = ln.Transform(
                 uid=uid,
                 description=description,
-                key=path.name,
-                type="script" if path.suffix in {".R", ".py"} else "notebook",
+                key=key,
+                type="script" if ppath.suffix in {".R", ".py"} else "notebook",
                 revises=revises,
             )
             if space is not None:
@@ -249,21 +276,26 @@ def save_from_path_cli(
             if branch is not None:
                 transform.branch = branch_record
             transform.save()
-            logger.important(f"created Transform('{transform.uid}')")
+            logger.important(
+                f"created Transform('{transform.uid}', key='{transform.key}')"
+            )
         if project is not None:
             transform.projects.add(project_record)
             logger.important(f"labeled with project: {project_record.name}")
         # latest run of this transform by user
         run = ln.Run.filter(transform=transform).order_by("-started_at").first()
-        if run is not None and run.created_by.id != ln_setup.settings.user.id:
-            response = input(
-                "You are trying to save a transform created by another user: Source"
-                " and report files will be tagged with *your* user id. Proceed?"
-                " (y/n)"
-            )
+        if run is not None and run.created_by.id != ln.setup.settings.user.id:
+            if os.getenv("LAMIN_TESTING") == "true":
+                response = "y"
+            else:
+                response = input(
+                    "You are trying to save a transform created by another user: Source"
+                    " and report files will be tagged with *your* user id. Proceed?"
+                    " (y/n) "
+                )
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
-        if run is None and transform.key.endswith(".ipynb"):
+        if run is None and transform.type == "notebook":
             run = ln.Run(transform=transform).save()
             logger.important(
                 f"found no run, creating Run('{run.uid}') to display the html"
@@ -271,7 +303,7 @@ def save_from_path_cli(
         return_code = save_context_core(
             run=run,
             transform=transform,
-            filepath=path,
+            filepath=ppath,
             from_cli=True,
         )
         return return_code

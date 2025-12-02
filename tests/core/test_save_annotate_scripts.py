@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def test_save_resave_script_no_uids():
     assert ln.Transform.filter(key=filepath.name).count() == 2
 
 
-def test_save_without_uid():
+def test_save_and_annotate_without_uid():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-and-finish.py"
@@ -46,6 +47,15 @@ def test_save_without_uid():
     assert result.returncode == 0
     assert "created Transform" in result.stdout.decode()
     assert "labeled with project: test_project" in result.stdout.decode()
+
+    result = subprocess.run(
+        "lamin annotate --key run-track-and-finish.py --project test_project",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
 
 
 def test_run_save_cache_with_git_and_uid():
@@ -64,7 +74,10 @@ def test_run_save_cache_with_git_and_uid():
         "mapped 'run-track-and-finish-sync-git.py' on uid 'm5uCHTTpJnjQ0000'"
         in result.stdout.decode()
     )
-    assert "created Transform('m5uCHTTpJnjQ0000')" in result.stdout.decode()
+    assert (
+        "created Transform('m5uCHTTpJnjQ0000', key='run-track-and-finish-sync-git.py')"
+        in result.stdout.decode()
+    )
 
     # run the script
     result = subprocess.run(

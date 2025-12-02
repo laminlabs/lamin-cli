@@ -6,20 +6,24 @@ from pathlib import Path
 
 from lamin_utils import logger
 
-
-def decompose_url(url: str) -> tuple[str, str, str]:
-    assert any(keyword in url for keyword in ["transform", "artifact", "collection"])
-    for entity in ["transform", "artifact", "collection"]:
-        if entity in url:
-            break
-    uid = url.split(f"{entity}/")[1]
-    instance_slug = "/".join(url.split("/")[3:5])
-    return instance_slug, entity, uid
+from ._save import parse_title_r_notebook
+from .urls import decompose_url
 
 
 def load(
     entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False
 ):
+    """Load artifact, collection, or transform from LaminDB.
+
+    Args:
+        entity: URL containing 'lamin', or 'artifact', 'collection', or 'transform'
+        uid: Unique identifier (prefix matching supported)
+        key: Key identifier
+        with_env: If True, also load environment requirements file for transforms
+
+    Returns:
+        Path to loaded transform, or None for artifacts/collections
+    """
     import lamindb_setup as ln_setup
 
     if entity.startswith("https://") and "lamin" in entity:
@@ -55,27 +59,21 @@ def load(
             else:
                 new_content = transform.source_code
         else:  # R notebook
-            # Pattern to match title only within YAML header section
-            title_pattern = r'^---\n.*?title:\s*"([^"]*)".*?---'
-            title_match = re.search(
-                title_pattern, transform.source_code, flags=re.DOTALL | re.MULTILINE
-            )
             new_content = transform.source_code
-            if title_match:
-                current_title = title_match.group(1)
-                if current_title != transform.description:
-                    pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
-                    replacement = f'\\1"{transform.description}"\\3'
-                    new_content = re.sub(
-                        pattern,
-                        replacement,
-                        new_content,
-                        flags=re.DOTALL | re.MULTILINE,
-                    )
-                    logger.important(
-                        f"updated title to match description: {current_title} →"
-                        f" {transform.description}"
-                    )
+            current_title = parse_title_r_notebook(new_content)
+            if current_title is not None and current_title != transform.description:
+                pattern = r'^(---\n.*?title:\s*)"([^"]*)"(.*?---)'
+                replacement = f'\\1"{transform.description}"\\3'
+                new_content = re.sub(
+                    pattern,
+                    replacement,
+                    new_content,
+                    flags=re.DOTALL | re.MULTILINE,
+                )
+                logger.important(
+                    f"updated title to match description: {current_title} →"
+                    f" {transform.description}"
+                )
         if bump_revision:
             uid = transform.uid
             if (
@@ -115,27 +113,25 @@ def load(
                 transforms = transforms.order_by("-created_at")
             transform = transforms.first()
 
-            target_relpath = Path(transform.key)
-            if len(target_relpath.parents) > 1:
-                logger.important(
-                    "preserve the folder structure for versioning:"
-                    f" {target_relpath.parent}/"
-                )
-                target_relpath.parent.mkdir(parents=True, exist_ok=True)
-            if target_relpath.exists():
-                response = input(f"! {target_relpath} exists: replace? (y/n)")
+            target_path = Path(transform.key)
+            if ln_setup.settings.dev_dir is not None:
+                target_path = ln_setup.settings.dev_dir / target_path
+            if len(target_path.parents) > 1:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+            if target_path.exists():
+                response = input(f"! {target_path} exists: replace? (y/n)")
                 if response != "y":
                     raise SystemExit("Aborted.")
 
             if transform.source_code is not None:
-                if target_relpath.suffix in (".ipynb", ".Rmd", ".qmd"):
-                    script_to_notebook(transform, target_relpath, bump_revision=True)
+                if target_path.suffix in (".ipynb", ".Rmd", ".qmd"):
+                    script_to_notebook(transform, target_path, bump_revision=True)
                 else:
-                    target_relpath.write_text(transform.source_code)
+                    target_path.write_text(transform.source_code)
             else:
                 raise SystemExit("No source code available for this transform.")
 
-            logger.important(f"{transform.type} is here: {target_relpath}")
+            logger.important(f"{transform.type} is here: {target_path}")
 
             if with_env:
                 ln.settings.track_run_inputs = False
@@ -145,8 +141,7 @@ def load(
                 ):
                     filepath_env_cache = transform.latest_run.environment.cache()
                     target_env_filename = (
-                        target_relpath.parent
-                        / f"{target_relpath.stem}__requirements.txt"
+                        target_path.parent / f"{target_path.stem}__requirements.txt"
                     )
                     shutil.move(filepath_env_cache, target_env_filename)
                     logger.important(f"environment is here: {target_env_filename}")
@@ -155,14 +150,13 @@ def load(
                         "latest transform run with environment doesn't exist"
                     )
 
-            return target_relpath
+            return target_path
         case "artifact" | "collection":
             ln.settings.track_run_inputs = False
 
             EntityClass = ln.Artifact if entity == "artifact" else ln.Collection
 
-            # we don't use .get here because DoesNotExist is hard to catch
-            # due to private django API
+            # we don't use .get here because DoesNotExist is hard to catch due to private django API
             # we use `.objects` here because we don't want to exclude kind = __lamindb_run__ artifacts
             if query_by_uid:
                 entities = EntityClass.objects.filter(uid__startswith=uid)

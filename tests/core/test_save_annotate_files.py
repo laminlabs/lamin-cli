@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import lamindb_setup as ln_setup
 test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
 
 
-def test_save_local_file():
+def test_save_and_annotate_local_file():
     filepath = test_file
 
     # neither key nor description
@@ -40,11 +41,12 @@ def test_save_local_file():
     assert "labeled with project: test_project" in result.stdout.decode()
     assert result.returncode == 0
 
-    artifact = ln.Artifact.get(key="mytest")
+    artifact = ln.Artifact.get(key="mytest", branch=branch)
     assert artifact.branch == branch
     assert project in artifact.projects.all()
 
-    # test passing the registry and saving the same file
+    # test passing the registry and saving the same file on the main branch
+    # it should recognize the file on the contrib1 branch
     result = subprocess.run(
         f"lamin save {filepath} --key mytest --registry artifact",
         shell=True,
@@ -52,7 +54,7 @@ def test_save_local_file():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert "returning existing artifact with same hash" in result.stdout.decode()
+    assert "returning artifact with same hash" in result.stdout.decode()
     assert "key='mytest'" in result.stdout.decode()
     assert "storage path:" in result.stdout.decode()
     assert result.returncode == 0
@@ -70,6 +72,46 @@ def test_save_local_file():
         in result.stderr.decode()
     )
     assert result.returncode == 1
+
+    result = subprocess.run(
+        f"lamin save {filepath} --key mytest --registry artifact",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert "returning artifact with same hash" in result.stdout.decode()
+    assert "key='mytest'" in result.stdout.decode()
+    assert "storage path:" in result.stdout.decode()
+    assert result.returncode == 0
+
+    artifact.projects.remove(project)
+
+    ml_split_type = ln.ULabel(name="Perturbation", is_type=True).save()
+    ln.ULabel(name="DMSO", type=ml_split_type).save()
+    ln.ULabel(name="IFNG", type=ml_split_type).save()
+    ln.Feature(name="perturbation", dtype=ml_split_type).save()
+    # can't find by key here because the artifact is not in the main branch
+    result = subprocess.run(
+        f"lamin annotate --uid {artifact.uid} --project test_project --features perturbation=DMSO,IFNG",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+
+    artifact = ln.Artifact.get(key="mytest", branch=branch)
+    features = artifact.features.get_values()
+    assert features["perturbation"] == {"DMSO", "IFNG"}
+    assert project in artifact.projects.all()
+    # can't find by key here because the artifact is not in the main branch
+    result = subprocess.run(
+        f"lamin describe --uid {artifact.uid}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
 
 
 def test_save_cloud_file():

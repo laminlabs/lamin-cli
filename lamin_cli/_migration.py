@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 if os.environ.get("NO_RICH"):
     import click as click
@@ -23,11 +22,13 @@ def create():
 
 
 @migrate.command("deploy")
-def deploy():
+@click.option("--package-name", type=str, default=None)
+@click.option("--number", type=str, default=None)
+def deploy(package_name: str | None = None, number: str | None = None):
     """Deploy migrations."""
     from lamindb_setup._migrate import migrate
 
-    return migrate.deploy()
+    return migrate.deploy(package_name=package_name, number=number)
 
 
 @migrate.command("squash")
