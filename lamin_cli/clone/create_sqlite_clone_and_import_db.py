@@ -44,9 +44,6 @@ clone_counts = _count_instance_records()
 original_counts = json.loads(args.original_counts)
 mismatches = _compare_record_counts(original_counts, clone_counts)
 if mismatches:
-    import json
-
-    # Print mismatches as JSON so parent can parse them
     print(json.dumps(mismatches), file=sys.stderr)
     sys.exit(1)
 
