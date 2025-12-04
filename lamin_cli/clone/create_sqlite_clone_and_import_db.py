@@ -1,12 +1,17 @@
 import argparse
+import json
+import sys
 from pathlib import Path
 
 import lamindb_setup as ln_setup
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--instance-name", required=True)
 parser.add_argument("--export-dir", required=True)
 parser.add_argument("--modules", required=True)
+parser.add_argument("--original-counts", required=True)
 args = parser.parse_args()
 
 instance_name = args.instance_name
@@ -29,6 +34,18 @@ from django.db import connection
 
 with connection.cursor() as cursor:
     cursor.execute("PRAGMA wal_checkpoint(FULL)")
+
+from lamin_cli.clone._clone_verification import (
+    _compare_record_counts,
+    _count_instance_records,
+)
+
+clone_counts = _count_instance_records()
+original_counts = json.loads(args.original_counts)
+mismatches = _compare_record_counts(original_counts, clone_counts)
+if mismatches:
+    print(json.dumps(mismatches), file=sys.stderr)
+    sys.exit(1)
 
 from django.db import connections
 
