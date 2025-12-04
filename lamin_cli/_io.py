@@ -10,7 +10,6 @@ from pathlib import Path
 import lamindb_setup as ln_setup
 
 from lamin_cli.clone._clone_verification import (
-    _compare_record_counts,
     _count_instance_records,
 )
 
@@ -28,8 +27,9 @@ def io():
 # fmt: off
 @io.command("snapshot")
 @click.option("--upload/--no-upload", is_flag=True, help="Whether to upload the snapshot.", default=True)
+@click.option("--track/--no-track", is_flag=True, help="Whether to track snapshot generation.", default=True)
 # fmt: on
-def snapshot(upload: bool):
+def snapshot(upload: bool, track: bool) -> None:
     """Create and optionally upload a SQLite snapshot of the current instance."""
     if not ln_setup.settings._instance_exists:
         raise click.ClickException(
@@ -51,9 +51,11 @@ def snapshot(upload: bool):
 
 
     with tempfile.TemporaryDirectory() as export_dir:
-        #ln.track()
+        if track:
+            ln.track()
         ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
-        #ln.finish()
+        if track:
+            ln.finish()
 
         script_path = (
             Path(__file__).parent / "clone" / "create_sqlite_clone_and_import_db.py"
