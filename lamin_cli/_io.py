@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -7,7 +8,11 @@ import tempfile
 from pathlib import Path
 
 import lamindb_setup as ln_setup
-from lamindb._finish import save_run_logs
+
+from lamin_cli.clone._clone_verification import (
+    _compare_record_counts,
+    _count_instance_records,
+)
 
 if os.environ.get("NO_RICH"):
     import click as click
@@ -36,21 +41,24 @@ def snapshot(upload: bool):
 
     ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
 
+    import lamindb as ln
+
+    original_counts = _count_instance_records()
+
     modules_without_lamindb = ln_setup.settings.instance.modules
     modules_complete = modules_without_lamindb.copy()
     modules_complete.add("lamindb")
 
-    import lamindb as ln
 
     with tempfile.TemporaryDirectory() as export_dir:
-        ln.track()
+        #ln.track()
         ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
-        ln.finish()
+        #ln.finish()
 
         script_path = (
             Path(__file__).parent / "clone" / "create_sqlite_clone_and_import_db.py"
         )
-        subprocess.run(
+        result = subprocess.run(
             [
                 sys.executable,
                 str(script_path),
@@ -60,10 +68,25 @@ def snapshot(upload: bool):
                 export_dir,
                 "--modules",
                 ",".join(modules_without_lamindb),
+                "--original-counts",
+                json.dumps(original_counts),
             ],
-            check=True,
+            check=False,
+            stderr=subprocess.PIPE,
+            text=True,
             cwd=Path.cwd(),
         )
+        if result.returncode != 0:
+            try:
+                mismatches = json.loads(result.stderr.strip())
+                error_msg = "Record count mismatch detected:\n" + "\n".join(
+                    [f"  {table}: original={orig}, clone={clone}"
+                    for table, (orig, clone) in mismatches.items()]
+                )
+                raise click.ClickException(error_msg)
+            except json.JSONDecodeError:
+                error_msg = f"Clone verification failed:\n{result.stderr}"
+
 
         ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
         if upload:
