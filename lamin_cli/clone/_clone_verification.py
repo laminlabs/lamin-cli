@@ -48,7 +48,9 @@ def _compare_record_counts(
         orig_count = original.get(table, 0)
         clone_count = clone.get(table, 0)
 
-        if orig_count != clone_count:
+        # we allow a difference of 1 because of tracking
+        # new records during the cloning process
+        if abs(clone_count - orig_count) > 1:
             mismatches[table] = (orig_count, clone_count)
 
     return mismatches
