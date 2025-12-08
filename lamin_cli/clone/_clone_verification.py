@@ -2,7 +2,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from django.db import OperationalError, ProgrammingError
 from lamin_utils import logger
-from lamindb.models import SQLRecord
 
 
 def _count_instance_records() -> dict[str, int]:
@@ -18,6 +17,7 @@ def _count_instance_records() -> dict[str, int]:
     """
     # Import here to ensure that models are loaded
     from django.apps import apps
+    from lamindb.models import SQLRecord
 
     def _count_model(model):
         """Count records for a single model."""
@@ -48,7 +48,9 @@ def _compare_record_counts(
         orig_count = original.get(table, 0)
         clone_count = clone.get(table, 0)
 
-        if orig_count != clone_count:
+        # we allow a difference of 1 because of tracking
+        # new records during the cloning process
+        if abs(clone_count - orig_count) > 1:
             mismatches[table] = (orig_count, clone_count)
 
     return mismatches
