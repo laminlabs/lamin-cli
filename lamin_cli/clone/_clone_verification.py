@@ -2,7 +2,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from django.db import OperationalError, ProgrammingError
 from lamin_utils import logger
-from lamindb.models import SQLRecord
 
 
 def _count_instance_records() -> dict[str, int]:
@@ -18,6 +17,7 @@ def _count_instance_records() -> dict[str, int]:
     """
     # Import here to ensure that models are loaded
     from django.apps import apps
+    from lamindb.models import SQLRecord
 
     def _count_model(model):
         """Count records for a single model."""
