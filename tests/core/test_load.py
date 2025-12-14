@@ -18,10 +18,6 @@ def test_decompose_url():
 
 
 def test_load_transform():
-    import lamindb_setup as ln_setup
-
-    print(ln_setup.settings.instance.slug)
-
     # check via a renamed instance
     result = subprocess.run(
         "lamin load"
@@ -39,11 +35,7 @@ def test_load_transform():
         shell=True,
         capture_output=True,
     )
-    print(result.stdout.decode())
-    print(result.stderr.decode())
     assert result.returncode == 0
-
-    print(ln_setup.settings.instance.slug)
 
     path1 = Path("run-track-and-finish.py")
     path2 = Path("run-track-and-finish__requirements.txt")
@@ -74,6 +66,7 @@ def test_load_transform():
 
 
 def test_get_load_artifact():
+    # test get
     result = subprocess.run(
         "lamin get"
         " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",
@@ -82,6 +75,7 @@ def test_get_load_artifact():
     )
     assert result.returncode == 0
 
+    # test load
     result = subprocess.run(
         "lamin load"
         " 'https://lamin.ai/laminlabs/lamin-site-assets/artifact/e2G7k9EVul4JbfsEYAy5'",
@@ -90,11 +84,20 @@ def test_get_load_artifact():
     )
     assert result.returncode == 0
 
+    # connect to instance
     subprocess.run("lamin connect laminlabs/lamin-site-assets", shell=True)
 
     # partial uid
     result = subprocess.run(
         "lamin load artifact --uid e2G7k9EVul4JbfsEYA",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
+    # by key
+    result = subprocess.run(
+        "lamin load --key blog/nbproject/elyra-completed-tutorial-pipeline.png",
         shell=True,
         capture_output=True,
     )

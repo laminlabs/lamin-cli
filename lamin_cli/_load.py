@@ -6,12 +6,15 @@ from pathlib import Path
 
 from lamin_utils import logger
 
-from ._save import parse_title_r_notebook
+from ._save import infer_registry_from_path, parse_title_r_notebook
 from .urls import decompose_url
 
 
 def load(
-    entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False
+    entity: str | None = None,
+    uid: str | None = None,
+    key: str | None = None,
+    with_env: bool = False,
 ):
     """Load artifact, collection, or transform from LaminDB.
 
@@ -25,6 +28,12 @@ def load(
         Path to loaded transform, or None for artifacts/collections
     """
     import lamindb_setup as ln_setup
+
+    if entity is None:
+        if key is None:
+            raise SystemExit("Either entity or key has to be provided.")
+        else:
+            entity = infer_registry_from_path(key)
 
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
