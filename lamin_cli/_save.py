@@ -219,7 +219,7 @@ def save(
                 if transform is None:
                     uid = f"{stem_uid}0000"
         else:
-            transform_hash, _ = hash_file(ppath)
+            _, transform_hash, _ = hash_file(ppath)
             transform = ln.Transform.filter(hash=transform_hash).first()
             if transform is not None and transform.hash is not None:
                 if transform.hash == transform_hash:
