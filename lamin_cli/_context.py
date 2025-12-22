@@ -43,7 +43,9 @@ def track(key: str | None = None):
         )
 
     if is_interactive_shell():
-        transform = ln.Transform(key=key).save()
+        raise click.ClickException(
+            "Can not track a run in an interactive shell. Please run through a shell script."
+        )
     else:
         path = get_script_filename()
         source_code = path.read_text()
