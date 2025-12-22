@@ -34,6 +34,7 @@ def test_track_lineage_via_cli():
     )
 
     transform = ln.Transform.get(key="track-lineage.sh")
+    assert transform.type == "script"
     run = transform.latest_run
 
     input_artifacts = run.input_artifacts.all()
