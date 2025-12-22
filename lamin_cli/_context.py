@@ -41,16 +41,9 @@ def track():
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
-
-    if is_interactive_shell():
-        raise click.ClickException(
-            "Can not track a run in an interactive shell. Please run through a shell script."
-        )
-    else:
-        path = get_script_filename()
-        source_code = path.read_text()
-        transform = ln.Transform(key=path.name, source_code=source_code).save()
-
+    path = get_script_filename()
+    source_code = path.read_text()
+    transform = ln.Transform(key=path.name, source_code=source_code).save()
     run = ln.Run(transform=transform).save()
     current_run_file = get_current_run_file()
     current_run_file.parent.mkdir(parents=True, exist_ok=True)
