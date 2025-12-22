@@ -49,15 +49,27 @@ def load(
     ln_setup.connect(instance)
     import lamindb as ln
 
-    # Check for active run from environment variable
+    # Check for active run from file (also support env var for backward compatibility)
     current_run = None
-    current_run_uid = os.environ.get("LAMINDB_CURRENT_RUN")
+    current_run_uid = None
+
+    # First check environment variable (for backward compatibility)
+    if "LAMINDB_CURRENT_RUN" in os.environ:
+        current_run_uid = os.environ.get("LAMINDB_CURRENT_RUN")
+
+    # Then check file (takes precedence)
+    from lamindb_setup.core._settings_store import settings_dir
+
+    current_run_file = settings_dir / "current_run.txt"
+    if current_run_file.exists():
+        file_run_uid = current_run_file.read_text().strip()
+        if file_run_uid:
+            current_run_uid = file_run_uid
+
     if current_run_uid:
         current_run = ln.Run.filter(uid=current_run_uid).one_or_none()
         if current_run is None:
-            logger.warning(
-                f"Run with UID {current_run_uid} from LAMINDB_CURRENT_RUN not found, ignoring"
-            )
+            logger.warning(f"Run with UID {current_run_uid} not found, ignoring")
 
     def script_to_notebook(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False

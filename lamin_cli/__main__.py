@@ -441,16 +441,38 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
         sys.exit(1)
 
 
+def get_current_run_file() -> Path:
+    """Get the path to the file storing the current run UID."""
+    from lamindb_setup.core._settings_store import settings_dir
+    return settings_dir / "current_shell_run.txt"
+
+
+def is_interactive_shell() -> bool:
+    """Check if running in an interactive terminal."""
+    return sys.stdin.isatty() and sys.stdout.isatty() and os.isatty(0)
+
+
+def get_script_filename() -> Path:
+    """Try to get the filename of the calling shell script."""
+    import psutil
+
+    parent = psutil.Process(os.getppid())
+    cmdline = parent.cmdline()
+
+    # For shells like bash, sh, zsh
+    if parent.name() in ['bash', 'sh', 'zsh', 'dash']:
+        # cmdline is typically: ['/bin/bash', 'script.sh', ...]
+        if len(cmdline) > 1 and not cmdline[1].startswith('-'):
+            return Path(cmdline[1])
+    raise click.ClickException("Cannot determine script filename. Please run in an interactive shell.")
+
+
 @main.command()
-@click.option("--transform", type=str, default=None, help="A transform (stem) uid. If not passed, auto-creates a transform with its uid.")
-@click.option("--project", type=str, default=None, help="A valid project name or uid.")
-@click.option("--space", type=str, default=None, help="A valid space name or uid.")
-@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
-@click.option("--path", type=str, default=None, help="Filepath of notebook or script. Only needed if it can't be automatically detected.")
-def track(transform: str | None = None, project: str | None = None, space: str | None = None, branch: str | None = None, path: str | None = None):
+@click.argument("key", type=str, default=None, required=False)
+def track(key: str | None = None):
     """Start tracking a run of a notebook or script.
 
-    This command works exactly like `ln.track()` in a Python session.
+    This command works like `ln.track()` in a Python session, but in a shell.
 
     Example:
 
@@ -461,33 +483,26 @@ def track(transform: str | None = None, project: str | None = None, space: str |
     lamin finish
     ```
 
-    The run UID is stored in the `LAMINDB_CURRENT_RUN` environment variable,
-    which is automatically used by `lamin load` and `lamin save` to track
-    inputs and outputs.
+    The run UID is stored in a file and automatically used by `lamin load` and
+    `lamin save` to track inputs and outputs.
     """
     import lamindb as ln
 
     if not ln.setup.settings._instance_exists:
         raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
 
-    # Call ln.track() with the provided options
-    ln.track(
-        transform=transform,
-        project=project,
-        space=space,
-        branch=branch,
-        path=path,
-    )
+    if is_interactive_shell():
+        transform = ln.Transform(key=key).save()
+    else:
+        path = get_script_filename()
+        source_code = path.read_text()
+        transform = ln.Transform(key=path.name, source_code=source_code).save()
 
-    # Get the run UID and store it in environment variable
-    if ln.context.run is None:
-        raise click.ClickException("Failed to start tracking: no run was created")
-
-    run_uid = ln.context.run.uid
-    os.environ["LAMINDB_CURRENT_RUN"] = run_uid
-    logger.important(f"Started tracking run: {run_uid}")
-    logger.important("To use this run in separate commands, export it:")
-    logger.important(f"  export LAMINDB_CURRENT_RUN={run_uid}")
+    run = ln.Run(transform=transform).save()
+    current_run_file = get_current_run_file()
+    current_run_file.parent.mkdir(parents=True, exist_ok=True)
+    current_run_file.write_text(run.uid)
+    logger.important(f"started tracking shell run: {run.uid}")
 
 
 @main.command()
@@ -497,7 +512,7 @@ def finish():
     This command works exactly like `ln.finish()` in a Python session.
 
     It marks the run as finished, saves the execution report, source code & environment,
-    and clears the `LAMINDB_CURRENT_RUN` environment variable.
+    and clears the stored run UID.
 
     Example:
 
@@ -508,30 +523,22 @@ def finish():
     lamin finish
     ```
     """
+    from datetime import datetime, timezone
+
     import lamindb as ln
 
     if not ln.setup.settings._instance_exists:
         raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
 
-    if ln.context.run is None:
-        current_run_uid = os.environ.get("LAMINDB_CURRENT_RUN")
-        if current_run_uid is None:
-            raise click.ClickException("No active run to finish. Please run `lamin track` first.")
-        # Try to load the run from the environment variable
-        run = ln.Run.filter(uid=current_run_uid).one_or_none()
-        if run is None:
-            raise click.ClickException(f"Run with UID {current_run_uid} not found")
-        # Set the context run and transform so finish() can work
-        ln.context._run = run
-        ln.context._transform = run.transform
-
-    # Call ln.finish()
-    ln.finish()
-
-    # Clear the environment variable
-    if "LAMINDB_CURRENT_RUN" in os.environ:
-        del os.environ["LAMINDB_CURRENT_RUN"]
-        logger.important("Finished tracking run and cleared LAMINDB_CURRENT_RUN environment variable")
+    current_run_file = get_current_run_file()
+    if not current_run_file.exists():
+        raise click.ClickException("No active run to finish. Please run `lamin track` first.")
+    run = ln.Run.get(uid=current_run_file.read_text().strip())
+    run._status_code = 0
+    run.finished_at = datetime.now(timezone.utc)
+    run.save()
+    current_run_file.unlink()
+    logger.important(f"finished tracking shell run: {run.uid}")
 
 
 @main.command()
