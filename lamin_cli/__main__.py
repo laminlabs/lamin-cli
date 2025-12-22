@@ -43,7 +43,7 @@ COMMAND_GROUPS = {
             "commands": ["load", "save", "create", "delete"],
         },
         {
-            "name": "Track runs",
+            "name": "Tracking within shell scripts",
             "commands": ["track", "finish"],
         },
         {
@@ -443,21 +443,24 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
 @main.command()
 @click.argument("key", type=str, default=None, required=False)
 def track(key: str | None = None):
-    """Start tracking a run of a notebook or script.
+    """Start tracking a run of a shell script.
 
-    This command works like `ln.track()` in a Python session, but in a shell.
-
-    Example:
+    This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
 
     ```
+    # my_script.sh
     lamin track
-    lamin load --key mydata.parquet
-    lamin save output.parquet --key results/output.parquet
+    lamin load --key raw/file1.txt
+    # do something
+    lamin save processed_file1.txt --key processed/file1.txt
     lamin finish
     ```
 
-    The run UID is stored in a file and automatically used by `lamin load` and
-    `lamin save` to track inputs and outputs.
+    If you run that script, it will track the run of the script, and save the input and output artifacts:
+
+    ```
+    sh my_script.sh
+    ```
     """
     from lamin_cli._context import track as track_
     return track_(key=key)
@@ -465,21 +468,9 @@ def track(key: str | None = None):
 
 @main.command()
 def finish():
-    """Finish the current tracked run.
+    """Finish the current tracked run of a shell script.
 
-    This command works exactly like `ln.finish()` in a Python session.
-
-    It marks the run as finished, saves the execution report, source code & environment,
-    and clears the stored run UID.
-
-    Example:
-
-    ```
-    lamin track
-    lamin load --key mydata.parquet
-    lamin save output.parquet --key results/output.parquet
-    lamin finish
-    ```
+    This command works like {func}`~lamindb.finish()` in a Python session.
     """
     from lamin_cli._context import finish as finish_
     return finish_()
