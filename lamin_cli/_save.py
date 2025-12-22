@@ -9,6 +9,8 @@ import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
+from lamin_cli._context import get_current_run_file
+
 
 def infer_registry_from_path(path: Path | str) -> str:
     suffixes_transform = {
@@ -82,25 +84,12 @@ def save(
 ) -> str | None:
     import lamindb as ln
     from lamindb._finish import save_context_core
+    from lamindb_setup.core._settings_store import settings_dir
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
-    # Check for active run from file (also support env var for backward compatibility)
     current_run = None
-    current_run_uid = None
-
-    # Then check file (takes precedence)
-    from lamindb_setup.core._settings_store import settings_dir
-
-    current_run_file = settings_dir / "current_run.txt"
-    if current_run_file.exists():
-        file_run_uid = current_run_file.read_text().strip()
-        if file_run_uid:
-            current_run_uid = file_run_uid
-
-    if current_run_uid:
-        current_run = ln.Run.filter(uid=current_run_uid).one_or_none()
-        if current_run is None:
-            logger.warning(f"Run with UID {current_run_uid} not found, ignoring")
+    if get_current_run_file().exists():
+        current_run = ln.Run.get(uid=get_current_run_file().read_text().strip())
 
     # this allows to have the correct treatment of credentials in case of cloud paths
     ppath = create_path(path)
@@ -167,7 +156,7 @@ def save(
             revises=revises,
             branch=branch_record,
             space=space_record,
-            run=current_run if current_run is not None else None,
+            run=current_run,
         ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")

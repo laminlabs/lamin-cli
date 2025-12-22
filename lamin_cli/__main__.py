@@ -440,33 +440,6 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
-
-def get_current_run_file() -> Path:
-    """Get the path to the file storing the current run UID."""
-    from lamindb_setup.core._settings_store import settings_dir
-    return settings_dir / "current_shell_run.txt"
-
-
-def is_interactive_shell() -> bool:
-    """Check if running in an interactive terminal."""
-    return sys.stdin.isatty() and sys.stdout.isatty() and os.isatty(0)
-
-
-def get_script_filename() -> Path:
-    """Try to get the filename of the calling shell script."""
-    import psutil
-
-    parent = psutil.Process(os.getppid())
-    cmdline = parent.cmdline()
-
-    # For shells like bash, sh, zsh
-    if parent.name() in ['bash', 'sh', 'zsh', 'dash']:
-        # cmdline is typically: ['/bin/bash', 'script.sh', ...]
-        if len(cmdline) > 1 and not cmdline[1].startswith('-'):
-            return Path(cmdline[1])
-    raise click.ClickException("Cannot determine script filename. Please run in an interactive shell.")
-
-
 @main.command()
 @click.argument("key", type=str, default=None, required=False)
 def track(key: str | None = None):
@@ -486,23 +459,8 @@ def track(key: str | None = None):
     The run UID is stored in a file and automatically used by `lamin load` and
     `lamin save` to track inputs and outputs.
     """
-    import lamindb as ln
-
-    if not ln.setup.settings._instance_exists:
-        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
-
-    if is_interactive_shell():
-        transform = ln.Transform(key=key).save()
-    else:
-        path = get_script_filename()
-        source_code = path.read_text()
-        transform = ln.Transform(key=path.name, source_code=source_code).save()
-
-    run = ln.Run(transform=transform).save()
-    current_run_file = get_current_run_file()
-    current_run_file.parent.mkdir(parents=True, exist_ok=True)
-    current_run_file.write_text(run.uid)
-    logger.important(f"started tracking shell run: {run.uid}")
+    from lamin_cli._context import track as track_
+    return track_(key=key)
 
 
 @main.command()
@@ -523,22 +481,8 @@ def finish():
     lamin finish
     ```
     """
-    from datetime import datetime, timezone
-
-    import lamindb as ln
-
-    if not ln.setup.settings._instance_exists:
-        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
-
-    current_run_file = get_current_run_file()
-    if not current_run_file.exists():
-        raise click.ClickException("No active run to finish. Please run `lamin track` first.")
-    run = ln.Run.get(uid=current_run_file.read_text().strip())
-    run._status_code = 0
-    run.finished_at = datetime.now(timezone.utc)
-    run.save()
-    current_run_file.unlink()
-    logger.important(f"finished tracking shell run: {run.uid}")
+    from lamin_cli._context import finish as finish_
+    return finish_()
 
 
 @main.command()
