@@ -84,6 +84,16 @@ def save(
     from lamindb._finish import save_context_core
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
+    # Check for active run from environment variable
+    current_run = None
+    current_run_uid = os.environ.get("LAMINDB_CURRENT_RUN")
+    if current_run_uid:
+        current_run = ln.Run.filter(uid=current_run_uid).one_or_none()
+        if current_run is None:
+            logger.warning(
+                f"Run with UID {current_run_uid} from LAMINDB_CURRENT_RUN not found, ignoring"
+            )
+
     # this allows to have the correct treatment of credentials in case of cloud paths
     ppath = create_path(path)
     # isinstance is needed to cast the type of path to UPath
@@ -149,6 +159,7 @@ def save(
             revises=revises,
             branch=branch_record,
             space=space_record,
+            run=current_run if current_run is not None else None,
         ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")

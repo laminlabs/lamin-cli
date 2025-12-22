@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from pathlib import Path
@@ -47,6 +48,16 @@ def load(
 
     ln_setup.connect(instance)
     import lamindb as ln
+
+    # Check for active run from environment variable
+    current_run = None
+    current_run_uid = os.environ.get("LAMINDB_CURRENT_RUN")
+    if current_run_uid:
+        current_run = ln.Run.filter(uid=current_run_uid).one_or_none()
+        if current_run is None:
+            logger.warning(
+                f"Run with UID {current_run_uid} from LAMINDB_CURRENT_RUN not found, ignoring"
+            )
 
     def script_to_notebook(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
@@ -182,7 +193,11 @@ def load(
                 entities = entities.order_by("-created_at")
 
             entity_obj = entities.first()
-            cache_path = entity_obj.cache()
+            # Pass the run to track as input if LAMINDB_CURRENT_RUN is set
+            if current_run is not None:
+                cache_path = entity_obj.cache(is_run_input=current_run)
+            else:
+                cache_path = entity_obj.cache()
 
             # collection gives us a list of paths
             if isinstance(cache_path, list):

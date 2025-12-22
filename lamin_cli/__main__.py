@@ -43,6 +43,10 @@ COMMAND_GROUPS = {
             "commands": ["load", "save", "create", "delete"],
         },
         {
+            "name": "Track runs",
+            "commands": ["track", "finish"],
+        },
+        {
             "name": "Describe, annotate & list data",
             "commands": ["describe", "annotate", "list"],
         },
@@ -435,6 +439,99 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     """
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
+
+
+@main.command()
+@click.option("--transform", type=str, default=None, help="A transform (stem) uid. If not passed, auto-creates a transform with its uid.")
+@click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--space", type=str, default=None, help="A valid space name or uid.")
+@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
+@click.option("--path", type=str, default=None, help="Filepath of notebook or script. Only needed if it can't be automatically detected.")
+def track(transform: str | None = None, project: str | None = None, space: str | None = None, branch: str | None = None, path: str | None = None):
+    """Start tracking a run of a notebook or script.
+
+    This command works exactly like `ln.track()` in a Python session.
+
+    Example:
+
+    ```
+    lamin track
+    lamin load --key mydata.parquet
+    lamin save output.parquet --key results/output.parquet
+    lamin finish
+    ```
+
+    The run UID is stored in the `LAMINDB_CURRENT_RUN` environment variable,
+    which is automatically used by `lamin load` and `lamin save` to track
+    inputs and outputs.
+    """
+    import lamindb as ln
+
+    if not ln.setup.settings._instance_exists:
+        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
+
+    # Call ln.track() with the provided options
+    ln.track(
+        transform=transform,
+        project=project,
+        space=space,
+        branch=branch,
+        path=path,
+    )
+
+    # Get the run UID and store it in environment variable
+    if ln.context.run is None:
+        raise click.ClickException("Failed to start tracking: no run was created")
+
+    run_uid = ln.context.run.uid
+    os.environ["LAMINDB_CURRENT_RUN"] = run_uid
+    logger.important(f"Started tracking run: {run_uid}")
+    logger.important("To use this run in separate commands, export it:")
+    logger.important(f"  export LAMINDB_CURRENT_RUN={run_uid}")
+
+
+@main.command()
+def finish():
+    """Finish the current tracked run.
+
+    This command works exactly like `ln.finish()` in a Python session.
+
+    It marks the run as finished, saves the execution report, source code & environment,
+    and clears the `LAMINDB_CURRENT_RUN` environment variable.
+
+    Example:
+
+    ```
+    lamin track
+    lamin load --key mydata.parquet
+    lamin save output.parquet --key results/output.parquet
+    lamin finish
+    ```
+    """
+    import lamindb as ln
+
+    if not ln.setup.settings._instance_exists:
+        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
+
+    if ln.context.run is None:
+        current_run_uid = os.environ.get("LAMINDB_CURRENT_RUN")
+        if current_run_uid is None:
+            raise click.ClickException("No active run to finish. Please run `lamin track` first.")
+        # Try to load the run from the environment variable
+        run = ln.Run.filter(uid=current_run_uid).one_or_none()
+        if run is None:
+            raise click.ClickException(f"Run with UID {current_run_uid} not found")
+        # Set the context run and transform so finish() can work
+        ln.context._run = run
+        ln.context._transform = run.transform
+
+    # Call ln.finish()
+    ln.finish()
+
+    # Clear the environment variable
+    if "LAMINDB_CURRENT_RUN" in os.environ:
+        del os.environ["LAMINDB_CURRENT_RUN"]
+        logger.important("Finished tracking run and cleared LAMINDB_CURRENT_RUN environment variable")
 
 
 @main.command()
