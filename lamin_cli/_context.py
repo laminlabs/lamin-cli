@@ -34,7 +34,7 @@ def get_script_filename() -> Path:
     )
 
 
-def track(key: str | None = None):
+def track():
     import lamindb as ln
 
     if not ln.setup.settings._instance_exists:

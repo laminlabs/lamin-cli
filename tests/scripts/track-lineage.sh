@@ -17,7 +17,7 @@ lamin save "$INPUT_FILE" --key test/input.txt
 
 # Start tracking a run
 # When run non-interactively, track will use the script filename as the key
-lamin track test-lineage-tracking
+lamin track
 
 # Load the input artifact (this should track it as a run input)
 lamin load --key test/input.txt

@@ -441,8 +441,7 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
         sys.exit(1)
 
 @main.command()
-@click.argument("key", type=str, default=None, required=False)
-def track(key: str | None = None):
+def track():
     """Start tracking a run of a shell script.
 
     This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
@@ -463,7 +462,7 @@ def track(key: str | None = None):
     ```
     """
     from lamin_cli._context import track as track_
-    return track_(key=key)
+    return track_()
 
 
 @main.command()
