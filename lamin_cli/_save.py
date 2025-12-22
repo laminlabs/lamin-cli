@@ -16,12 +16,16 @@ def infer_registry_from_path(path: Path | str) -> str:
     suffixes_transform = {
         "py": {".py", ".ipynb"},
         "R": {".R", ".qmd", ".Rmd"},
+        "sh": {".sh"},
     }
     if isinstance(path, str):
         path = Path(path)
     registry = (
         "transform"
-        if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
+        if path.suffix
+        in suffixes_transform["py"]
+        .union(suffixes_transform["R"])
+        .union(suffixes_transform["sh"])
         else "artifact"
     )
     return registry
