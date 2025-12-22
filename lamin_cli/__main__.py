@@ -448,11 +448,12 @@ def track():
 
     ```
     # my_script.sh
-    lamin track
+    set -e         # exit on error
+    lamin track    # initiate a tracked shell script run
     lamin load --key raw/file1.txt
     # do something
     lamin save processed_file1.txt --key processed/file1.txt
-    lamin finish
+    lamin finish   # mark the shell script run as finished
     ```
 
     If you run that script, it will track the run of the script, and save the input and output artifacts:

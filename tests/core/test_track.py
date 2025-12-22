@@ -19,7 +19,7 @@ def test_track_lineage_via_cli():
 
     # Run the shell script
     result = subprocess.run(
-        ["bash", str(script_path)],
+        ["sh", str(script_path)],
         env=env,
         capture_output=True,
         text=True,
