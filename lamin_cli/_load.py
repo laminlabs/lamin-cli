@@ -6,6 +6,7 @@ from pathlib import Path
 
 from lamin_utils import logger
 
+from ._context import get_current_run_file
 from ._save import infer_registry_from_path, parse_title_r_notebook
 from .urls import decompose_url
 
@@ -47,6 +48,10 @@ def load(
 
     ln_setup.connect(instance)
     import lamindb as ln
+
+    current_run = None
+    if get_current_run_file().exists():
+        current_run = ln.Run.get(uid=get_current_run_file().read_text().strip())
 
     def script_to_notebook(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
@@ -182,7 +187,7 @@ def load(
                 entities = entities.order_by("-created_at")
 
             entity_obj = entities.first()
-            cache_path = entity_obj.cache()
+            cache_path = entity_obj.cache(is_run_input=current_run)
 
             # collection gives us a list of paths
             if isinstance(cache_path, list):

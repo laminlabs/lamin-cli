@@ -9,17 +9,23 @@ import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
+from lamin_cli._context import get_current_run_file
+
 
 def infer_registry_from_path(path: Path | str) -> str:
     suffixes_transform = {
         "py": {".py", ".ipynb"},
         "R": {".R", ".qmd", ".Rmd"},
+        "sh": {".sh"},
     }
     if isinstance(path, str):
         path = Path(path)
     registry = (
         "transform"
-        if path.suffix in suffixes_transform["py"].union(suffixes_transform["R"])
+        if path.suffix
+        in suffixes_transform["py"]
+        .union(suffixes_transform["R"])
+        .union(suffixes_transform["sh"])
         else "artifact"
     )
     return registry
@@ -42,9 +48,11 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
             r'track\(\s*(?:transform\s*=\s*)?([\'"])([a-zA-Z0-9]{12,16})\1'
         )
         uid_pattern = None
+    elif suffix == ".sh":
+        return None
     else:
         raise SystemExit(
-            "Only .py, .ipynb, .R, .qmd, .Rmd files are supported for saving"
+            "Only .py, .ipynb, .R, .qmd, .Rmd, .sh files are supported for saving"
             " transforms."
         )
 
@@ -82,7 +90,12 @@ def save(
 ) -> str | None:
     import lamindb as ln
     from lamindb._finish import save_context_core
+    from lamindb_setup.core._settings_store import settings_dir
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
+
+    current_run = None
+    if get_current_run_file().exists():
+        current_run = ln.Run.get(uid=get_current_run_file().read_text().strip())
 
     # this allows to have the correct treatment of credentials in case of cloud paths
     ppath = create_path(path)
@@ -149,6 +162,7 @@ def save(
             revises=revises,
             branch=branch_record,
             space=space_record,
+            run=current_run,
         ).save()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
@@ -268,7 +282,7 @@ def save(
                 uid=uid,
                 description=description,
                 key=key,
-                type="script" if ppath.suffix in {".R", ".py"} else "notebook",
+                type="script" if ppath.suffix in {".R", ".py", ".sh"} else "notebook",
                 revises=revises,
             )
             if space is not None:

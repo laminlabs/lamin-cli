@@ -43,6 +43,10 @@ COMMAND_GROUPS = {
             "commands": ["load", "save", "create", "delete"],
         },
         {
+            "name": "Tracking within shell scripts",
+            "commands": ["track", "finish"],
+        },
+        {
             "name": "Describe, annotate & list data",
             "commands": ["describe", "annotate", "list"],
         },
@@ -435,6 +439,41 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     """
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
+
+@main.command()
+def track():
+    """Start tracking a run of a shell script.
+
+    This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
+
+    ```
+    # my_script.sh
+    set -e         # exit on error
+    lamin track    # initiate a tracked shell script run
+    lamin load --key raw/file1.txt
+    # do something
+    lamin save processed_file1.txt --key processed/file1.txt
+    lamin finish   # mark the shell script run as finished
+    ```
+
+    If you run that script, it will track the run of the script, and save the input and output artifacts:
+
+    ```
+    sh my_script.sh
+    ```
+    """
+    from lamin_cli._context import track as track_
+    return track_()
+
+
+@main.command()
+def finish():
+    """Finish the current tracked run of a shell script.
+
+    This command works like {func}`~lamindb.finish()` in a Python session.
+    """
+    from lamin_cli._context import finish as finish_
+    return finish_()
 
 
 @main.command()
