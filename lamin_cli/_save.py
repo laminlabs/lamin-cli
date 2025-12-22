@@ -48,9 +48,11 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
             r'track\(\s*(?:transform\s*=\s*)?([\'"])([a-zA-Z0-9]{12,16})\1'
         )
         uid_pattern = None
+    elif suffix == ".sh":
+        return None
     else:
         raise SystemExit(
-            "Only .py, .ipynb, .R, .qmd, .Rmd files are supported for saving"
+            "Only .py, .ipynb, .R, .qmd, .Rmd, .sh files are supported for saving"
             " transforms."
         )
 
@@ -280,7 +282,7 @@ def save(
                 uid=uid,
                 description=description,
                 key=key,
-                type="script" if ppath.suffix in {".R", ".py"} else "notebook",
+                type="script" if ppath.suffix in {".R", ".py", ".sh"} else "notebook",
                 revises=revises,
             )
             if space is not None:

@@ -43,7 +43,9 @@ def track():
         )
     path = get_script_filename()
     source_code = path.read_text()
-    transform = ln.Transform(key=path.name, source_code=source_code).save()
+    transform = ln.Transform(
+        key=path.name, source_code=source_code, type="script"
+    ).save()
     run = ln.Run(transform=transform).save()
     current_run_file = get_current_run_file()
     current_run_file.parent.mkdir(parents=True, exist_ok=True)
