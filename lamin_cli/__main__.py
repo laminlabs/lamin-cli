@@ -43,6 +43,10 @@ COMMAND_GROUPS = {
             "commands": ["load", "save", "create", "delete"],
         },
         {
+            "name": "Tracking within shell scripts",
+            "commands": ["track", "finish"],
+        },
+        {
             "name": "Describe, annotate & list data",
             "commands": ["describe", "annotate", "list"],
         },
@@ -322,35 +326,39 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
 
 
 @main.command()
-@click.argument("entity", type=str)
+@click.argument("entity", type=str, required=False)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def load(entity: str, uid: str | None = None, key: str | None = None, with_env: bool = False):
+def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
     """Load a file or folder into the cache or working directory.
 
-    Pass a URL, `artifact`, or `transform`. For example:
+    Pass a URL or `--key`. For example:
 
     ```
     lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
-    lamin load artifact --key mydatasets/mytable.parquet
+    lamin load --key mydatasets/mytable.parquet
+    lamin load --key analysis.ipynb
+    lamin load --key myanalyses/analysis.ipynb --with-env
+    ```
+
+    You can also pass a uid and the entity type:
+
+    ```
     lamin load artifact --uid e2G7k9EVul4JbfsE
-    lamin load transform --key analysis.ipynb
     lamin load transform --uid Vul4JbfsEYAy5
-    lamin load transform --uid Vul4JbfsEYAy5 --with-env
     ```
     """
-    is_slug = entity.count("/") == 1
-    if is_slug:
-        from lamindb_setup._connect_instance import _connect_cli
-        # for backward compat and convenience, connect to the instance
-        return _connect_cli(entity)
-    else:
-        from lamin_cli._load import load as load_
-
-        return load_(entity, uid=uid, key=key, with_env=with_env)
+    from lamin_cli._load import load as load_
+    if entity is not None:
+        is_slug = entity.count("/") == 1
+        if is_slug:
+            from lamindb_setup._connect_instance import _connect_cli
+            # for backward compat
+            return _connect_cli(entity)
+    return load_(entity, uid=uid, key=key, with_env=with_env)
 
 
 def _describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
@@ -431,6 +439,41 @@ def save(path: str, key: str, description: str, stem_uid: str, project: str, spa
     """
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
+
+@main.command()
+def track():
+    """Start tracking a run of a shell script.
+
+    This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
+
+    ```
+    # my_script.sh
+    set -e         # exit on error
+    lamin track    # initiate a tracked shell script run
+    lamin load --key raw/file1.txt
+    # do something
+    lamin save processed_file1.txt --key processed/file1.txt
+    lamin finish   # mark the shell script run as finished
+    ```
+
+    If you run that script, it will track the run of the script, and save the input and output artifacts:
+
+    ```
+    sh my_script.sh
+    ```
+    """
+    from lamin_cli._context import track as track_
+    return track_()
+
+
+@main.command()
+def finish():
+    """Finish the current tracked run of a shell script.
+
+    This command works like {func}`~lamindb.finish()` in a Python session.
+    """
+    from lamin_cli._context import finish as finish_
+    return finish_()
 
 
 @main.command()

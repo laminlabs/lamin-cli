@@ -25,8 +25,6 @@ if __name__ == "__main__":
         storage=f"{instance_name}-clone", modules=f"{','.join(modules_without_lamindb)}"
     )
 
-    import lamindb  # why is this needed?
-
     ln_setup.io.import_db(
         module_names=list(modules_complete), input_dir=export_dir, if_exists="replace"
     )
