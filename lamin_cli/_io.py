@@ -86,8 +86,8 @@ def snapshot(upload: bool, track: bool) -> None:
                     for table, (orig, clone) in mismatches.items()]
                 )
                 raise click.ClickException(error_msg)
-            except json.JSONDecodeError:
-                error_msg = f"Clone verification failed:\n{result.stderr}"
+            except (json.JSONDecodeError, AttributeError, ValueError, TypeError):
+                raise click.ClickException(f"Clone verification failed:\n{result.stderr}") from None
 
 
         ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
