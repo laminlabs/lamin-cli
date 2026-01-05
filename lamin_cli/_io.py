@@ -30,7 +30,7 @@ def io():
 @click.option("--track/--no-track", is_flag=True, help="Whether to track snapshot generation.", default=True)
 # fmt: on
 def snapshot(upload: bool, track: bool) -> None:
-    """Create and optionally upload a SQLite snapshot of the current instance."""
+    """Create a SQLite snapshot of the connected instance."""
     if not ln_setup.settings._instance_exists:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
