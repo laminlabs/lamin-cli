@@ -9,7 +9,7 @@ def test_run_on_modal():
 
     subprocess.run("lamin connect laminlabs/lamindata", shell=True, check=True)
     result = subprocess.run(
-        f"lamin run {filepath} --project 1QLbS6N7wwiL",
+        f"lamin run {filepath} --project 1QLbS6N7wwiL --packages httpx_retries",
         shell=True,
         capture_output=True,
     )
