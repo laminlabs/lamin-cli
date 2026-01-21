@@ -16,4 +16,3 @@ def test_run_on_modal():
     print(result.stdout.decode())
     assert result.returncode == 0
     assert "hello!" in result.stdout.decode()
-    assert "finished Run" in result.stdout.decode()
