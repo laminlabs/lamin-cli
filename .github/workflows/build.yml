@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [release]
+    branches: [release, main]
   pull_request:
 
 jobs:
@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_groups: ${{ steps.set-matrix.outputs.has_groups }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
       - uses: dorny/paths-filter@v3
         id: changes
         if: github.event_name != 'push'
@@ -23,29 +23,28 @@ jobs:
             modal:
               - 'lamin_cli/compute/modal.py'
               - 'tests/modal/**'
-
       - id: set-matrix
         shell: bash
         run: |
           BASE_GROUPS=$(jq -n -c '[]')
-
+          # Run everything on push or when modal paths change
           if [[ "${{ github.event_name }}" == "push" || "${{ steps.changes.outputs.modal }}" == "true" ]]; then
-            # Run everything on push or when modal paths change
             MATRIX=$(jq -n -c --argjson groups "$BASE_GROUPS" '{group: ($groups + ["modal"])}')
+            echo "has_groups=true" >> $GITHUB_OUTPUT
+          # Otherwise only run base groups
           else
-            # Otherwise only run base groups
             MATRIX=$(jq -n -c --argjson groups "$BASE_GROUPS" '{group: $groups}')
+            echo "has_groups=false" >> $GITHUB_OUTPUT
           fi
-
           # Output as single line for GitHub Actions
           echo "matrix=$(echo "$MATRIX" | jq -c .)" >> $GITHUB_OUTPUT
-
           # Pretty print for debugging
           echo "Generated matrix:"
           echo "$MATRIX" | jq .
 
   test:
     needs: pre-filter
+    if: needs.pre-filter.outputs.has_groups == 'true'
     runs-on: ubuntu-latest
     env:
       LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
@@ -58,25 +57,17 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-
       - uses: actions/setup-python@v6
         with:
           python-version: 3.12
-
       - name: cache pre-commit
         uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-
       - run: pip install git+https://github.com/laminlabs/laminci
-
       - run: uv pip install --system modal pytest
-
       - run: modal token set --token-id ${{ secrets.MODAL_DEV_TOKEN_ID }} --token-secret ${{ secrets.MODAL_DEV_TOKEN_SECRET }}
-
       - run: nox -s setup
-
       - run: lamin login
-
       - run: pytest tests/modal
