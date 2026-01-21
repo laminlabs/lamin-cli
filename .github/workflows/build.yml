@@ -27,17 +27,18 @@ jobs:
         shell: bash
         run: |
           BASE_GROUPS=$(jq -n -c '[]')
-
+          # Run everything on push or when modal paths change
           if [[ "${{ github.event_name }}" == "push" || "${{ steps.changes.outputs.modal }}" == "true" ]]; then
             MATRIX=$(jq -n -c --argjson groups "$BASE_GROUPS" '{group: ($groups + ["modal"])}')
             echo "has_groups=true" >> $GITHUB_OUTPUT
+          # Otherwise only run base groups
           else
             MATRIX=$(jq -n -c --argjson groups "$BASE_GROUPS" '{group: $groups}')
             echo "has_groups=false" >> $GITHUB_OUTPUT
           fi
-
+          # Output as single line for GitHub Actions
           echo "matrix=$(echo "$MATRIX" | jq -c .)" >> $GITHUB_OUTPUT
-
+          # Pretty print for debugging
           echo "Generated matrix:"
           echo "$MATRIX" | jq .
 
