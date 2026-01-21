@@ -162,9 +162,6 @@ class Runner:
             packages = base_packages
         else:
             packages += base_packages
-
-        print(f"packages: {packages}")
-
         if image_url is None:
             image = modal.Image.debian_slim(python_version=python_version)
         else:
