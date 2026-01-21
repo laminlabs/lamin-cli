@@ -171,6 +171,5 @@ class Runner:
             image.pip_install(packages)
             .env(env_variables)
             .add_local_python_source("lamindb", "lamindb_setup", copy=True)
-            .run_commands("lamin settings set auto-connect true")
             .add_local_dir(local_dir, remote_dir)
         )
