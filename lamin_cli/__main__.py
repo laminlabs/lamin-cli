@@ -548,7 +548,7 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
 @click.argument("filepath", type=str)
 @click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
 @click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
-@click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
+@click.option("--packages", type=str, default=None, help="A comma-separated list of additional packages to install.")
 @click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
 @click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
 def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
