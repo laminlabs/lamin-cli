@@ -157,10 +157,11 @@ class Runner:
     ) -> modal.Image:
         if env_variables is None:
             env_variables = {}
+        base_packages = ["lamindb", "httpx_retries"]
         if packages is None:
-            packages = ["lamindb"]
+            packages = base_packages
         else:
-            packages.append("lamindb")  # Append lamindb to the list of packages
+            packages += base_packages
 
         if image_url is None:
             image = modal.Image.debian_slim(python_version=python_version)
