@@ -207,7 +207,7 @@ def connect(instance: str, use_proxy_db: bool):
 def disconnect():
     """Unset the default instance for auto-connection.
 
-    Python/R sessions and CLI commandswill no longer auto-connect to a LaminDB instance.
+    Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
 
     See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
