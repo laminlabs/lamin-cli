@@ -33,7 +33,7 @@ def settings(ctx):
     lamin settings dev-dir get
     lamin settings dev-dir set .  # set to current directory
     lamin settings dev-dir set ~/my-project
-    lamin settings dev-dir set none  # unset
+    lamin settings dev-dir unset
     lamin settings cache-dir get
     lamin settings cache-dir set /path/to/cache
     lamin settings cache-dir clear
@@ -68,12 +68,20 @@ def dev_dir_get():
 @dev_dir_group.command("set")
 @click.argument("value", type=str)
 def dev_dir_set(value: str):
-    """Set the development directory. Use 'none' to unset."""
+    """Set the development directory."""
     from lamindb_setup import settings as settings_
 
     if value.lower() == "none":
         value = None  # type: ignore[assignment]
     settings_.dev_dir = value
+
+
+@dev_dir_group.command("unset")
+def dev_dir_unset():
+    """Unset the development directory."""
+    from lamindb_setup import settings as settings_
+
+    settings_.dev_dir = None
 
 
 settings.add_command(dev_dir_group)

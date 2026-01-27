@@ -75,7 +75,7 @@ def test_dev_dir():
     assert result.stdout.strip().split("\n")[-1] == str(this_path.parent)
     assert ln_setup.settings.dev_dir == this_path.parent
     # unset dev-dir
-    exit_status = os.system("lamin settings dev-dir set none")
+    exit_status = os.system("lamin settings dev-dir unset")
     assert exit_status == 0
     result = subprocess.run(
         "lamin settings dev-dir get",
