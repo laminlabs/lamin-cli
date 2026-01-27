@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -81,3 +82,48 @@ def test_dev_dir():
     )
     assert result.stdout.strip().split("\n")[-1] == "None"
     assert ln_setup.settings.dev_dir is None
+
+
+def test_settings_cache_get_set():
+    """Test lamin settings cache get and set."""
+    result = subprocess.run(
+        "lamin settings cache get",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.returncode == 0
+    line = result.stdout.strip().split("\n")[-1]
+    # Output is "The cache directory is <path>"
+    original_cache = line.split(" is ", 1)[-1] if " is " in line else line
+    assert original_cache
+    assert Path(original_cache).is_absolute() or original_cache.startswith("~")
+    # Set cache to a temp dir, verify, then restore
+    tmp_dir = Path(__file__).resolve().parent / "tmp_cache_test"
+    tmp_dir.mkdir(exist_ok=True)
+    try:
+        result_set = subprocess.run(
+            f"lamin settings cache set {tmp_dir}",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result_set.returncode == 0
+        result = subprocess.run(
+            "lamin settings cache get",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result.returncode == 0
+        line = result.stdout.strip().split("\n")[-1]
+        got_path = line.split(" is ", 1)[-1] if " is " in line else line
+        assert got_path == str(tmp_dir)
+    finally:
+        subprocess.run(
+            f"lamin settings cache set {original_cache}",
+            capture_output=True,
+            shell=True,
+        )
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir)

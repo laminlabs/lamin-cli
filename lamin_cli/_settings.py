@@ -23,9 +23,10 @@ def settings(ctx):
     Allows to get and set these settings:
 
     - `dev-dir` → {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
-    - `private-django-api` → {attr}`~lamindb.setup.core.SetupSettings.private_django_api`
     - `branch` → current branch (use `lamin switch --branch` to change)
     - `space` → current space (use `lamin switch --space` to change)
+
+    Cache can be managed via `lamin settings cache get/set/clear`.
 
     Examples for getting a setting:
 
@@ -94,3 +95,8 @@ def get(setting: str):
     else:
         value = getattr(settings_, setting.replace("-", "_"))
     click.echo(value)
+
+
+from lamin_cli._cache import cache
+
+settings.add_command(cache, "cache")
