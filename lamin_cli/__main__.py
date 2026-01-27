@@ -264,9 +264,8 @@ def create(registry: Literal["branch", "project"], name: str | None = None):
 # fmt: off
 @main.command(name="list")
 @click.argument("registry", type=str)
-@click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
-def list_(registry: Literal["branch", "space"], name: str | None = None):
+def list_(registry: Literal["branch", "space"]):
     """List objects.
 
     For example:
