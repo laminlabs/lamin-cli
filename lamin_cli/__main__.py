@@ -331,7 +331,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
-    """Load a file or folder into the cache or working directory.
+    """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass a URL or `--key`. For example:
 
