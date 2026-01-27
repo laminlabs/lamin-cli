@@ -192,9 +192,9 @@ def init(
 @click.option("--use_proxy_db", is_flag=True, help="Use proxy database connection.")
 # fmt: on
 def connect(instance: str, use_proxy_db: bool):
-    """Configure default instance for connections.
+    """Set a default instance for auto-connection.
 
-    Python/R sessions and CLI commands will then auto-connect to the configured instance.
+    Python/R sessions and CLI commands will then auto-connect to this LaminDB instance.
 
     Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
@@ -205,7 +205,9 @@ def connect(instance: str, use_proxy_db: bool):
 
 @main.command()
 def disconnect():
-    """Clear default instance configuration.
+    """Unset the default instance for auto-connection.
+
+    Python/R sessions and CLI commandswill no longer auto-connect to a LaminDB instance.
 
     See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
