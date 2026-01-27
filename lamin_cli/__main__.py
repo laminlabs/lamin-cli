@@ -53,7 +53,6 @@ COMMAND_GROUPS = {
         {
             "name": "Configure",
             "commands": [
-                "checkout",
                 "switch",
                 "settings",
                 "migrate",
