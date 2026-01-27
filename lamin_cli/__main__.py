@@ -306,7 +306,7 @@ def switch(branch: str | None = None, space: str | None = None):
 
 
 @main.command()
-@click.option("--schema", is_flag=True, help="View database schema.")
+@click.option("--schema", is_flag=True, help="View database schema via Django plugin.")
 def info(schema: bool):
     """Show info about the instance, development & cache directories, branch, space, and user.
 
