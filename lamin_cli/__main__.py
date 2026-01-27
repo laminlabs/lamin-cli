@@ -55,7 +55,6 @@ COMMAND_GROUPS = {
             "commands": [
                 "checkout",
                 "switch",
-                "cache",
                 "settings",
                 "migrate",
             ],
@@ -112,7 +111,6 @@ else:
 
 from lamindb_setup._silence_loggers import silence_loggers
 
-from lamin_cli._cache import cache
 from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
@@ -333,7 +331,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
-    """Load a file or folder into the cache or working directory.
+    """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass a URL or `--key`. For example:
 
@@ -589,9 +587,53 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
 
 main.add_command(settings)
-main.add_command(cache)
 main.add_command(migrate)
 main.add_command(io)
+
+
+def _deprecated_cache_set(cache_dir: str) -> None:
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
+    from lamindb_setup._cache import set_cache_dir
+
+    set_cache_dir(cache_dir)
+
+
+def _deprecated_cache_clear() -> None:
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
+    from lamindb_setup._cache import clear_cache_dir
+
+    clear_cache_dir()
+
+
+def _deprecated_cache_get() -> None:
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
+    from lamindb_setup._cache import get_cache_dir
+
+    click.echo(f"The cache directory is {get_cache_dir()}")
+
+
+@main.group("cache", hidden=True)
+def deprecated_cache():
+    """Deprecated. Use 'lamin settings cache-dir' instead."""
+
+
+@deprecated_cache.command("set")
+@click.argument(
+    "cache_dir",
+    type=click.Path(dir_okay=True, file_okay=False),
+)
+def _deprecated_cache_set_cmd(cache_dir: str) -> None:
+    _deprecated_cache_set(cache_dir)
+
+
+@deprecated_cache.command("clear")
+def _deprecated_cache_clear_cmd() -> None:
+    _deprecated_cache_clear()
+
+
+@deprecated_cache.command("get")
+def _deprecated_cache_get_cmd() -> None:
+    _deprecated_cache_get()
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
@@ -601,6 +643,8 @@ def _generate_help():
     def recursive_help(
         cmd: Command, parent: Context | None = None, name: tuple[str, ...] = ()
     ):
+        if getattr(cmd, "hidden", False):
+            return
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
         assert cmd.name
         name = (*name, cmd.name)
@@ -615,6 +659,8 @@ def _generate_help():
         }
 
         for sub in getattr(cmd, "commands", {}).values():
+            if getattr(sub, "hidden", False):
+                continue
             recursive_help(sub, ctx, name=name)
 
     recursive_help(main)
