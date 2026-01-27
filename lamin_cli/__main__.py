@@ -592,21 +592,21 @@ main.add_command(io)
 
 
 def _deprecated_cache_set(cache_dir: str) -> None:
-    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache' instead.")
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
     from lamindb_setup._cache import set_cache_dir
 
     set_cache_dir(cache_dir)
 
 
 def _deprecated_cache_clear() -> None:
-    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache' instead.")
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
     from lamindb_setup._cache import clear_cache_dir
 
     clear_cache_dir()
 
 
 def _deprecated_cache_get() -> None:
-    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache' instead.")
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
     from lamindb_setup._cache import get_cache_dir
 
     click.echo(f"The cache directory is {get_cache_dir()}")
@@ -614,7 +614,7 @@ def _deprecated_cache_get() -> None:
 
 @main.group("cache", hidden=True)
 def deprecated_cache():
-    """Deprecated. Use 'lamin settings cache' instead."""
+    """Deprecated. Use 'lamin settings cache-dir' instead."""
 
 
 @deprecated_cache.command("set")

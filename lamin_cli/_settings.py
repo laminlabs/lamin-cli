@@ -26,7 +26,7 @@ def settings(ctx):
     - `branch` → current branch (use `lamin switch --branch` to change)
     - `space` → current space (use `lamin switch --space` to change)
 
-    Cache can be managed via `lamin settings cache get/set/clear`.
+    Cache can be managed via `lamin settings cache-dir get/set/clear`.
 
     Examples for getting a setting:
 
@@ -99,4 +99,4 @@ def get(setting: str):
 
 from lamin_cli._cache import cache
 
-settings.add_command(cache, "cache")
+settings.add_command(cache, "cache-dir")

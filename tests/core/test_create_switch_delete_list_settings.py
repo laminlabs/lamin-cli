@@ -85,9 +85,9 @@ def test_dev_dir():
 
 
 def test_settings_cache_get_set():
-    """Test lamin settings cache get and set."""
+    """Test lamin settings cache-dir get and set."""
     result = subprocess.run(
-        "lamin settings cache get",
+        "lamin settings cache-dir get",
         capture_output=True,
         text=True,
         shell=True,
@@ -103,14 +103,14 @@ def test_settings_cache_get_set():
     tmp_dir.mkdir(exist_ok=True)
     try:
         result_set = subprocess.run(
-            f"lamin settings cache set {tmp_dir}",
+            f"lamin settings cache-dir set {tmp_dir}",
             capture_output=True,
             text=True,
             shell=True,
         )
         assert result_set.returncode == 0
         result = subprocess.run(
-            "lamin settings cache get",
+            "lamin settings cache-dir get",
             capture_output=True,
             text=True,
             shell=True,
@@ -121,7 +121,7 @@ def test_settings_cache_get_set():
         assert got_path == str(tmp_dir)
     finally:
         subprocess.run(
-            f"lamin settings cache set {original_cache}",
+            f"lamin settings cache-dir set {original_cache}",
             capture_output=True,
             shell=True,
         )
