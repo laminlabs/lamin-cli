@@ -14,33 +14,29 @@ else:
 def settings(ctx):
     """Manage settings.
 
-    Call without subcommands and options to show settings:
+    Call without subcommands and options to show the current environment setup settings:
 
     ```
     lamin settings
     ```
 
-    Allows to get and set these settings:
+    Get or set a setting by name:
 
-    - `dev-dir` → {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
-    - `branch` → current branch (use `lamin switch --branch` to change)
-    - `space` → current space (use `lamin switch --space` to change)
+    - `dev-dir` → development directory {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
+    - `cache-dir` → cache directory {attr}`~lamindb.setup.core.SetupSettings.cache_dir`
+    - `branch` → branch (use `lamin switch --branch` to change)
+    - `space` → space (use `lamin switch --space` to change)
 
-    Cache can be managed via `lamin settings cache-dir get/set/clear`.
-
-    Examples for getting a setting:
-
-    ```
-    lamin settings get dev-dir
-    lamin settings get branch
-    ```
-
-    Examples for setting the working directory:
+    Examples:
 
     ```
-    lamin settings set dev-dir .  # set dev-dir to current directory
-    lamin settings set dev-dir ~/my-project  # set dev-dir to ~/my-project
-    lamin settings set dev-dir none  # unset dev-dir
+    lamin settings dev-dir get
+    lamin settings dev-dir set .  # set to current directory
+    lamin settings dev-dir set ~/my-project
+    lamin settings dev-dir set none  # unset
+    lamin settings cache-dir get
+    lamin settings cache-dir set /path/to/cache
+    lamin settings cache-dir clear
     ```
     """
     if ctx.invoked_subcommand is None:
@@ -50,7 +46,45 @@ def settings(ctx):
         click.echo(settings_)
 
 
-@settings.command("set")
+# -----------------------------------------------------------------------------
+# dev-dir group (pattern: lamin settings dev-dir get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("dev-dir")
+def dev_dir_group():
+    """Get or set the development directory."""
+
+
+@dev_dir_group.command("get")
+def dev_dir_get():
+    """Show the current development directory."""
+    from lamindb_setup import settings as settings_
+
+    value = settings_.dev_dir
+    click.echo(value if value is not None else "None")
+
+
+@dev_dir_group.command("set")
+@click.argument("value", type=str)
+def dev_dir_set(value: str):
+    """Set the development directory. Use 'none' to unset."""
+    from lamindb_setup import settings as settings_
+
+    if value.lower() == "none":
+        value = None  # type: ignore[assignment]
+    settings_.dev_dir = value
+
+
+settings.add_command(dev_dir_group)
+
+
+# -----------------------------------------------------------------------------
+# Legacy get/set (hidden, backward compatibility)
+# -----------------------------------------------------------------------------
+
+
+@settings.command("set", hidden=True)
 @click.argument(
     "setting",
     type=click.Choice(
@@ -58,8 +92,8 @@ def settings(ctx):
     ),
 )
 @click.argument("value")  # No explicit type - let Click handle it
-def set(setting: str, value: str):
-    """Set a setting."""
+def set_legacy(setting: str, value: str):
+    """Set a setting (legacy). Use lamin settings <name> set <value> instead."""
     from lamindb_setup import settings as settings_
 
     if setting == "auto-connect":
@@ -72,7 +106,7 @@ def set(setting: str, value: str):
         settings_.dev_dir = value
 
 
-@settings.command("get")
+@settings.command("get", hidden=True)
 @click.argument(
     "setting",
     type=click.Choice(
@@ -80,8 +114,8 @@ def set(setting: str, value: str):
         case_sensitive=False,
     ),
 )
-def get(setting: str):
-    """Get a setting."""
+def get_legacy(setting: str):
+    """Get a setting (legacy). Use lamin settings <name> get instead."""
     from lamindb_setup import settings as settings_
 
     if setting == "branch":
@@ -96,6 +130,10 @@ def get(setting: str):
         value = getattr(settings_, setting.replace("-", "_"))
     click.echo(value)
 
+
+# -----------------------------------------------------------------------------
+# cache-dir (already uses lamin settings cache-dir get/set/clear)
+# -----------------------------------------------------------------------------
 
 from lamin_cli._cache import cache
 
