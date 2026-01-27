@@ -53,7 +53,6 @@ COMMAND_GROUPS = {
         {
             "name": "Configure",
             "commands": [
-                "checkout",
                 "switch",
                 "settings",
                 "migrate",
@@ -237,10 +236,10 @@ def disconnect():
 
 # fmt: off
 @main.command()
-@click.argument("entity", type=str)
+@click.argument("registry", type=str)
 @click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
-def create(entity: Literal["branch"], name: str | None = None):
+def create(registry: Literal["branch", "project"], name: str | None = None):
     """Create an object.
 
     Currently only supports creating branches and projects.
@@ -252,21 +251,20 @@ def create(entity: Literal["branch"], name: str | None = None):
     """
     from lamindb.models import Branch, Project
 
-    if entity == "branch":
+    if registry == "branch":
         record = Branch(name=name).save()
-    elif entity == "project":
+    elif registry == "project":
         record = Project(name=name).save()
     else:
-        raise NotImplementedError(f"Creating {entity} is not implemented.")
-    logger.important(f"created {entity}: {record.name}")
+        raise NotImplementedError(f"Creating {registry} object is not implemented.")
+    logger.important(f"created {registry}: {record.name}")
 
 
 # fmt: off
 @main.command(name="list")
-@click.argument("entity", type=str)
-@click.option("--name", type=str, default=None, help="A name.")
+@click.argument("registry", type=str)
 # fmt: on
-def list_(entity: Literal["branch"], name: str | None = None):
+def list_(registry: Literal["branch", "space"]):
     """List objects.
 
     For example:
@@ -276,11 +274,11 @@ def list_(entity: Literal["branch"], name: str | None = None):
     lamin list space
     ```
     """
-    assert entity in {"branch", "space"}, "Currently only supports listing branches and spaces."
+    assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
     from lamindb.models import Branch, Space
 
-    if entity == "branch":
+    if registry == "branch":
         print(Branch.to_dataframe())
     else:
         print(Space.to_dataframe())
@@ -307,7 +305,7 @@ def switch(branch: str | None = None, space: str | None = None):
 
 
 @main.command()
-@click.option("--schema", is_flag=True, help="View database schema.")
+@click.option("--schema", is_flag=True, help="View database schema via Django plugin.")
 def info(schema: bool):
     """Show info about the instance, development & cache directories, branch, space, and user.
 
@@ -326,6 +324,7 @@ def info(schema: bool):
 
 # fmt: off
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
@@ -351,6 +350,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
 
 
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str, required=False)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
@@ -406,6 +406,7 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 
 
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
@@ -425,6 +426,7 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
 
 
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
@@ -502,15 +504,15 @@ def finish():
 
 
 @main.command()
-@click.argument("entity", type=str, default=None, required=False)
+@click.argument("registry", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
+def annotate(registry: str | None, key: str, uid: str, project: str, features: tuple):
     """Annotate an artifact or transform.
 
-    Entity is either 'artifact' or 'transform'. If not passed, chooses based on key suffix.
+    The `registry` can be either 'artifact' or 'transform'. If not passed, chooses based on `key` suffix.
 
     You can annotate with projects and valid features & values. For example,
 
@@ -529,13 +531,11 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
     if not ln.setup.settings._instance_exists:
         raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
 
-    if entity is None:
+    if registry is None:
         if key is not None:
             registry = infer_registry_from_path(key)
         else:
             registry = "artifact"
-    else:
-        registry = entity
     if registry == "artifact":
         model = ln.Artifact
     else:
