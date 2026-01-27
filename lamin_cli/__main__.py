@@ -328,11 +328,12 @@ def info(schema: bool):
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
+@click.option("--key", type=str, default=None, help="The key for the entity (artifact, transform).")
 @click.option("--slug", type=str, default=None)
 @click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
+def delete(entity: str, name: str | None = None, uid: str | None = None, key: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an object.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
@@ -342,11 +343,13 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     lamin delete branch --name my_branch
     lamin delete instance --slug account/name
+    lamin delete artifact --key mydatasets/mytable.parquet
+    lamin delete transform --key myanalyses/analysis.ipynb
     ```
     """
     from lamin_cli._delete import delete as delete_
 
-    return delete_(entity=entity, name=name, uid=uid, slug=slug, permanent=permanent, force=force)
+    return delete_(entity=entity, name=name, uid=uid, key=key, slug=slug, permanent=permanent, force=force)
 
 
 @main.command()

@@ -8,6 +8,7 @@ def delete(
     entity: str,
     name: str | None = None,
     uid: str | None = None,
+    key: str | None = None,
     slug: str | None = None,
     permanent: bool | None = None,
     force: bool = False,
@@ -24,20 +25,44 @@ def delete(
 
         Branch.get(name=name).delete(permanent=permanent)
     elif entity == "artifact":
-        assert uid is not None, "You have to pass a uid for deleting an artifact."
+        assert uid is not None or key is not None, (
+            "You have to pass a uid or key for deleting an artifact."
+        )
         from lamindb import Artifact
 
-        Artifact.get(uid).delete(permanent=permanent)
+        if key is not None:
+            record = Artifact.objects.filter(key=key).order_by("-created_at").first()
+            if record is None:
+                raise SystemExit(f"Artifact with key={key} does not exist.")
+        else:
+            record = Artifact.get(uid)
+        record.delete(permanent=permanent)
     elif entity == "transform":
-        assert uid is not None, "You have to pass a uid for deleting an transform."
+        assert uid is not None or key is not None, (
+            "You have to pass a uid or key for deleting a transform."
+        )
         from lamindb import Transform
 
-        Transform.get(uid).delete(permanent=permanent)
+        if key is not None:
+            record = Transform.objects.filter(key=key).order_by("-created_at").first()
+            if record is None:
+                raise SystemExit(f"Transform with key={key} does not exist.")
+        else:
+            record = Transform.get(uid)
+        record.delete(permanent=permanent)
     elif entity == "collection":
-        assert uid is not None, "You have to pass a uid for deleting an collection."
+        assert uid is not None or key is not None, (
+            "You have to pass a uid or key for deleting a collection."
+        )
         from lamindb import Collection
 
-        Collection.get(uid).delete(permanent=permanent)
+        if key is not None:
+            record = Collection.objects.filter(key=key).order_by("-created_at").first()
+            if record is None:
+                raise SystemExit(f"Collection with key={key} does not exist.")
+        else:
+            record = Collection.get(uid)
+        record.delete(permanent=permanent)
     elif entity == "instance":
         return delete_instance(slug, force=force)
     else:  # backwards compatibility
