@@ -51,7 +51,7 @@ def parse_uid_from_code(content: str, suffix: str) -> str | None:
     elif suffix == ".sh":
         return None
     else:
-        raise SystemExit(
+        raise click.ClickException(
             "Only .py, .ipynb, .R, .qmd, .Rmd, .sh files are supported for saving"
             " transforms."
         )
@@ -113,14 +113,14 @@ def save(
             ln.Q(name=project) | ln.Q(uid=project)
         ).one_or_none()
         if project_record is None:
-            raise ln.errors.InvalidArgument(
+            raise click.ClickException(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
     space_record = None
     if space is not None:
         space_record = ln.Space.filter(ln.Q(name=space) | ln.Q(uid=space)).one_or_none()
         if space_record is None:
-            raise ln.errors.InvalidArgument(
+            raise click.ClickException(
                 f"Space '{space}' not found, either create it on LaminHub or fix typos."
             )
     branch_record = None
@@ -129,7 +129,7 @@ def save(
             ln.Q(name=branch) | ln.Q(uid=branch)
         ).one_or_none()
         if branch_record is None:
-            raise ln.errors.InvalidArgument(
+            raise click.ClickException(
                 f"Branch '{branch}' not found, either create it with `ln.Branch(name='...').save()` or fix typos."
             )
 
@@ -145,7 +145,7 @@ def save(
                 .first()
             )
             if revises is None:
-                raise ln.errors.InvalidArgument("The stem uid is not found.")
+                raise click.ClickException("The stem uid is not found.")
 
         if is_cloud_path:
             if key is not None:
@@ -270,12 +270,20 @@ def save(
                 revises_other_branches = ln.Transform.filter(uid__startswith=stem_uid, branch=None).first()
                 if revises_other_branches is not None:
                     if revises_other_branches.branch_id == -1:
-                        raise ln.errors.InvalidArgument("Transform is in the trash, please restore it before running `lamin save`!")
+                        raise click.ClickException(
+                            "Transform is in the trash, please restore it before running `lamin save`!"
+                        )
                     elif revises_other_branches.branch_id == 0:
-                        raise ln.errors.InvalidArgument("Transform is in the archive, please restore it before running `lamin save`!")
+                        raise click.ClickException(
+                            "Transform is in the archive, please restore it before running `lamin save`!"
+                        )
                     elif revises_other_branches.branch_id != ln_setup.settings.branch.id:
-                        raise ln.errors.InvalidArgument(f"Transform is on a different branch({revises_other_branches.branch.name}), please switch to the correct branch before running `lamin save`!")
-            raise ln.errors.InvalidArgument("The stem uid is not found.")
+                        raise click.ClickException(
+                            "Transform is on a different branch"
+                            f"({revises_other_branches.branch.name}), please switch to the correct branch"
+                            " before running `lamin save`!"
+                        )
+            raise click.ClickException("The stem uid is not found.")
         if transform is None:
             if ppath.suffix == ".ipynb":
                 from nbproject.dev import read_notebook
@@ -331,4 +339,4 @@ def save(
         )
         return return_code
     else:
-        raise SystemExit("Allowed values for '--registry' are: 'artifact', 'transform'")
+        raise click.ClickException("Allowed values for '--registry' are: 'artifact', 'transform'")
