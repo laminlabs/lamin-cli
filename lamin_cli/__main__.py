@@ -179,7 +179,17 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Init a LaminDB instance.
+    """Initialize an instance.
+
+    This initializes a LaminDB instance, for example:
+
+    ```
+    lamin init --storage ./mydata
+    lamin init --storage s3://my-bucket
+    lamin init --storage gs://my-bucket
+    lamin init --storage ./mydata --modules bionty
+    lamin init --storage ./mydata --modules bionty,pertdb
+    ```
 
     See also: Init in a Python session via {func}`~lamindb.setup.init`.
     """
@@ -196,7 +206,12 @@ def connect(instance: str, use_proxy_db: bool):
 
     Python/R sessions and CLI commands will then auto-connect to this LaminDB instance.
 
-    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
+    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`), for example:
+
+    ```
+    lamin connect laminlabs/cellxgene
+    lamin connect https://lamin.ai/laminlabs/cellxgene
+    ```
 
     See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
@@ -209,6 +224,12 @@ def disconnect():
 
     Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
 
+    For example:
+
+    ```
+    lamin disconnect
+    ```
+
     See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
     return disconnect_()
@@ -220,7 +241,7 @@ def disconnect():
 @click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
 def create(entity: Literal["branch"], name: str | None = None):
-    """Create a record for an entity.
+    """Create an object.
 
     Currently only supports creating branches and projects.
 
@@ -246,7 +267,9 @@ def create(entity: Literal["branch"], name: str | None = None):
 @click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
 def list_(entity: Literal["branch"], name: str | None = None):
-    """List records for an entity.
+    """List objects.
+
+    For example:
 
     ```
     lamin list branch
@@ -271,6 +294,8 @@ def list_(entity: Literal["branch"], name: str | None = None):
 def switch(branch: str | None = None, space: str | None = None):
     """Switch between branches or spaces.
 
+    Python/R sessions and CLI commands will use the current default branch or space, for example:
+
     ```
     lamin switch --branch my_branch
     lamin switch --space our_space
@@ -284,7 +309,7 @@ def switch(branch: str | None = None, space: str | None = None):
 @main.command()
 @click.option("--schema", is_flag=True, help="View database schema.")
 def info(schema: bool):
-    """Show info about the environment, instance, branch, space, and user.
+    """Show info about the instance, development & cache directories, branch, space, and user.
 
     See also: Print the instance settings in a Python session via {func}`~lamindb.setup.settings`.
     """
@@ -309,7 +334,7 @@ def info(schema: bool):
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
 def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
-    """Delete an entity.
+    """Delete an object.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
@@ -385,7 +410,7 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
 def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    """Describe an artifact.
+    """Describe an object.
 
     Examples:
 
@@ -404,7 +429,7 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
 def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    """Query metadata about an entity.
+    """Query metadata about an object.
 
     Currently equivalent to `lamin describe`.
     """
@@ -468,7 +493,7 @@ def track():
 
 @main.command()
 def finish():
-    """Finish the current tracked run of a shell script.
+    """Finish a currently tracked run of a shell script.
 
     This command works like {func}`~lamindb.finish()` in a Python session.
     """
