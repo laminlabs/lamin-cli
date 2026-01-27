@@ -266,7 +266,16 @@ def save(
                 .first()
             )
             if revises is None:
-                raise ln.errors.InvalidArgument("The stem uid is not found.")
+                # check if the transform is on other branches
+                revises_other_branches = ln.Transform.filter(uid__startswith=stem_uid, branch=None).first()
+                if revises_other_branches is not None:
+                    if revises_other_branches.branch_id == -1:
+                        raise ln.errors.InvalidArgument("Transform is in the trash, please restore it before running `lamin save`!")
+                    elif revises_other_branches.branch_id == 0:
+                        raise ln.errors.InvalidArgument("Transform is in the archive, please restore it before running `lamin save`!")
+                    elif revises_other_branches.branch_id != ln_setup.settings.branch.id:
+                        raise ln.errors.InvalidArgument(f"Transform is on a different branch({revises_other_branches.branch.name}), please switch to the correct branch before running `lamin save`!")
+            raise ln.errors.InvalidArgument("The stem uid is not found.")
         if transform is None:
             if ppath.suffix == ".ipynb":
                 from nbproject.dev import read_notebook
