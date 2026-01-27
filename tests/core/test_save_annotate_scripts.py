@@ -29,6 +29,20 @@ def test_save_resave_script_no_uids():
     assert "created Transform" in result.stdout.decode()
     assert ln.Transform.filter(key=filepath.name).count() == 2
 
+    # lamin delete by key (parallel to lamin load/save)
+    result = subprocess.run(
+        f"lamin delete transform --key {filepath.name} --permanent",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    result = subprocess.run(
+        f"lamin delete transform --key {filepath.name} --permanent",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
 
 def test_save_and_annotate_without_uid():
     env = os.environ
@@ -55,6 +69,14 @@ def test_save_and_annotate_without_uid():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
+    assert result.returncode == 0
+
+    # lamin delete by key (parallel to lamin load/save)
+    result = subprocess.run(
+        "lamin delete transform --key run-track-and-finish.py --permanent",
+        shell=True,
+        capture_output=True,
+    )
     assert result.returncode == 0
 
 
@@ -243,6 +265,20 @@ if __name__ == "__main__":
     print(result.stderr.decode())
     assert result.returncode == 0
 
+    # lamin delete by key (parallel to lamin load/save)
+    result = subprocess.run(
+        f"lamin delete transform --key {filepath.name} --permanent",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    result = subprocess.run(
+        f"lamin delete transform --key {filepath.name} --permanent",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
 
 def test_run_save_with_params():
     env = os.environ
@@ -280,3 +316,11 @@ def test_run_save_with_params():
     assert (
         "run-track-with-params.py' on uid 'JjRF4mACd9m00000'" in result.stdout.decode()
     )
+
+    # lamin delete by key (parallel to lamin load/save)
+    result = subprocess.run(
+        "lamin delete transform --key run-track-with-params.py --permanent",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0

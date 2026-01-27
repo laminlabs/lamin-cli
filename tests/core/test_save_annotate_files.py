@@ -113,6 +113,14 @@ def test_save_and_annotate_local_file():
     )
     assert result.returncode == 0
 
+    # lamin delete by key (parallel to lamin load/save)
+    result = subprocess.run(
+        "lamin delete artifact --key mytest --permanent",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
 
 def test_save_cloud_file():
     # should be no key for cloud paths
