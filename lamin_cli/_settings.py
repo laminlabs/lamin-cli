@@ -24,8 +24,8 @@ def settings(ctx):
 
     - `dev-dir` → development directory {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
     - `cache-dir` → cache directory {attr}`~lamindb.setup.core.SetupSettings.cache_dir`
-    - `branch` → branch (use `lamin switch --branch` to change)
-    - `space` → space (use `lamin switch --space` to change)
+    - `branch` → branch (use `lamin switch branch <name>` to change)
+    - `space` → space (use `lamin switch space <name>` to change)
 
     Examples:
 
