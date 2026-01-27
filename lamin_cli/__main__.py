@@ -237,10 +237,10 @@ def disconnect():
 
 # fmt: off
 @main.command()
-@click.argument("entity", type=str)
+@click.argument("registry", type=str)
 @click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
-def create(entity: Literal["branch"], name: str | None = None):
+def create(registry: Literal["branch"], name: str | None = None):
     """Create an object.
 
     Currently only supports creating branches and projects.
@@ -252,21 +252,21 @@ def create(entity: Literal["branch"], name: str | None = None):
     """
     from lamindb.models import Branch, Project
 
-    if entity == "branch":
+    if registry == "branch":
         record = Branch(name=name).save()
-    elif entity == "project":
+    elif registry == "project":
         record = Project(name=name).save()
     else:
-        raise NotImplementedError(f"Creating {entity} is not implemented.")
-    logger.important(f"created {entity}: {record.name}")
+        raise NotImplementedError(f"Creating {registry} is not implemented.")
+    logger.important(f"created {registry}: {record.name}")
 
 
 # fmt: off
 @main.command(name="list")
-@click.argument("entity", type=str)
+@click.argument("registry", type=str)
 @click.option("--name", type=str, default=None, help="A name.")
 # fmt: on
-def list_(entity: Literal["branch"], name: str | None = None):
+def list_(registry: Literal["branch"], name: str | None = None):
     """List objects.
 
     For example:
@@ -276,11 +276,11 @@ def list_(entity: Literal["branch"], name: str | None = None):
     lamin list space
     ```
     """
-    assert entity in {"branch", "space"}, "Currently only supports listing branches and spaces."
+    assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
     from lamindb.models import Branch, Space
 
-    if entity == "branch":
+    if registry == "branch":
         print(Branch.to_dataframe())
     else:
         print(Space.to_dataframe())
@@ -326,14 +326,14 @@ def info(schema: bool):
 
 # fmt: off
 @main.command()
-@click.argument("entity", type=str)
+@click.argument("registry", type=str)
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
 @click.option("--slug", type=str, default=None)
-@click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
+@click.option("--permanent", is_flag=True, default=None, help="Permanently delete the registry where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
+def delete(registry: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an object.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
@@ -347,17 +347,17 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     """
     from lamin_cli._delete import delete as delete_
 
-    return delete_(entity=entity, name=name, uid=uid, slug=slug, permanent=permanent, force=force)
+    return delete_(registry=registry, name=name, uid=uid, slug=slug, permanent=permanent, force=force)
 
 
 @main.command()
-@click.argument("entity", type=str, required=False)
-@click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
+@click.argument("registry", type=str, required=False)
+@click.option("--uid", help="The uid for the registry.")
+@click.option("--key", help="The key for the registry.")
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
+def load(registry: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
     """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass a URL or `--key`. For example:
@@ -369,7 +369,7 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load --key myanalyses/analysis.ipynb --with-env
     ```
 
-    You can also pass a uid and the entity type:
+    You can also pass a uid and the registry type:
 
     ```
     lamin load artifact --uid e2G7k9EVul4JbfsE
@@ -377,20 +377,20 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     ```
     """
     from lamin_cli._load import load as load_
-    if entity is not None:
-        is_slug = entity.count("/") == 1
+    if registry is not None:
+        is_slug = registry.count("/") == 1
         if is_slug:
             from lamindb_setup._connect_instance import _connect_cli
             # for backward compat
-            return _connect_cli(entity)
-    return load_(entity, uid=uid, key=key, with_env=with_env)
+            return _connect_cli(registry)
+    return load_(registry, uid=uid, key=key, with_env=with_env)
 
 
-def _describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    if entity.startswith("https://") and "lamin" in entity:
-        url = entity
-        instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact"}:
+def _describe(registry: str = "artifact", uid: str | None = None, key: str | None = None):
+    if registry.startswith("https://") and "lamin" in registry:
+        url = registry
+        instance, registry, uid = decompose_url(url)
+    elif registry not in {"artifact"}:
         raise SystemExit("Entity has to be a laminhub URL or 'artifact'")
     else:
         instance = ln_setup.settings.instance.slug
@@ -406,10 +406,10 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 
 
 @main.command()
-@click.argument("entity", type=str, default="artifact")
-@click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
-def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+@click.argument("registry", type=str, default="artifact")
+@click.option("--uid", help="The uid for the registry.")
+@click.option("--key", help="The key for the registry.")
+def describe(registry: str = "artifact", uid: str | None = None, key: str | None = None):
     """Describe an object.
 
     Examples:
@@ -421,20 +421,20 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
 
     See also: Describe an artifact in a Python session via {func}`~lamindb.Artifact.describe`.
     """
-    _describe(entity=entity, uid=uid, key=key)
+    _describe(registry=registry, uid=uid, key=key)
 
 
 @main.command()
-@click.argument("entity", type=str, default="artifact")
-@click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
-def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+@click.argument("registry", type=str, default="artifact")
+@click.option("--uid", help="The uid for the registry.")
+@click.option("--key", help="The key for the registry.")
+def get(registry: str = "artifact", uid: str | None = None, key: str | None = None):
     """Query metadata about an object.
 
     Currently equivalent to `lamin describe`.
     """
     logger.warning("please use `lamin describe` instead of `lamin get` to describe")
-    _describe(entity=entity, uid=uid, key=key)
+    _describe(registry=registry, uid=uid, key=key)
 
 
 @main.command()
@@ -502,12 +502,12 @@ def finish():
 
 
 @main.command()
-@click.argument("entity", type=str, default=None, required=False)
+@click.argument("registry", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
+def annotate(registry: str | None, key: str, uid: str, project: str, features: tuple):
     """Annotate an artifact or transform.
 
     Entity is either 'artifact' or 'transform'. If not passed, chooses based on key suffix.
@@ -525,17 +525,17 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
     from lamin_cli._annotate import _parse_features_list
     from lamin_cli._save import infer_registry_from_path
 
-    # once we enable passing the URL as entity, then we don't need to throw this error
+    # once we enable passing the URL as registry, then we don't need to throw this error
     if not ln.setup.settings._instance_exists:
         raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
 
-    if entity is None:
+    if registry is None:
         if key is not None:
             registry = infer_registry_from_path(key)
         else:
             registry = "artifact"
     else:
-        registry = entity
+        registry = registry
     if registry == "artifact":
         model = ln.Artifact
     else:

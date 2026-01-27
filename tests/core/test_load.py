@@ -11,9 +11,9 @@ def test_decompose_url():
     ]
     for url in urls:
         result = decompose_url(url)
-        instance_slug, entity, uid = result
+        instance_slug, registry, uid = result
         assert instance_slug == "laminlabs/arrayloader-benchmarks"
-        assert entity == "transform"
+        assert registry == "transform"
         assert uid == "1GCKs8zLtkc85zKv"
 
 

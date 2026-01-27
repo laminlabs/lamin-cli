@@ -12,7 +12,7 @@ from .urls import decompose_url
 
 
 def load(
-    entity: str | None = None,
+    registry: str | None = None,
     uid: str | None = None,
     key: str | None = None,
     with_env: bool = False,
@@ -20,7 +20,7 @@ def load(
     """Load artifact, collection, or transform from LaminDB.
 
     Args:
-        entity: URL containing 'lamin', or 'artifact', 'collection', or 'transform'
+        registry: URL containing 'lamin', or 'artifact', 'collection', or 'transform'
         uid: Unique identifier (prefix matching supported)
         key: Key identifier
         with_env: If True, also load environment requirements file for transforms
@@ -30,16 +30,16 @@ def load(
     """
     import lamindb_setup as ln_setup
 
-    if entity is None:
+    if registry is None:
         if key is None:
-            raise SystemExit("Either entity or key has to be provided.")
+            raise SystemExit("Either registry or key has to be provided.")
         else:
-            entity = infer_registry_from_path(key)
+            registry = infer_registry_from_path(key)
 
-    if entity.startswith("https://") and "lamin" in entity:
-        url = entity
-        instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact", "transform", "collection"}:
+    if registry.startswith("https://") and "lamin" in registry:
+        url = registry
+        instance, registry, uid = decompose_url(url)
+    elif registry not in {"artifact", "transform", "collection"}:
         raise SystemExit(
             "Entity has to be a laminhub URL or 'artifact', 'collection', or 'transform'"
         )
@@ -104,7 +104,7 @@ def load(
 
     query_by_uid = uid is not None
 
-    match entity:
+    match registry:
         case "transform":
             if query_by_uid:
                 # we don't use .get here because DoesNotExist is hard to catch
@@ -168,7 +168,7 @@ def load(
         case "artifact" | "collection":
             ln.settings.track_run_inputs = False
 
-            EntityClass = ln.Artifact if entity == "artifact" else ln.Collection
+            EntityClass = ln.Artifact if registry == "artifact" else ln.Collection
 
             # we don't use .get here because DoesNotExist is hard to catch due to private django API
             # we use `.objects` here because we don't want to exclude kind = __lamindb_run__ artifacts
@@ -180,24 +180,24 @@ def load(
             if (n_entities := len(entities)) == 0:
                 err_msg = f"uid={uid}" if query_by_uid else f"key={key}"
                 raise SystemExit(
-                    f"{entity.capitalize()} with {err_msg} does not exist."
+                    f"{registry.capitalize()} with {err_msg} does not exist."
                 )
 
             if n_entities > 1:
                 entities = entities.order_by("-created_at")
 
-            entity_obj = entities.first()
-            cache_path = entity_obj.cache(is_run_input=current_run)
+            registry_obj = entities.first()
+            cache_path = registry_obj.cache(is_run_input=current_run)
 
             # collection gives us a list of paths
             if isinstance(cache_path, list):
-                logger.important(f"{entity} paths ({len(cache_path)} files):")
+                logger.important(f"{registry} paths ({len(cache_path)} files):")
                 for i, path in enumerate(cache_path):
                     if i < 5 or i >= len(cache_path) - 5:
                         logger.important(f"  [{i + 1}/{len(cache_path)}] {path}")
                     elif i == 5:
                         logger.important(f"  ... {len(cache_path) - 10} more files ...")
             else:
-                logger.important(f"{entity} is here: {cache_path}")
+                logger.important(f"{registry} is here: {cache_path}")
         case _:
-            raise AssertionError(f"unknown entity {entity}")
+            raise AssertionError(f"unknown registry {registry}")
