@@ -211,8 +211,8 @@ def connect(instance: str):
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
 
-    Python/R: {func}`~lamindb.connect` to connect the global default database
-    and {class}`~lamindb.DB` to connect a database object
+    Python/R: {func}`~lamindb.connect` the global default database
+    or a database object via {class}`~lamindb.DB`
     """
     return connect_(instance)
 
