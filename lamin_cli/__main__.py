@@ -594,7 +594,7 @@ def annotate(registry: str | None, key: str, uid: str, project: str, features: t
     lamin annotate --key my-notebook.ipynb --project "My Project"
     ```
 
-    → Python/R alternative: {meth}`~lamindb.models.FeatureManager.add_values and {meth}`~lamindb.QueryManager.add`
+    → Python/R alternative: {meth}`~lamindb.models.FeatureManager.add_values` and {meth}`~lamindb.models.RelatedManager.add`
     """
     import lamindb as ln
 
