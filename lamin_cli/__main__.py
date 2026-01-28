@@ -236,25 +236,42 @@ def disconnect():
 
 # fmt: off
 @main.command()
-@click.argument("registry", type=str)
-@click.option("--name", type=str, default=None, help="A name.")
+@click.argument("registry", type=click.Choice(["branch", "project"]))
+@click.argument("name", type=str, required=False)
+@click.option("--name", "name_opt", type=str, default=None, hidden=True, help="A name.")
 # fmt: on
-def create(registry: Literal["branch", "project"], name: str | None = None):
+def create(
+    registry: Literal["branch", "project"],
+    name: str | None,
+    name_opt: str | None,
+):
     """Create an object.
 
     Currently only supports creating branches and projects.
 
     ```
-    lamin create branch --name my_branch
-    lamin create project --name my_project
+    lamin create branch my_branch
+    lamin create project my_project
     ```
     """
+    resolved_name = name if name is not None else name_opt
+    if resolved_name is None:
+        raise click.UsageError(
+            "Specify a name. Examples: lamin create branch my_branch, lamin create project my_project"
+        )
+    if name_opt is not None:
+        warnings.warn(
+            "lamin create --name is deprecated; use 'lamin create <registry> <name>' instead, e.g. lamin create branch my_branch.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     from lamindb.models import Branch, Project
 
     if registry == "branch":
-        record = Branch(name=name).save()
+        record = Branch(name=resolved_name).save()
     elif registry == "project":
-        record = Project(name=name).save()
+        record = Project(name=resolved_name).save()
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
     logger.important(f"created {registry}: {record.name}")
@@ -312,6 +329,12 @@ def switch(
     elif branch is None and space is None:
         raise click.UsageError(
             "Specify branch or space. Examples: lamin switch branch my_branch, lamin switch space our_space"
+        )
+    else:
+        warnings.warn(
+            "lamin switch --branch and --space are deprecated; use 'lamin switch branch <name>' or 'lamin switch space <name>' instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
 
     from lamindb.setup import switch as switch_

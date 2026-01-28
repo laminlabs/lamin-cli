@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import warnings
 from pathlib import Path
 
 import lamindb as ln
@@ -8,7 +9,17 @@ import lamindb_setup as ln_setup
 
 
 def test_create_project():
-    exit_status = os.system("lamin create project --name testproject")
+    exit_status = os.system("lamin create project testproject")
+    assert exit_status == 0
+
+
+def test_create_backward_compat():
+    """Backward compat: lamin create <registry> --name <name> still works (undocumented)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        exit_status = os.system("lamin create branch --name backcompatbranch")
+    assert exit_status == 0
+    exit_status = os.system("lamin delete branch --name backcompatbranch")
     assert exit_status == 0
 
 
@@ -31,7 +42,7 @@ def test_branch():
         shell=True,
     )
     assert result.stdout.strip().split("\n")[-1] == "main"
-    exit_status = os.system("lamin create branch --name testbranch")
+    exit_status = os.system("lamin create branch testbranch")
     exit_status = os.system("lamin switch branch testbranch")
     assert exit_status == 0
     exit_status = os.system("lamin list branch")
