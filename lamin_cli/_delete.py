@@ -1,5 +1,7 @@
+import click
 from lamindb_setup import connect
 from lamindb_setup import delete as delete_instance
+from lamindb_setup.errors import StorageNotEmpty
 
 from .urls import decompose_url
 
@@ -63,7 +65,9 @@ def delete(
         else:
             record = Collection.get(uid)
         record.delete(permanent=permanent)
-    elif entity == "instance":
-        return delete_instance(slug, force=force)
-    else:  # backwards compatibility
-        return delete_instance(entity, force=force)
+    else:
+        # could introduce "db" as an entity
+        try:
+            return delete_instance(entity, force=force)
+        except StorageNotEmpty as e:
+            raise click.ClickException(str(e)) from e
