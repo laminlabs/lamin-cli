@@ -67,11 +67,10 @@ def test_save_and_annotate_local_file():
     )
     print(result.stdout.decode())
     print(result.stderr.decode())
-    assert (
-        "Allowed values for '--registry' are: 'artifact', 'transform'"
-        in result.stderr.decode()
-    )
-    assert result.returncode == 1
+    stderr = result.stderr.decode()
+    assert "'artifact'" in stderr and "'transform'" in stderr
+    assert "invalid" in stderr.lower() or "Invalid" in stderr
+    assert result.returncode != 0
 
     result = subprocess.run(
         f"lamin save {filepath} --key mytest --registry artifact",
@@ -108,6 +107,14 @@ def test_save_and_annotate_local_file():
     # can't find by key here because the artifact is not in the main branch
     result = subprocess.run(
         f"lamin describe --uid {artifact.uid}",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+
+    # lamin delete by key (parallel to lamin load/save)
+    result = subprocess.run(
+        "lamin delete artifact --key mytest --permanent",
         shell=True,
         capture_output=True,
     )

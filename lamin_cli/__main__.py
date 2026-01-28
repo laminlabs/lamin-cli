@@ -53,9 +53,7 @@ COMMAND_GROUPS = {
         {
             "name": "Configure",
             "commands": [
-                "checkout",
                 "switch",
-                "cache",
                 "settings",
                 "migrate",
             ],
@@ -112,7 +110,6 @@ else:
 
 from lamindb_setup._silence_loggers import silence_loggers
 
-from lamin_cli._cache import cache
 from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
@@ -181,7 +178,17 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Init a LaminDB instance.
+    """Initialize an instance.
+
+    This initializes a LaminDB instance, for example:
+
+    ```
+    lamin init --storage ./mydata
+    lamin init --storage s3://my-bucket
+    lamin init --storage gs://my-bucket
+    lamin init --storage ./mydata --modules bionty
+    lamin init --storage ./mydata --modules bionty,pertdb
+    ```
 
     See also: Init in a Python session via {func}`~lamindb.setup.init`.
     """
@@ -191,23 +198,35 @@ def init(
 # fmt: off
 @main.command()
 @click.argument("instance", type=str)
-@click.option("--use_proxy_db", is_flag=True, help="Use proxy database connection.")
 # fmt: on
-def connect(instance: str, use_proxy_db: bool):
-    """Configure default instance for connections.
+def connect(instance: str):
+    """Set a default instance for auto-connection.
 
-    Python/R sessions and CLI commands will then auto-connect to the configured instance.
+    Python/R sessions and CLI commands will then auto-connect to this LaminDB instance.
 
-    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
+    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`), for example:
+
+    ```
+    lamin connect laminlabs/cellxgene
+    lamin connect https://lamin.ai/laminlabs/cellxgene
+    ```
 
     See also: Connect in a Python session via {func}`~lamindb.connect`.
     """
-    return connect_(instance, use_proxy_db=use_proxy_db)
+    return connect_(instance)
 
 
 @main.command()
 def disconnect():
-    """Clear default instance configuration.
+    """Unset the default instance for auto-connection.
+
+    Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
+
+    For example:
+
+    ```
+    lamin disconnect
+    ```
 
     See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
     """
@@ -216,48 +235,67 @@ def disconnect():
 
 # fmt: off
 @main.command()
-@click.argument("entity", type=str)
-@click.option("--name", type=str, default=None, help="A name.")
+@click.argument("registry", type=click.Choice(["branch", "project"]))
+@click.argument("name", type=str, required=False)
+# below is deprecated, for backward compatibility
+@click.option("--name", "name_opt", type=str, default=None, hidden=True, help="A name.")
 # fmt: on
-def create(entity: Literal["branch"], name: str | None = None):
-    """Create a record for an entity.
+def create(
+    registry: Literal["branch", "project"],
+    name: str | None,
+    name_opt: str | None,
+):
+    """Create an object.
 
     Currently only supports creating branches and projects.
 
     ```
-    lamin create branch --name my_branch
-    lamin create project --name my_project
+    lamin create branch my_branch
+    lamin create project my_project
     ```
     """
+    resolved_name = name if name is not None else name_opt
+    if resolved_name is None:
+        raise click.UsageError(
+            "Specify a name. Examples: lamin create branch my_branch, lamin create project my_project"
+        )
+    if name_opt is not None:
+        warnings.warn(
+            "lamin create --name is deprecated; use 'lamin create <registry> <name>' instead, e.g. lamin create branch my_branch.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     from lamindb.models import Branch, Project
 
-    if entity == "branch":
-        record = Branch(name=name).save()
-    elif entity == "project":
-        record = Project(name=name).save()
+    if registry == "branch":
+        record = Branch(name=resolved_name).save()
+    elif registry == "project":
+        record = Project(name=resolved_name).save()
     else:
-        raise NotImplementedError(f"Creating {entity} is not implemented.")
-    logger.important(f"created {entity}: {record.name}")
+        raise NotImplementedError(f"Creating {registry} object is not implemented.")
+    logger.important(f"created {registry}: {record.name}")
 
 
 # fmt: off
 @main.command(name="list")
-@click.argument("entity", type=str)
-@click.option("--name", type=str, default=None, help="A name.")
+@click.argument("registry", type=str)
 # fmt: on
-def list_(entity: Literal["branch"], name: str | None = None):
-    """List records for an entity.
+def list_(registry: Literal["branch", "space"]):
+    """List objects.
+
+    For example:
 
     ```
     lamin list branch
     lamin list space
     ```
     """
-    assert entity in {"branch", "space"}, "Currently only supports listing branches and spaces."
+    assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
     from lamindb.models import Branch, Space
 
-    if entity == "branch":
+    if registry == "branch":
         print(Branch.to_dataframe())
     else:
         print(Space.to_dataframe())
@@ -265,26 +303,50 @@ def list_(entity: Literal["branch"], name: str | None = None):
 
 # fmt: off
 @main.command()
-@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
-@click.option("--space", type=str, default=None, help="A valid branch name or uid.")
+@click.argument("registry", type=click.Choice(["branch", "space"]), required=False)
+@click.argument("name", type=str, required=False)
+# below are deprecated, for backward compatibility
+@click.option("--branch", type=str, default=None, hidden=True, help="A valid branch name or uid.")
+@click.option("--space", type=str, default=None, hidden=True, help="A valid space name or uid.")
 # fmt: on
-def switch(branch: str | None = None, space: str | None = None):
+def switch(
+    registry: Literal["branch", "space"] | None,
+    name: str | None,
+    branch: str | None,
+    space: str | None,
+):
     """Switch between branches or spaces.
 
+    Python/R sessions and CLI commands will use the current default branch or space, for example:
+
     ```
-    lamin switch --branch my_branch
-    lamin switch --space our_space
+    lamin switch branch my_branch
+    lamin switch space our_space
     ```
     """
+    if registry is not None and name is not None:
+        branch = name if registry == "branch" else None
+        space = name if registry == "space" else None
+    elif branch is None and space is None:
+        raise click.UsageError(
+            "Specify branch or space. Examples: lamin switch branch my_branch, lamin switch space our_space"
+        )
+    else:
+        warnings.warn(
+            "lamin switch --branch and --space are deprecated; use 'lamin switch branch <name>' or 'lamin switch space <name>' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     from lamindb.setup import switch as switch_
 
     switch_(branch=branch, space=space)
 
 
 @main.command()
-@click.option("--schema", is_flag=True, help="View database schema.")
+@click.option("--schema", is_flag=True, help="View database schema via Django plugin.")
 def info(schema: bool):
-    """Show info about the environment, instance, branch, space, and user.
+    """Show info about the instance, development & cache directories, branch, space, and user.
 
     See also: Print the instance settings in a Python session via {func}`~lamindb.setup.settings`.
     """
@@ -301,15 +363,17 @@ def info(schema: bool):
 
 # fmt: off
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
+@click.option("--key", type=str, default=None, help="The key for the entity (artifact, transform).")
 @click.option("--slug", type=str, default=None)
 @click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
-def delete(entity: str, name: str | None = None, uid: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
-    """Delete an entity.
+def delete(entity: str, name: str | None = None, uid: str | None = None, key: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
+    """Delete an object.
 
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
@@ -318,14 +382,17 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     lamin delete branch --name my_branch
     lamin delete instance --slug account/name
+    lamin delete artifact --key mydatasets/mytable.parquet
+    lamin delete transform --key myanalyses/analysis.ipynb
     ```
     """
     from lamin_cli._delete import delete as delete_
 
-    return delete_(entity=entity, name=name, uid=uid, slug=slug, permanent=permanent, force=force)
+    return delete_(entity=entity, name=name, uid=uid, key=key, slug=slug, permanent=permanent, force=force)
 
 
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str, required=False)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
@@ -333,7 +400,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, slug: s
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
-    """Load a file or folder into the cache or working directory.
+    """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass a URL or `--key`. For example:
 
@@ -381,11 +448,12 @@ def _describe(entity: str = "artifact", uid: str | None = None, key: str | None 
 
 
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
 def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    """Describe an artifact.
+    """Describe an object.
 
     Examples:
 
@@ -400,11 +468,12 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
 
 
 @main.command()
+# entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity.")
 def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
-    """Query metadata about an entity.
+    """Query metadata about an object.
 
     Currently equivalent to `lamin describe`.
     """
@@ -420,8 +489,22 @@ def get(entity: str = "artifact", uid: str | None = None, key: str | None = None
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--space", type=str, default=None, help="A valid space name or uid.")
 @click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
-@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
-def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
+@click.option(
+    "--registry",
+    type=click.Choice(["artifact", "transform"]),
+    default=None,
+    help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.",
+)
+def save(
+    path: str,
+    key: str,
+    description: str,
+    stem_uid: str,
+    project: str,
+    space: str,
+    branch: str,
+    registry: Literal["artifact", "transform"] | None,
+):
     """Save a file or folder.
 
     Example: Given a valid project name "my_project",
@@ -468,7 +551,7 @@ def track():
 
 @main.command()
 def finish():
-    """Finish the current tracked run of a shell script.
+    """Finish a currently tracked run of a shell script.
 
     This command works like {func}`~lamindb.finish()` in a Python session.
     """
@@ -477,15 +560,15 @@ def finish():
 
 
 @main.command()
-@click.argument("entity", type=str, default=None, required=False)
+@click.argument("registry", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
+def annotate(registry: str | None, key: str, uid: str, project: str, features: tuple):
     """Annotate an artifact or transform.
 
-    Entity is either 'artifact' or 'transform'. If not passed, chooses based on key suffix.
+    The `registry` can be either 'artifact' or 'transform'. If not passed, chooses based on `key` suffix.
 
     You can annotate with projects and valid features & values. For example,
 
@@ -504,13 +587,11 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
     if not ln.setup.settings._instance_exists:
         raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
 
-    if entity is None:
+    if registry is None:
         if key is not None:
             registry = infer_registry_from_path(key)
         else:
             registry = "artifact"
-    else:
-        registry = entity
     if registry == "artifact":
         model = ln.Artifact
     else:
@@ -548,7 +629,7 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
 @click.argument("filepath", type=str)
 @click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
 @click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
-@click.option("--packages", type=str, default="lamindb", help="A comma-separated list of additional packages to install.")
+@click.option("--packages", type=str, default=None, help="A comma-separated list of additional packages to install.")
 @click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
 @click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
 def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
@@ -589,9 +670,53 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
 
 main.add_command(settings)
-main.add_command(cache)
 main.add_command(migrate)
 main.add_command(io)
+
+
+def _deprecated_cache_set(cache_dir: str) -> None:
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
+    from lamindb_setup._cache import set_cache_dir
+
+    set_cache_dir(cache_dir)
+
+
+def _deprecated_cache_clear() -> None:
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
+    from lamindb_setup._cache import clear_cache_dir
+
+    clear_cache_dir()
+
+
+def _deprecated_cache_get() -> None:
+    logger.warning("'lamin cache' is deprecated. Use 'lamin settings cache-dir' instead.")
+    from lamindb_setup._cache import get_cache_dir
+
+    click.echo(f"The cache directory is {get_cache_dir()}")
+
+
+@main.group("cache", hidden=True)
+def deprecated_cache():
+    """Deprecated. Use 'lamin settings cache-dir' instead."""
+
+
+@deprecated_cache.command("set")
+@click.argument(
+    "cache_dir",
+    type=click.Path(dir_okay=True, file_okay=False),
+)
+def _deprecated_cache_set_cmd(cache_dir: str) -> None:
+    _deprecated_cache_set(cache_dir)
+
+
+@deprecated_cache.command("clear")
+def _deprecated_cache_clear_cmd() -> None:
+    _deprecated_cache_clear()
+
+
+@deprecated_cache.command("get")
+def _deprecated_cache_get_cmd() -> None:
+    _deprecated_cache_get()
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
@@ -601,6 +726,8 @@ def _generate_help():
     def recursive_help(
         cmd: Command, parent: Context | None = None, name: tuple[str, ...] = ()
     ):
+        if getattr(cmd, "hidden", False):
+            return
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
         assert cmd.name
         name = (*name, cmd.name)
@@ -615,6 +742,8 @@ def _generate_help():
         }
 
         for sub in getattr(cmd, "commands", {}).values():
+            if getattr(sub, "hidden", False):
+                continue
             recursive_help(sub, ctx, name=name)
 
     recursive_help(main)
