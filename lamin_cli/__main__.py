@@ -143,7 +143,7 @@ def login(user: str, key: str | None):
 
     After authenticating once, you can re-authenticate and switch between accounts via `lamin login myhandle`.
 
-    Python/R: {func}`~lamindb.setup.login`
+    💡 Python/R: {func}`~lamindb.setup.login`
     """
     return login_(user, key=key)
 
@@ -190,7 +190,7 @@ def init(
     lamin init --storage ./mydata --modules bionty,pertdb
     ```
 
-    Python/R: {func}`~lamindb.setup.init`
+    💡 Python/R: {func}`~lamindb.setup.init`
     """
     return init_(storage=storage, db=db, modules=modules, name=name)
 
@@ -211,7 +211,7 @@ def connect(instance: str):
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
 
-    Python/R: {func}`~lamindb.connect` the global default database
+    💡 Python/R: {func}`~lamindb.connect` the global default database
     or a database object via {class}`~lamindb.DB`
     """
     return connect_(instance)
@@ -229,7 +229,7 @@ def disconnect():
     lamin disconnect
     ```
 
-    Python/R: {func}`~lamindb.setup.disconnect`.
+    💡 Python/R: {func}`~lamindb.setup.disconnect`.
     """
     return disconnect_()
 
@@ -255,7 +255,7 @@ def create(
     lamin create project my_project
     ```
 
-    Python/R: {class}`~lamindb.Branch` and {class}`~lamindb.Project`.
+    💡 Python/R: {class}`~lamindb.Branch` and {class}`~lamindb.Project`.
     """
     resolved_name = name if name is not None else name_opt
     if resolved_name is None:
@@ -294,7 +294,7 @@ def list_(registry: Literal["branch", "space"]):
     lamin list space
     ```
 
-    Python/R: {method}`~lamindb.Branch.to_dataframe()`
+    💡 Python/R: {method}`~lamindb.Branch.to_dataframe()`
     """
     assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
@@ -329,7 +329,7 @@ def switch(
     lamin switch space our_space
     ```
 
-    Python/R: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
+    💡 Python/R: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
     if registry is not None and name is not None:
         branch = name if registry == "branch" else None
@@ -355,9 +355,9 @@ def switch(
 def info(schema: bool):
     """Show info about the instance, development & cache directories, branch, space, and user.
 
-    Manage settings via [lamin settings](https://docs.lamin.ai/cli#settings)
+    Manage settings via [lamin settings](https://docs.lamin.ai/cli#settings).
 
-    Python/R: {func}`~lamindb.setup.settings`
+    💡 Python/R: {func}`~lamindb.setup.settings`
     """
     if schema:
         from lamindb_setup._schema import view
@@ -395,7 +395,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     lamin delete transform --key myanalyses/analysis.ipynb
     ```
 
-    Python/R: {method}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
+    💡 Python/R: {method}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
     """
     from lamin_cli._delete import delete as delete_
 
@@ -429,7 +429,7 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load transform --uid Vul4JbfsEYAy5
     ```
 
-    Python/R: {func}`~lamindb.Artifact.load`, no equivalent for transforms
+    💡 Python/R: {func}`~lamindb.Artifact.load`, no equivalent for transforms
     """
     from lamin_cli._load import load as load_
     if entity is not None:
@@ -475,7 +475,7 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
     ```
 
-    Python/R: {meth}`~lamindb.Artifact.describe`
+    💡 Python/R: {meth}`~lamindb.Artifact.describe`
     """
     _describe(entity=entity, uid=uid, key=key)
 
@@ -533,7 +533,7 @@ def save(
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
-    Python/R: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
+    💡 Python/R: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
@@ -560,7 +560,7 @@ def track():
     sh my_script.sh
     ```
 
-    Python/R: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
+    💡 Python/R: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
     from lamin_cli._context import track as track_
     return track_()
@@ -570,7 +570,7 @@ def track():
 def finish():
     """Finish a currently tracked run of a shell script.
 
-    Python/R: {func}`~lamindb.finish()`
+    💡 Python/R: {func}`~lamindb.finish()`
     """
     from lamin_cli._context import finish as finish_
     return finish_()
@@ -595,7 +595,7 @@ def annotate(registry: str | None, key: str, uid: str, project: str, features: t
     lamin annotate --key my-notebook.ipynb --project "My Project"
     ```
 
-    Python/R: {meth}`~lamindb.models.FeatureManager.add_values and {meth}`~lamindb.QueryManager.add`
+    💡 Python/R: {meth}`~lamindb.models.FeatureManager.add_values and {meth}`~lamindb.QueryManager.add`
     """
     import lamindb as ln
 
@@ -662,7 +662,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     lamin run my_script.py --project my_project
     ```
 
-    Python/R: no equivalent
+    💡 Python/R: no equivalent
     """
     from lamin_cli.compute.modal import Runner
 
