@@ -12,32 +12,38 @@ else:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage settings.
-
-    Call without subcommands and options to show the current environment setup settings:
-
-    ```
-    lamin settings
-    ```
+    """Manage development & cache directories, branch, and space settings.
 
     Get or set a setting by name:
 
     - `dev-dir` → development directory {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
     - `cache-dir` → cache directory {attr}`~lamindb.setup.core.SetupSettings.cache_dir`
-    - `branch` → branch (use `lamin switch branch <name>` to change)
-    - `space` → space (use `lamin switch space <name>` to change)
+    - `branch` → branch {attr}`~lamindb.setup.core.SetupSettings.branch`
+    - `space` → space {attr}`~lamindb.setup.core.SetupSettings.space`
+
+    Display via [lamin info](https://docs.lamin.ai/cli#info)
 
     Examples:
 
     ```
+    # dev-dir
     lamin settings dev-dir get
     lamin settings dev-dir set .  # set to current directory
     lamin settings dev-dir set ~/my-project
     lamin settings dev-dir unset
+    # cache-dir
     lamin settings cache-dir get
     lamin settings cache-dir set /path/to/cache
     lamin settings cache-dir clear
+    # branch
+    lamin settings branch get
+    lamin settings branch set main
+    # space
+    lamin settings space get
+    lamin settings space set all
     ```
+
+    Python/R: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
     if ctx.invoked_subcommand is None:
         from lamindb_setup import settings as settings_
