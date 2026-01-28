@@ -386,12 +386,17 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
-    lamin delete branch --name my_branch
-    lamin delete instance --slug account/name
+    # via --key or --name
     lamin delete artifact --key mydatasets/mytable.parquet
     lamin delete transform --key myanalyses/analysis.ipynb
+    lamin delete branch --name my_branch
+    lamin delete instance --slug account/name
+    # via registry and --uid
+    lamin delete artifact --uid e2G7k9EVul4JbfsE
+    lamin delete transform --uid Vul4JbfsEYAy5
+    # via URL
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     ```
 
     → Python/R alternative: {method}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
@@ -415,17 +420,15 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     Pass a URL or `--key`. For example:
 
     ```
-    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
+    # via key
     lamin load --key mydatasets/mytable.parquet
     lamin load --key analysis.ipynb
     lamin load --key myanalyses/analysis.ipynb --with-env
-    ```
-
-    You can also pass a uid and the entity type:
-
-    ```
+    # via registry and --uid
     lamin load artifact --uid e2G7k9EVul4JbfsE
     lamin load transform --uid Vul4JbfsEYAy5
+    # via URL
+    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
     ```
 
     → Python/R alternative: {func}`~lamindb.Artifact.load`, no equivalent for transforms

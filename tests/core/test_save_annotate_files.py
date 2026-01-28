@@ -129,7 +129,7 @@ def test_annotate_rejects_collection_url():
         capture_output=True,
     )
     assert result.returncode != 0
-    err = (result.stderr or result.stdout).decode()
+    err = (result.stderr or b"").decode() + (result.stdout or b"").decode()
     assert "collection" in err.lower()
     assert "artifact" in err.lower() or "transform" in err.lower()
 
