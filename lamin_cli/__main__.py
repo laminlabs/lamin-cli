@@ -228,7 +228,7 @@ def disconnect():
     lamin disconnect
     ```
 
-    💡 Python/R alternative: {func}`~lamindb.setup.disconnect`.
+    💡 Python/R alternative: {func}`~lamindb.setup.disconnect`
     """
     return disconnect_()
 
