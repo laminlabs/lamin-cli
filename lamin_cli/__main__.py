@@ -470,7 +470,11 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
     Examples:
 
     ```
+    # via --key
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
+    # via registry and --uid
+    lamin describe artifact --uid e2G7k9EVul4JbfsE
+    # via URL
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
     ```
 
@@ -590,12 +594,15 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
     You can annotate with projects, ulabels, records, and valid features & values. For example,
 
     ```
+    # via --key
     lamin annotate --key raw/sample.fastq --project "My Project"
     lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key my-notebook.ipynb --project "My Project"
-    lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
+    # via registry and --uid
     lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
+    # via URL
+    lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
     ```
 
     → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values` and `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`
@@ -607,6 +614,10 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
     if entity is not None and entity.startswith("https://"):
         url = entity
         instance, registry, uid = decompose_url(url)
+        if registry not in {"artifact", "transform"}:
+            raise click.ClickException(
+                f"Annotate does not support {registry}. Use artifact or transform URLs."
+            )
         ln_setup.connect(instance)
     else:
         if not ln_setup.settings._instance_exists:
@@ -617,10 +628,10 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             registry = infer_registry_from_path(key) if key is not None else "artifact"
         else:
             registry = entity
-    if registry not in {"artifact", "transform"}:
-        raise click.ClickException(
-            f"Annotate does not support {registry}. Use artifact or transform URLs."
-        )
+        if registry not in {"artifact", "transform"}:
+            raise click.ClickException(
+                f"Annotate does not support {registry}. Use artifact or transform URLs."
+            )
 
     # import lamindb after connect went through
     import lamindb as ln
