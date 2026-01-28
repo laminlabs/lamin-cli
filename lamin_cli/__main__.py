@@ -581,20 +581,24 @@ def finish():
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--ulabel", type=str, default=None, help="A valid ulabel name or uid.")
+@click.option("--record", type=str, default=None, help="A valid record name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
+def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, features: tuple):
     """Annotate an artifact or transform.
 
-    You can annotate with projects and valid features & values. For example,
+    You can annotate with projects, ulabels, records, and valid features & values. For example,
 
     ```
     lamin annotate --key raw/sample.fastq --project "My Project"
+    lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key my-notebook.ipynb --project "My Project"
     lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
+    lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
     ```
 
-    → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values` and `artifact.projects.add()`, `artifact.ulabels.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`
+    → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values` and `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`
     """
     from lamin_cli._annotate import _parse_features_list
     from lamin_cli._save import infer_registry_from_path
@@ -646,6 +650,28 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
         artifact.projects.add(project_record)
+
+    # Handle ulabel annotation
+    if ulabel is not None:
+        ulabel_record = ln.ULabel.filter(
+            ln.Q(name=ulabel) | ln.Q(uid=ulabel)
+        ).one_or_none()
+        if ulabel_record is None:
+            raise ln.errors.InvalidArgument(
+                f"ULabel '{ulabel}' not found, either create it with `ln.ULabel(name='...').save()` or fix typos."
+            )
+        artifact.ulabels.add(ulabel_record)
+
+    # Handle record annotation
+    if record is not None:
+        record_record = ln.Record.filter(
+            ln.Q(name=record) | ln.Q(uid=record)
+        ).one_or_none()
+        if record_record is None:
+            raise ln.errors.InvalidArgument(
+                f"Record '{record}' not found, either create it with `ln.Record(name='...').save()` or fix typos."
+            )
+        artifact.records.add(record_record)
 
     # Handle feature annotations
     if features:
