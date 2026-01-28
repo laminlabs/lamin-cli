@@ -65,12 +65,7 @@ def delete(
         else:
             record = Collection.get(uid)
         record.delete(permanent=permanent)
-    elif entity == "instance":
-        try:
-            return delete_instance(slug, force=force)
-        except StorageNotEmpty as e:
-            raise click.ClickException(str(e)) from e
-    else:  # backwards compatibility
+    else:
         try:
             return delete_instance(entity, force=force)
         except StorageNotEmpty as e:
