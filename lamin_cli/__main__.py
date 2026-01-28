@@ -143,7 +143,7 @@ def login(user: str, key: str | None):
 
     After authenticating once, you can re-authenticate and switch between accounts via `lamin login myhandle`.
 
-    See also: Login in a Python session via {func}`~lamindb.setup.login`.
+    → Python/R alternative: {func}`~lamindb.setup.login`
     """
     return login_(user, key=key)
 
@@ -190,7 +190,7 @@ def init(
     lamin init --storage ./mydata --modules bionty,pertdb
     ```
 
-    See also: Init in a Python session via {func}`~lamindb.setup.init`.
+    → Python/R alternative: {func}`~lamindb.setup.init`
     """
     return init_(storage=storage, db=db, modules=modules, name=name)
 
@@ -211,7 +211,7 @@ def connect(instance: str):
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
 
-    See also: Connect in a Python session via {func}`~lamindb.connect`.
+    → Python/R alternative: {func}`~lamindb.connect` the global default database or a database object via {class}`~lamindb.DB`
     """
     return connect_(instance)
 
@@ -228,7 +228,7 @@ def disconnect():
     lamin disconnect
     ```
 
-    See also: Disconnect in a Python session via {func}`~lamindb.setup.disconnect`.
+    → Python/R alternative: {func}`~lamindb.setup.disconnect`
     """
     return disconnect_()
 
@@ -253,6 +253,8 @@ def create(
     lamin create branch my_branch
     lamin create project my_project
     ```
+
+    → Python/R alternative: {class}`~lamindb.Branch` and {class}`~lamindb.Project`.
     """
     resolved_name = name if name is not None else name_opt
     if resolved_name is None:
@@ -290,6 +292,8 @@ def list_(registry: Literal["branch", "space"]):
     lamin list branch
     lamin list space
     ```
+
+    → Python/R alternative: {method}`~lamindb.Branch.to_dataframe()`
     """
     assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
@@ -323,6 +327,8 @@ def switch(
     lamin switch branch my_branch
     lamin switch space our_space
     ```
+
+    → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
     if registry is not None and name is not None:
         branch = name if registry == "branch" else None
@@ -348,7 +354,9 @@ def switch(
 def info(schema: bool):
     """Show info about the instance, development & cache directories, branch, space, and user.
 
-    See also: Print the instance settings in a Python session via {func}`~lamindb.setup.settings`.
+    Manage settings via [lamin settings](https://docs.lamin.ai/cli#settings).
+
+    → Python/R alternative: {func}`~lamindb.setup.settings`
     """
     if schema:
         from lamindb_setup._schema import view
@@ -378,13 +386,20 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
 
     ```
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
-    lamin delete branch --name my_branch
-    lamin delete instance --slug account/name
+    # via --key or --name
     lamin delete artifact --key mydatasets/mytable.parquet
     lamin delete transform --key myanalyses/analysis.ipynb
+    lamin delete branch --name my_branch
+    lamin delete instance --slug account/name
+    # via registry and --uid
+    lamin delete artifact --uid e2G7k9EVul4JbfsE
+    lamin delete transform --uid Vul4JbfsEYAy5
+    # via URL
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
+    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     ```
+
+    → Python/R alternative: {method}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
     """
     from lamin_cli._delete import delete as delete_
 
@@ -405,18 +420,18 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     Pass a URL or `--key`. For example:
 
     ```
-    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
+    # via key
     lamin load --key mydatasets/mytable.parquet
     lamin load --key analysis.ipynb
     lamin load --key myanalyses/analysis.ipynb --with-env
-    ```
-
-    You can also pass a uid and the entity type:
-
-    ```
+    # via registry and --uid
     lamin load artifact --uid e2G7k9EVul4JbfsE
     lamin load transform --uid Vul4JbfsEYAy5
+    # via URL
+    lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
     ```
+
+    → Python/R alternative: {func}`~lamindb.Artifact.load`, no equivalent for transforms
     """
     from lamin_cli._load import load as load_
     if entity is not None:
@@ -458,11 +473,15 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
     Examples:
 
     ```
+    # via --key
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
+    # via registry and --uid
+    lamin describe artifact --uid e2G7k9EVul4JbfsE
+    # via URL
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
     ```
 
-    See also: Describe an artifact in a Python session via {func}`~lamindb.Artifact.describe`.
+    → Python/R alternative: {meth}`~lamindb.Artifact.describe`
     """
     _describe(entity=entity, uid=uid, key=key)
 
@@ -505,9 +524,9 @@ def save(
     branch: str,
     registry: Literal["artifact", "transform"] | None,
 ):
-    """Save a file or folder.
+    """Save a file or folder as an artifact or transform.
 
-    Example: Given a valid project name "my_project",
+    Example:
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv --project my_project
@@ -516,9 +535,11 @@ def save(
     By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
     If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
 
-    Note: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
+    Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
+
+    → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
     if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
@@ -544,6 +565,8 @@ def track():
     ```
     sh my_script.sh
     ```
+
+    → Python/R alternative: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
     from lamin_cli._context import track as track_
     return track_()
@@ -553,57 +576,83 @@ def track():
 def finish():
     """Finish a currently tracked run of a shell script.
 
-    This command works like {func}`~lamindb.finish()` in a Python session.
+    → Python/R alternative: {func}`~lamindb.finish()`
     """
     from lamin_cli._context import finish as finish_
     return finish_()
 
 
 @main.command()
-@click.argument("registry", type=str, default=None, required=False)
+# entity can be a registry or an object in the registry
+@click.argument("entity", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
+@click.option("--ulabel", type=str, default=None, help="A valid ulabel name or uid.")
+@click.option("--record", type=str, default=None, help="A valid record name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(registry: str | None, key: str, uid: str, project: str, features: tuple):
+def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, features: tuple):
     """Annotate an artifact or transform.
 
-    The `registry` can be either 'artifact' or 'transform'. If not passed, chooses based on `key` suffix.
-
-    You can annotate with projects and valid features & values. For example,
+    You can annotate with projects, ulabels, records, and valid features & values. For example,
 
     ```
+    # via --key
     lamin annotate --key raw/sample.fastq --project "My Project"
+    lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key my-notebook.ipynb --project "My Project"
+    # via registry and --uid
+    lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
+    # via URL
+    lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
     ```
-    """
-    import lamindb as ln
 
+    → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values` and `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`
+    """
     from lamin_cli._annotate import _parse_features_list
     from lamin_cli._save import infer_registry_from_path
 
-    # once we enable passing the URL as entity, then we don't need to throw this error
-    if not ln.setup.settings._instance_exists:
-        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
-
-    if registry is None:
-        if key is not None:
-            registry = infer_registry_from_path(key)
+    # Handle URL: decompose and connect (same pattern as load/delete)
+    if entity is not None and entity.startswith("https://"):
+        url = entity
+        instance, registry, uid = decompose_url(url)
+        if registry not in {"artifact", "transform"}:
+            raise click.ClickException(
+                f"Annotate does not support {registry}. Use artifact or transform URLs."
+            )
+        ln_setup.connect(instance)
+    else:
+        if not ln_setup.settings._instance_exists:
+            raise click.ClickException(
+                "Not connected to an instance. Please run: lamin connect account/name"
+            )
+        if entity is None:
+            registry = infer_registry_from_path(key) if key is not None else "artifact"
         else:
-            registry = "artifact"
+            registry = entity
+        if registry not in {"artifact", "transform"}:
+            raise click.ClickException(
+                f"Annotate does not support {registry}. Use artifact or transform URLs."
+            )
+
+    # import lamindb after connect went through
+    import lamindb as ln
+
     if registry == "artifact":
         model = ln.Artifact
     else:
         model = ln.Transform
 
-    # Get the artifact
+    # Get the artifact or transform
     if key is not None:
         artifact = model.get(key=key)
     elif uid is not None:
         artifact = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
     else:
-        raise ln.errors.InvalidArgument("Either --key or --uid must be provided")
+        raise ln.errors.InvalidArgument(
+            "Either pass a URL as entity or provide --key or --uid"
+        )
 
     # Handle project annotation
     if project is not None:
@@ -615,6 +664,28 @@ def annotate(registry: str | None, key: str, uid: str, project: str, features: t
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
         artifact.projects.add(project_record)
+
+    # Handle ulabel annotation
+    if ulabel is not None:
+        ulabel_record = ln.ULabel.filter(
+            ln.Q(name=ulabel) | ln.Q(uid=ulabel)
+        ).one_or_none()
+        if ulabel_record is None:
+            raise ln.errors.InvalidArgument(
+                f"ULabel '{ulabel}' not found, either create it with `ln.ULabel(name='...').save()` or fix typos."
+            )
+        artifact.ulabels.add(ulabel_record)
+
+    # Handle record annotation
+    if record is not None:
+        record_record = ln.Record.filter(
+            ln.Q(name=record) | ln.Q(uid=record)
+        ).one_or_none()
+        if record_record is None:
+            raise ln.errors.InvalidArgument(
+                f"Record '{record}' not found, either create it with `ln.Record(name='...').save()` or fix typos."
+            )
+        artifact.records.add(record_record)
 
     # Handle feature annotations
     if features:
@@ -642,6 +713,8 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     ```
     lamin run my_script.py --project my_project
     ```
+
+    → Python/R alternative: no equivalent
     """
     from lamin_cli.compute.modal import Runner
 
