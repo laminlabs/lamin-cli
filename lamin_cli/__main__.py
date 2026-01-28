@@ -238,6 +238,7 @@ def disconnect():
 @main.command()
 @click.argument("registry", type=click.Choice(["branch", "project"]))
 @click.argument("name", type=str, required=False)
+# below is deprecated, for backward compatibility
 @click.option("--name", "name_opt", type=str, default=None, hidden=True, help="A name.")
 # fmt: on
 def create(
@@ -305,6 +306,7 @@ def list_(registry: Literal["branch", "space"]):
 @main.command()
 @click.argument("registry", type=click.Choice(["branch", "space"]), required=False)
 @click.argument("name", type=str, required=False)
+# below are deprecated, for backward compatibility
 @click.option("--branch", type=str, default=None, hidden=True, help="A valid branch name or uid.")
 @click.option("--space", type=str, default=None, hidden=True, help="A valid space name or uid.")
 # fmt: on
