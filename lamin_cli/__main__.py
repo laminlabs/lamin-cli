@@ -576,15 +576,14 @@ def finish():
 
 
 @main.command()
-@click.argument("registry", type=str, default=None, required=False)
+# entity can be a registry or an object in the registry
+@click.argument("entity", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
 @click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(registry: str | None, key: str, uid: str, project: str, features: tuple):
+def annotate(entity: str | None, key: str, uid: str, project: str, features: tuple):
     """Annotate an artifact or transform.
-
-    The `registry` can be either 'artifact' or 'transform'. If not passed, chooses based on `key` suffix.
 
     You can annotate with projects and valid features & values. For example,
 
@@ -605,11 +604,14 @@ def annotate(registry: str | None, key: str, uid: str, project: str, features: t
     if not ln.setup.settings._instance_exists:
         raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
 
-    if registry is None:
+    # TODO: allow passing URL as entity
+    if entity is None:
         if key is not None:
             registry = infer_registry_from_path(key)
         else:
             registry = "artifact"
+    else:
+        registry = entity
     if registry == "artifact":
         model = ln.Artifact
     else:
