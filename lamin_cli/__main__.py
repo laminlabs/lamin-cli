@@ -236,25 +236,43 @@ def disconnect():
 
 # fmt: off
 @main.command()
-@click.argument("registry", type=str)
-@click.option("--name", type=str, default=None, help="A name.")
+@click.argument("registry", type=click.Choice(["branch", "project"]))
+@click.argument("name", type=str, required=False)
+# below is deprecated, for backward compatibility
+@click.option("--name", "name_opt", type=str, default=None, hidden=True, help="A name.")
 # fmt: on
-def create(registry: Literal["branch", "project"], name: str | None = None):
+def create(
+    registry: Literal["branch", "project"],
+    name: str | None,
+    name_opt: str | None,
+):
     """Create an object.
 
     Currently only supports creating branches and projects.
 
     ```
-    lamin create branch --name my_branch
-    lamin create project --name my_project
+    lamin create branch my_branch
+    lamin create project my_project
     ```
     """
+    resolved_name = name if name is not None else name_opt
+    if resolved_name is None:
+        raise click.UsageError(
+            "Specify a name. Examples: lamin create branch my_branch, lamin create project my_project"
+        )
+    if name_opt is not None:
+        warnings.warn(
+            "lamin create --name is deprecated; use 'lamin create <registry> <name>' instead, e.g. lamin create branch my_branch.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     from lamindb.models import Branch, Project
 
     if registry == "branch":
-        record = Branch(name=name).save()
+        record = Branch(name=resolved_name).save()
     elif registry == "project":
-        record = Project(name=name).save()
+        record = Project(name=resolved_name).save()
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
     logger.important(f"created {registry}: {record.name}")
@@ -286,19 +304,41 @@ def list_(registry: Literal["branch", "space"]):
 
 # fmt: off
 @main.command()
-@click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
-@click.option("--space", type=str, default=None, help="A valid branch name or uid.")
+@click.argument("registry", type=click.Choice(["branch", "space"]), required=False)
+@click.argument("name", type=str, required=False)
+# below are deprecated, for backward compatibility
+@click.option("--branch", type=str, default=None, hidden=True, help="A valid branch name or uid.")
+@click.option("--space", type=str, default=None, hidden=True, help="A valid space name or uid.")
 # fmt: on
-def switch(branch: str | None = None, space: str | None = None):
+def switch(
+    registry: Literal["branch", "space"] | None,
+    name: str | None,
+    branch: str | None,
+    space: str | None,
+):
     """Switch between branches or spaces.
 
     Python/R sessions and CLI commands will use the current default branch or space, for example:
 
     ```
-    lamin switch --branch my_branch
-    lamin switch --space our_space
+    lamin switch branch my_branch
+    lamin switch space our_space
     ```
     """
+    if registry is not None and name is not None:
+        branch = name if registry == "branch" else None
+        space = name if registry == "space" else None
+    elif branch is None and space is None:
+        raise click.UsageError(
+            "Specify branch or space. Examples: lamin switch branch my_branch, lamin switch space our_space"
+        )
+    else:
+        warnings.warn(
+            "lamin switch --branch and --space are deprecated; use 'lamin switch branch <name>' or 'lamin switch space <name>' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     from lamindb.setup import switch as switch_
 
     switch_(branch=branch, space=space)
@@ -450,8 +490,22 @@ def get(entity: str = "artifact", uid: str | None = None, key: str | None = None
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--space", type=str, default=None, help="A valid space name or uid.")
 @click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
-@click.option("--registry", type=str, default=None, help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.")
-def save(path: str, key: str, description: str, stem_uid: str, project: str, space: str, branch: str, registry: str):
+@click.option(
+    "--registry",
+    type=click.Choice(["artifact", "transform"]),
+    default=None,
+    help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.",
+)
+def save(
+    path: str,
+    key: str,
+    description: str,
+    stem_uid: str,
+    project: str,
+    space: str,
+    branch: str,
+    registry: Literal["artifact", "transform"] | None,
+):
     """Save a file or folder.
 
     Example: Given a valid project name "my_project",
