@@ -211,7 +211,8 @@ def connect(instance: str):
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
 
-    See also: Connect in a Python session via {func}`~lamindb.connect`.
+    See also: Connect the default instance via {func}`~lamindb.connect`
+    or connect any instance via {class}`~lamindb.DB` in a Python/R session.
     """
     return connect_(instance)
 
