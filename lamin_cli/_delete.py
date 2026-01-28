@@ -66,6 +66,7 @@ def delete(
             record = Collection.get(uid)
         record.delete(permanent=permanent)
     else:
+        # could introduce "db" as an entity
         try:
             return delete_instance(entity, force=force)
         except StorageNotEmpty as e:
