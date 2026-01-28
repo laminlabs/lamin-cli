@@ -121,6 +121,19 @@ def test_save_and_annotate_local_file():
     assert result.returncode == 0
 
 
+def test_annotate_rejects_collection_url():
+    """Annotate supports artifact/transform URLs (like load/delete) but not collection."""
+    result = subprocess.run(
+        "lamin annotate https://lamin.ai/foo/bar/collection/abc123 --project x",
+        shell=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    err = (result.stderr or result.stdout).decode()
+    assert "collection" in err.lower()
+    assert "artifact" in err.lower() or "transform" in err.lower()
+
+
 def test_save_cloud_file():
     # should be no key for cloud paths
     result = subprocess.run(

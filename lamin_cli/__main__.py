@@ -591,39 +591,50 @@ def annotate(entity: str | None, key: str, uid: str, project: str, features: tup
     lamin annotate --key raw/sample.fastq --project "My Project"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key my-notebook.ipynb --project "My Project"
+    lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
     ```
 
     → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values` and `artifact.projects.add()`, `artifact.ulabels.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`
     """
-    import lamindb as ln
-
     from lamin_cli._annotate import _parse_features_list
     from lamin_cli._save import infer_registry_from_path
 
-    # once we enable passing the URL as entity, then we don't need to throw this error
-    if not ln.setup.settings._instance_exists:
-        raise click.ClickException("Not connected to an instance. Please run: lamin connect account/name")
-
-    # TODO: allow passing URL as entity
-    if entity is None:
-        if key is not None:
-            registry = infer_registry_from_path(key)
-        else:
-            registry = "artifact"
+    # Handle URL: decompose and connect (same pattern as load/delete)
+    if entity is not None and entity.startswith("https://"):
+        url = entity
+        instance, registry, uid = decompose_url(url)
+        ln_setup.connect(instance)
     else:
-        registry = entity
+        if not ln_setup.settings._instance_exists:
+            raise click.ClickException(
+                "Not connected to an instance. Please run: lamin connect account/name"
+            )
+        if entity is None:
+            registry = infer_registry_from_path(key) if key is not None else "artifact"
+        else:
+            registry = entity
+    if registry not in {"artifact", "transform"}:
+        raise click.ClickException(
+            f"Annotate does not support {registry}. Use artifact or transform URLs."
+        )
+
+    # import lamindb after connect went through
+    import lamindb as ln
+
     if registry == "artifact":
         model = ln.Artifact
     else:
         model = ln.Transform
 
-    # Get the artifact
+    # Get the artifact or transform
     if key is not None:
         artifact = model.get(key=key)
     elif uid is not None:
         artifact = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
     else:
-        raise ln.errors.InvalidArgument("Either --key or --uid must be provided")
+        raise ln.errors.InvalidArgument(
+            "Either pass a URL as entity or provide --key or --uid"
+        )
 
     # Handle project annotation
     if project is not None:
