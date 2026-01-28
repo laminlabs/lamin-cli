@@ -12,7 +12,7 @@ else:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage settings.
+    """Manage settings such as development directory or cache directory.
 
     Call without subcommands and options to show the current environment setup settings:
 

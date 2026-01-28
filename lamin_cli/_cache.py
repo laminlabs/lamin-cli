@@ -10,7 +10,7 @@ else:
 
 @click.group()
 def cache():
-    """Manage cache."""
+    """Get, set, or clear the cache directory."""
 
 
 @cache.command("set")
