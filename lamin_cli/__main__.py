@@ -376,7 +376,6 @@ def info(schema: bool):
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
 @click.option("--key", type=str, default=None, help="The key for the entity (artifact, transform).")
-@click.option("--slug", type=str, default=None)
 @click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
 # fmt: on
@@ -403,7 +402,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     """
     from lamin_cli._delete import delete as delete_
 
-    return delete_(entity=entity, name=name, uid=uid, key=key, slug=slug, permanent=permanent, force=force)
+    return delete_(entity=entity, name=name, uid=uid, key=key, permanent=permanent, force=force)
 
 
 @main.command()
