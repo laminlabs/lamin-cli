@@ -11,13 +11,17 @@ def test_save_transform_wrong_branch():
     env = os.environ.copy()
     env["LAMIN_TESTING"] = "true"
 
-    transform = ln.Transform(uid="s4bgVoaLOBjx0000", key="run-track-transform-branch.py", type="script").save()
+    transform = ln.Transform(
+        uid="s4bgVoaLOBjx0000", key="run-track-transform-branch.py", type="script"
+    ).save()
     ln.Run(transform=transform).save()
     # now move the transform to trash
     transform.delete()
 
     script_path = scripts_dir / "run-track-transform-branch.py"
-    script_path.write_text("import lamindb as ln\nln.track('s4bgVoaLOBjx')\nln.finish()")
+    script_path.write_text(
+        "import lamindb as ln\nln.track('s4bgVoaLOBjx')\nln.finish()"
+    )
 
     result = subprocess.run(
         f"lamin save {script_path}",

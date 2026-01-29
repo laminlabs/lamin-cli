@@ -267,7 +267,9 @@ def save(
             )
             if revises is None:
                 # check if the transform is on other branches
-                revises_other_branches = ln.Transform.filter(uid__startswith=stem_uid, branch=None).first()
+                revises_other_branches = ln.Transform.filter(
+                    uid__startswith=stem_uid, branch=None
+                ).first()
                 if revises_other_branches is not None:
                     if revises_other_branches.branch_id == -1:
                         raise click.ClickException(
@@ -277,7 +279,9 @@ def save(
                         raise click.ClickException(
                             "Transform is in the archive, please restore it before running `lamin save`!"
                         )
-                    elif revises_other_branches.branch_id != ln_setup.settings.branch.id:
+                    elif (
+                        revises_other_branches.branch_id != ln_setup.settings.branch.id
+                    ):
                         raise click.ClickException(
                             "Transform is on a different branch"
                             f"({revises_other_branches.branch.name}), please switch to the correct branch"
@@ -339,4 +343,6 @@ def save(
         )
         return return_code
     else:
-        raise click.ClickException("Allowed values for '--registry' are: 'artifact', 'transform'")
+        raise click.ClickException(
+            "Allowed values for '--registry' are: 'artifact', 'transform'"
+        )
