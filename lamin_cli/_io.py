@@ -31,6 +31,7 @@ def io():
 # fmt: on
 def snapshot(upload: bool, track: bool) -> None:
     """Create a SQLite snapshot of the connected instance."""
+    from lamindb_setup.io import export_db
     if not ln_setup.settings._instance_exists:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
@@ -53,7 +54,7 @@ def snapshot(upload: bool, track: bool) -> None:
     with tempfile.TemporaryDirectory() as export_dir:
         if track:
             ln.track()
-        ln_setup.io.export_db(module_names=modules_complete, output_dir=export_dir)
+        export_db(module_names=modules_complete, output_dir=export_dir)
         if track:
             ln.finish()
 
@@ -109,13 +110,14 @@ def snapshot(upload: bool, track: bool) -> None:
 # fmt: on
 def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size: int):
     """Export registry tables to parquet files."""
+    from lamindb_setup.io import export_db
     if not ln_setup.settings._instance_exists:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
 
     module_list = modules.split(",") if modules else None
-    ln_setup.io.export_db(
+    export_db(
         module_names=module_list,
         output_dir=output_dir,
         max_workers=max_workers,
@@ -131,13 +133,14 @@ def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size:
 # fmt: on
 def importdb(modules: str | None, input_dir: str, if_exists: str):
     """Import registry tables from parquet files."""
+    from lamindb_setup.io import import_db
     if not ln_setup.settings._instance_exists:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
 
     module_list = modules.split(",") if modules else None
-    ln_setup.io.import_db(
+    import_db(
         module_names=module_list,
         input_dir=input_dir,
         if_exists=if_exists,
