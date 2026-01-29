@@ -6,6 +6,8 @@ from pathlib import Path
 import lamindb_setup as ln_setup
 
 if __name__ == "__main__":
+    from lamindb_setup.io import import_db
+
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
     parser = argparse.ArgumentParser()
@@ -25,7 +27,7 @@ if __name__ == "__main__":
         storage=f"{instance_name}-clone", modules=f"{','.join(modules_without_lamindb)}"
     )
 
-    ln_setup.io.import_db(
+    import_db(
         module_names=list(modules_complete), input_dir=export_dir, if_exists="replace"
     )
 

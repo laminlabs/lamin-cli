@@ -1,5 +1,7 @@
+import click
 from lamindb_setup import connect
 from lamindb_setup import delete as delete_instance
+from lamindb_setup.errors import StorageNotEmpty
 
 from .urls import decompose_url
 
@@ -9,7 +11,6 @@ def delete(
     name: str | None = None,
     uid: str | None = None,
     key: str | None = None,
-    slug: str | None = None,
     permanent: bool | None = None,
     force: bool = False,
 ):
@@ -63,7 +64,22 @@ def delete(
         else:
             record = Collection.get(uid)
         record.delete(permanent=permanent)
-    elif entity == "instance":
-        return delete_instance(slug, force=force)
-    else:  # backwards compatibility
-        return delete_instance(entity, force=force)
+    elif entity == "record":
+        assert uid is not None or name is not None, (
+            "You have to pass a uid or name for deleting a record."
+        )
+        from lamindb import Record
+
+        if name is not None:
+            record = Record.objects.get(name=name)
+            if record is None:
+                raise SystemExit(f"Record with name={name} does not exist.")
+        else:
+            record = Record.get(uid)
+        record.delete(permanent=permanent)
+    else:
+        # could introduce "db" as an entity
+        try:
+            return delete_instance(entity, force=force)
+        except StorageNotEmpty as e:
+            raise click.ClickException(str(e)) from e
