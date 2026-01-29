@@ -11,7 +11,6 @@ def delete(
     name: str | None = None,
     uid: str | None = None,
     key: str | None = None,
-    slug: str | None = None,
     permanent: bool | None = None,
     force: bool = False,
 ):
@@ -64,6 +63,19 @@ def delete(
                 raise SystemExit(f"Collection with key={key} does not exist.")
         else:
             record = Collection.get(uid)
+        record.delete(permanent=permanent)
+    elif entity == "record":
+        assert uid is not None or name is not None, (
+            "You have to pass a uid or name for deleting a record."
+        )
+        from lamindb import Record
+
+        if name is not None:
+            record = Record.objects.get(name=name)
+            if record is None:
+                raise SystemExit(f"Record with name={name} does not exist.")
+        else:
+            record = Record.get(uid)
         record.delete(permanent=permanent)
     else:
         # could introduce "db" as an entity
