@@ -73,6 +73,8 @@ def test_save_consecutive_user_passes_uid():
         capture_output=True,
         env=env,
     )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
     assert result.returncode == 0
     assert (
         "created Transform('hlsFXswrJjtt0000', key='with-title-and-initialized-consecutive.ipynb')"

@@ -287,7 +287,8 @@ def save(
                             f"({revises_other_branches.branch.name}), please switch to the correct branch"
                             " before running `lamin save`!"
                         )
-            raise click.ClickException("The stem uid is not found.")
+                else:
+                    raise click.ClickException("The stem uid is not found.")
         if transform is None:
             if ppath.suffix == ".ipynb":
                 from nbproject.dev import read_notebook
