@@ -267,9 +267,11 @@ def save(
             )
             if revises is None:
                 # check if the transform is on other branches
-                revises_other_branches = ln.Transform.filter(
-                    uid__startswith=stem_uid, branch=None
-                ).first()
+                revises_other_branches = (
+                    ln.Transform.filter(uid__startswith=stem_uid, branch=None)
+                    .order_by("-created_at")
+                    .first()
+                )
                 if revises_other_branches is not None:
                     if revises_other_branches.branch_id == -1:
                         raise click.ClickException(
@@ -287,8 +289,7 @@ def save(
                             f"({revises_other_branches.branch.name}), please switch to the correct branch"
                             " before running `lamin save`!"
                         )
-                else:
-                    raise click.ClickException("The stem uid is not found.")
+                raise click.ClickException("The stem uid is not found.")
         if transform is None:
             if ppath.suffix == ".ipynb":
                 from nbproject.dev import read_notebook
