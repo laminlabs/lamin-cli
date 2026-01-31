@@ -53,7 +53,7 @@ def snapshot(upload: bool, track: bool) -> None:
 
     with tempfile.TemporaryDirectory() as export_dir:
         if track:
-            ln.track("o39ljgTzvFew", key="__lamin_io_snapshot__.py")
+            ln.track("o39ljgTzvFew")
         export_db(module_names=modules_complete, output_dir=export_dir)
         if track:
             ln.finish()
