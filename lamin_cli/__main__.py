@@ -293,7 +293,7 @@ def list_(registry: Literal["branch", "space"]):
     lamin list space
     ```
 
-    → Python/R alternative: {method}`~lamindb.Branch.to_dataframe()`
+    → Python/R alternative: {meth}`~lamindb.Branch.to_dataframe()`
     """
     assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
@@ -398,7 +398,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     ```
 
-    → Python/R alternative: {method}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
+    → Python/R alternative: {meth}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
     """
     from lamin_cli._delete import delete as delete_
 
