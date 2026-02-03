@@ -132,7 +132,7 @@ def test_dev_dir_legacy_get_set():
     assert exit_status == 0
 
 
-def test_settings_cache_get_set():
+def test_settings_cache_get_set_reset():
     """Test lamin settings cache-dir get and set."""
     result = subprocess.run(
         "lamin settings cache-dir get",
@@ -146,7 +146,7 @@ def test_settings_cache_get_set():
     original_cache = line.split(" is ", 1)[-1] if " is " in line else line
     assert original_cache
     assert Path(original_cache).is_absolute() or original_cache.startswith("~")
-    # Set cache to a temp dir, verify, then restore
+    # Set cache to a temp dir, verify, then reset to original
     tmp_dir = Path(__file__).resolve().parent / "tmp_cache_test"
     tmp_dir.mkdir(exist_ok=True)
     try:
@@ -167,6 +167,25 @@ def test_settings_cache_get_set():
         line = result.stdout.strip().split("\n")[-1]
         got_path = line.split(" is ", 1)[-1] if " is " in line else line
         assert got_path == str(tmp_dir)
+        # Reset to original cache
+        result_reset = subprocess.run(
+            "lamin settings cache-dir reset",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result_reset.returncode == 0
+        result = subprocess.run(
+            "lamin settings cache-dir get",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result.returncode == 0
+        line = result.stdout.strip().split("\n")[-1]
+        got_path = line.split(" is ", 1)[-1] if " is " in line else line
+        assert got_path == original_cache
+
     finally:
         subprocess.run(
             f"lamin settings cache-dir set {original_cache}",
