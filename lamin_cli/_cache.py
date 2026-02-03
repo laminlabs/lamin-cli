@@ -10,7 +10,7 @@ else:
 
 @click.group()
 def cache():
-    """Get, set, or clear the cache directory."""
+    """Get, set, reset, or clear the cache directory."""
 
 
 @cache.command("set")
@@ -19,15 +19,23 @@ def cache():
     type=click.Path(dir_okay=True, file_okay=False),
 )
 def set_cache(cache_dir: str):
-    """Set the cache directory."""
+    """Set the path to the cache directory."""
     from lamindb_setup._cache import set_cache_dir
 
     set_cache_dir(cache_dir)
 
 
+@cache.command("reset")
+def reset_cache():
+    """Reset the cache directory to the default path."""
+    from lamindb_setup._cache import set_cache_dir
+
+    set_cache_dir(None)
+
+
 @cache.command("clear")
 def clear_cache():
-    """Clear the cache directory."""
+    """Clear contents of the cache directory."""
     from lamindb_setup._cache import clear_cache_dir
 
     clear_cache_dir()
@@ -35,7 +43,7 @@ def clear_cache():
 
 @cache.command("get")
 def get_cache():
-    """Get the cache directory."""
+    """Get the path to the cache directory."""
     from lamindb_setup._cache import get_cache_dir
 
     click.echo(f"The cache directory is {get_cache_dir()}")
