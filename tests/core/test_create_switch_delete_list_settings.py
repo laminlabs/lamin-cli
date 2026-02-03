@@ -132,7 +132,7 @@ def test_dev_dir_legacy_get_set():
     assert exit_status == 0
 
 
-def test_settings_cache_get_set():
+def test_settings_cache_get_set_reset():
     """Test lamin settings cache-dir get and set."""
     result = subprocess.run(
         "lamin settings cache-dir get",
