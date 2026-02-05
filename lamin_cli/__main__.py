@@ -200,7 +200,7 @@ def init(
 @click.argument("instance", type=str)
 # fmt: on
 def connect(instance: str):
-    """Set a default instance for auto-connection.
+    """Set a default database for auto-connection.
 
     Python/R sessions and CLI commands will then auto-connect to this LaminDB instance.
 
@@ -211,7 +211,7 @@ def connect(instance: str):
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
 
-    → Python/R alternative: {func}`~lamindb.connect` the global default database or a database object via {class}`~lamindb.DB`
+    → Python/R alternative: {func}`~lamindb.connect` the default database or create a database object via {class}`~lamindb.DB`
     """
     return connect_(instance)
 
