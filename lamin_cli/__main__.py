@@ -381,7 +381,7 @@ def merge(branch: str):
     try:
         merge_(branch)
     except ObjectDoesNotExist as e:
-        raise SystemExit(str(e)) from e
+        raise click.ClickException(str(e)) from e
 
 
 @main.command()
