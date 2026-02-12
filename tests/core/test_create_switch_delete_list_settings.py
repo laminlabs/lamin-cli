@@ -42,8 +42,7 @@ def test_branch():
         shell=True,
     )
     assert result.stdout.strip().split("\n")[-1] == "main"
-    exit_status = os.system("lamin create branch testbranch")
-    exit_status = os.system("lamin switch testbranch")
+    exit_status = os.system("lamin switch -c testbranch")
     assert exit_status == 0
     exit_status = os.system("lamin list branch")
     assert exit_status == 0
@@ -53,9 +52,9 @@ def test_branch():
 
 
 def test_space():
-    exit_status = os.system("lamin switch non_existent --space")
+    exit_status = os.system("lamin switch --space non_existent")
     assert exit_status == 256
-    exit_status = os.system("lamin switch all --space")
+    exit_status = os.system("lamin switch --space all")
     assert exit_status == 0
     assert ln_setup.settings.space.uid == 12 * "a"
 

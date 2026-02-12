@@ -310,10 +310,12 @@ def list_(registry: Literal["branch", "space"]):
 @main.command()
 @click.argument("name", type=str, required=False)
 @click.option("--space", is_flag=True, default=False, help="Switch space instead of branch.")
+@click.option("-c", "--create", is_flag=True, default=False, help="Create branch if it does not exist.")
 # fmt: on
 def switch(
     name: str,
     space: bool = False,
+    create: bool = False,
 ):
     """Switch between branches.
 
@@ -321,6 +323,12 @@ def switch(
 
     ```
     lamin switch my_branch
+    ```
+
+    To create and switch in one step, pass `-c` or `--create`:
+
+    ```
+    lamin switch -c my_branch
     ```
 
     To switch to a space, pass `--space`:
@@ -337,6 +345,13 @@ def switch(
         space_name = name
     else:
         branch_name = name
+        if create and branch_name:
+            from lamindb import Branch, Q
+
+            existing = Branch.filter(Q(name=branch_name) | Q(uid=branch_name)).one_or_none()
+            if existing is None:
+                Branch(name=branch_name).save()
+                logger.important(f"created branch: {branch_name}")
 
     from lamindb.setup import switch as switch_
 
