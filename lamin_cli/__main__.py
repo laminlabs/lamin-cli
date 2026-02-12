@@ -367,14 +367,14 @@ def merge(branch_name: str):
     """Merge a branch into the current branch.
 
     Everything that was on the given branch will then be on the current branch.
-    Run this on the branch that should receive the records (e.g. main):
+    Run this on the branch that should receive the objects (e.g. `main`):
 
     ```
-    lamin switch main
-    lamin merge my_branch
+    lamin switch main  # swich to the main branch
+    lamin merge my_branch  # after this all objects on my_branch will be on main
     ```
 
-    The current branch is the one set by `lamin switch` or
+    The current branch is the one set by `lamin switch` or via
     :attr:`~lamindb_setup.core.SetupSettings.branch`.
 
     → Python/R alternative: {func}`~lamindb.setup.merge`
