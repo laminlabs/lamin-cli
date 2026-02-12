@@ -360,10 +360,12 @@ def switch(
 
 # fmt: off
 @main.command()
-@click.argument("branch", type=str, required=True, help="The name or uid of the branch to merge into the current branch.")
+@click.argument("branch", type=str, required=True)
 # fmt: on
 def merge(branch: str):
     """Merge a branch into the current branch.
+
+    Pass the `name` or `uid` of the branch to merge into the current branch.
 
     Everything that was on the given branch will then be on the current branch.
     Run this on the branch that should receive the objects (e.g. `main`):
