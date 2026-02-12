@@ -360,9 +360,9 @@ def switch(
 
 # fmt: off
 @main.command()
-@click.argument("branch_name", type=str, required=True)
+@click.argument("branch", type=str, required=True, help="The name or uid of the branch to merge into the current branch.")
 # fmt: on
-def merge(branch_name: str):
+def merge(branch: str):
     """Merge a branch into the current branch.
 
     Everything that was on the given branch will then be on the current branch.
@@ -373,17 +373,14 @@ def merge(branch_name: str):
     lamin merge my_branch  # after this all objects on my_branch will be on main
     ```
 
-    The current branch is the one set by `lamin switch` or via
-    :attr:`~lamindb_setup.core.SetupSettings.branch`.
-
     → Python/R alternative: {func}`~lamindb.setup.merge`
     """
-    from lamindb.errors import DoesNotExist
+    from lamindb.errors import ObjectDoesNotExist
     from lamindb.setup import merge as merge_
 
     try:
-        merge_(branch_name)
-    except DoesNotExist as e:
+        merge_(branch)
+    except ObjectDoesNotExist as e:
         raise SystemExit(str(e)) from e
 
 
