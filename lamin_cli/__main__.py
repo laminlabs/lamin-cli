@@ -323,6 +323,12 @@ def switch(
     lamin switch my_branch
     ```
 
+    To switch to a space, pass `--space`:
+
+    ```
+    lamin switch --space my_space
+    ```
+
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
     space_name = None
