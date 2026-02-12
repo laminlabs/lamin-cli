@@ -51,6 +51,37 @@ def test_branch():
     exit_status = os.system("lamin switch main")
 
 
+def test_merge():
+    """Merge a branch into main: create branch, add record, switch to main, merge."""
+    exit_status = os.system("lamin switch -c merge_test_branch")
+    assert exit_status == 0
+    ln.Record(name="merge_test_record").save()
+    exit_status = os.system("lamin switch main")
+    assert exit_status == 0
+    ln_setup.settings.branch = "main"  # refresh in-process; CLI wrote to file
+    assert ln.Record.filter(name="merge_test_record").count() == 0
+    exit_status = os.system("lamin merge merge_test_branch")
+    assert exit_status == 0
+    assert ln.Record.filter(name="merge_test_record").count() == 1
+    exit_status = os.system("lamin delete branch --name merge_test_branch")
+    assert exit_status == 0
+    exit_status = os.system("lamin switch main")
+    assert exit_status == 0
+
+
+def test_merge_nonexistent_branch():
+    """Merge a non-existent branch exits non-zero with clear error."""
+    result = subprocess.run(
+        "lamin merge nonexistent_branch_xyz",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.returncode != 0
+    err_output = (result.stderr + result.stdout).lower()
+    assert "not found" in err_output or "nonexistent" in err_output
+
+
 def test_space():
     exit_status = os.system("lamin switch --space non_existent")
     assert exit_status == 256

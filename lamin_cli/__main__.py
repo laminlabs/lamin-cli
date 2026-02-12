@@ -54,6 +54,7 @@ COMMAND_GROUPS = {
             "name": "Configure",
             "commands": [
                 "switch",
+                "merge",
                 "settings",
                 "migrate",
             ],
@@ -356,6 +357,35 @@ def switch(
     from lamindb.setup import switch as switch_
 
     switch_(branch=branch_name, space=space_name)
+
+
+# fmt: off
+@main.command()
+@click.argument("branch_name", type=str, required=True)
+# fmt: on
+def merge(branch_name: str):
+    """Merge a branch into the current branch.
+
+    Everything that was on the given branch will then be on the current branch.
+    Run this on the branch that should receive the records (e.g. main):
+
+    ```
+    lamin switch main
+    lamin merge my_branch
+    ```
+
+    The current branch is the one set by `lamin switch` or
+    :attr:`~lamindb_setup.core.SetupSettings.branch`.
+
+    → Python/R alternative: {func}`~lamindb.setup.merge`
+    """
+    from lamindb.errors import DoesNotExist
+    from lamindb.setup import merge as merge_
+
+    try:
+        merge_(branch_name)
+    except DoesNotExist as e:
+        raise SystemExit(str(e)) from e
 
 
 @main.command()
