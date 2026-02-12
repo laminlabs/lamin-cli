@@ -51,13 +51,12 @@ COMMAND_GROUPS = {
             "commands": ["describe", "annotate", "list"],
         },
         {
+            "name": "Change management",
+            "commands": ["switch", "merge"],
+        },
+        {
             "name": "Configure",
-            "commands": [
-                "switch",
-                "merge",
-                "settings",
-                "migrate",
-            ],
+            "commands": ["settings", "migrate"],
         },
         {
             "name": "Auth",
