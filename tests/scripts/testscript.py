@@ -1,2 +1,1 @@
-print("hello")
-print("world")
+print("describe_coll_art")

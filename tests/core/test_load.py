@@ -16,6 +16,14 @@ def test_decompose_url():
         assert entity == "transform"
         assert uid == "1GCKs8zLtkc85zKv"
 
+    # run URL (run must be checked after transform so ".../transform/..." is not parsed as run)
+    instance_slug, entity, uid = decompose_url(
+        "https://lamin.ai/laminlabs/benchmarks/run/Abc123XyZ"
+    )
+    assert instance_slug == "laminlabs/benchmarks"
+    assert entity == "run"
+    assert uid == "Abc123XyZ"
+
 
 def test_load_transform():
     # check via a renamed instance

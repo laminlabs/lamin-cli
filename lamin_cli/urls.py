@@ -1,8 +1,9 @@
 def decompose_url(url: str) -> tuple[str, str, str]:
     assert any(
-        keyword in url for keyword in ["transform", "artifact", "collection", "record"]
+        keyword in url
+        for keyword in ["transform", "artifact", "collection", "record", "run"]
     )
-    for entity in ["transform", "artifact", "collection", "record"]:
+    for entity in ["transform", "artifact", "collection", "record", "run"]:
         if entity in url:
             break
     uid = url.split(f"{entity}/")[1]
