@@ -308,46 +308,54 @@ def list_(registry: Literal["branch", "space"]):
 
 # fmt: off
 @main.command()
-@click.argument("registry", type=click.Choice(["branch", "space"]), required=False)
 @click.argument("name", type=str, required=False)
-# below are deprecated, for backward compatibility
-@click.option("--branch", type=str, default=None, hidden=True, help="A valid branch name or uid.")
-@click.option("--space", type=str, default=None, hidden=True, help="A valid space name or uid.")
+@click.option("--space", is_flag=True, default=False, help="Switch space instead of branch.")
+@click.option("-c", "--create", is_flag=True, default=False, help="Create branch if it does not exist.")
 # fmt: on
 def switch(
-    registry: Literal["branch", "space"] | None,
-    name: str | None,
-    branch: str | None,
-    space: str | None,
+    name: str,
+    space: bool = False,
+    create: bool = False,
 ):
-    """Switch between branches or spaces.
+    """Switch between branches.
 
-    Python/R sessions and CLI commands will use the current default branch or space, for example:
+    Python/R sessions and CLI commands use the current default branch. Switch it:
 
     ```
-    lamin switch branch my_branch
-    lamin switch space our_space
+    lamin switch my_branch
+    ```
+
+    To create and switch in one step, pass `-c` or `--create`:
+
+    ```
+    lamin switch -c my_branch
+    ```
+
+    To switch to a space, pass `--space`:
+
+    ```
+    lamin switch --space my_space
     ```
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
-    if registry is not None and name is not None:
-        branch = name if registry == "branch" else None
-        space = name if registry == "space" else None
-    elif branch is None and space is None:
-        raise click.UsageError(
-            "Specify branch or space. Examples: lamin switch branch my_branch, lamin switch space our_space"
-        )
+    space_name = None
+    branch_name = None
+    if space:
+        space_name = name
     else:
-        warnings.warn(
-            "lamin switch --branch and --space are deprecated; use 'lamin switch branch <name>' or 'lamin switch space <name>' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        branch_name = name
+        if create and branch_name:
+            from lamindb import Branch, Q
+
+            existing = Branch.filter(Q(name=branch_name) | Q(uid=branch_name)).one_or_none()
+            if existing is None:
+                Branch(name=branch_name).save()
+                logger.important(f"created branch: {branch_name}")
 
     from lamindb.setup import switch as switch_
 
-    switch_(branch=branch, space=space)
+    switch_(branch=branch_name, space=space_name)
 
 
 @main.command()
