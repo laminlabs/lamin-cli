@@ -308,12 +308,12 @@ def list_(registry: Literal["branch", "space"]):
 
 # fmt: off
 @main.command()
-@click.argument("name", type=str, required=False)
+@click.argument("target", type=str, required=False)
 @click.option("--space", is_flag=True, default=False, help="Switch space instead of branch.")
 @click.option("-c", "--create", is_flag=True, default=False, help="Create branch if it does not exist.")
 # fmt: on
 def switch(
-    name: str,
+    target: str,
     space: bool = False,
     create: bool = False,
 ):
@@ -322,7 +322,7 @@ def switch(
     Python/R sessions and CLI commands use the current default branch. Switch it:
 
     ```
-    lamin switch my_branch
+    lamin switch my_branch  # pass a name or uid of the target branch
     ```
 
     To create and switch in one step, pass `-c` or `--create`:
@@ -331,7 +331,7 @@ def switch(
     lamin switch -c my_branch
     ```
 
-    To switch to a space, pass `--space`:
+    To switch to a target space, pass `--space`:
 
     ```
     lamin switch --space my_space
@@ -339,23 +339,9 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
-    space_name = None
-    branch_name = None
-    if space:
-        space_name = name
-    else:
-        branch_name = name
-        if create and branch_name:
-            from lamindb import Branch, Q
-
-            existing = Branch.filter(Q(name=branch_name) | Q(uid=branch_name)).one_or_none()
-            if existing is None:
-                Branch(name=branch_name).save()
-                logger.important(f"created branch: {branch_name}")
-
     from lamindb.setup import switch as switch_
 
-    switch_(branch=branch_name, space=space_name)
+    switch_(target, space=space, create=create)
 
 
 # fmt: off
