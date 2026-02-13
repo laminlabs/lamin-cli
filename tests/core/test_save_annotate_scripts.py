@@ -10,6 +10,8 @@ scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def test_save_resave_script_no_uids():
+    # Ensure dev-dir is unset so transform keys are filename-only (not scripts/...)
+    subprocess.run("lamin settings dev-dir unset", shell=True, capture_output=True)
     filepath = scripts_dir / "testscript.py"
     filepath.write_text("print('hello')")
     result = subprocess.run(

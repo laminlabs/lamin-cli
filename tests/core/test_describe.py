@@ -90,6 +90,8 @@ def test_describe_transform_by_uid_and_key():
         capture_output=True,
     )
     script_path.unlink(missing_ok=True)
+    # Restore dev-dir so other tests (e.g. test_save_annotate_scripts) are not affected
+    subprocess.run("lamin settings dev-dir unset", shell=True, capture_output=True)
 
 
 def test_describe_run_by_uid():
@@ -130,6 +132,8 @@ def test_describe_run_by_uid():
         capture_output=True,
     )
     script_path.unlink(missing_ok=True)
+    # Restore dev-dir so other tests (e.g. test_save_annotate_scripts) are not affected
+    subprocess.run("lamin settings dev-dir unset", shell=True, capture_output=True)
 
 
 def test_describe_record_by_name_and_uid():
