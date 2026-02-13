@@ -564,19 +564,19 @@ def describe(
     Examples:
 
     ```
-    # via --key
+    # via URL
+    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
+    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/transform/uDVvTANB0f48
+    # via --key for artifacts
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
-    # via registry and --uid
+    # via registry and one of --uid / --name / --key
     lamin describe artifact --uid e2G7k9EVul4JbfsE
     lamin describe transform --uid Vul4JbfsEYAy5
-    lamin describe run --uid RunUid123
+    lamin describe run --uid 6sofuDVvTANB0f48
     lamin describe record --name "Experiment 1"
     lamin describe project --name "My Project"
     lamin describe ulabel --name "My ULabel"
     lamin describe branch --name main
-    # via URL
-    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
-    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/transform/uDVvTANB0f48
     ```
 
     → Python/R alternative: {meth}`~lamindb.Artifact.describe`
