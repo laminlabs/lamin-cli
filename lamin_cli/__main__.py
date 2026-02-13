@@ -466,7 +466,7 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
 
 
 DESCRIBE_ENTITIES_KEY = {"artifact", "transform", "collection"}
-DESCRIBE_ENTITIES_NAME = {"record", "project", "ulabel"}
+DESCRIBE_ENTITIES_NAME = {"record", "project", "ulabel", "branch"}
 DESCRIBE_ENTITIES_UID_ONLY = {"run"}
 DESCRIBE_ENTITIES = (
     DESCRIBE_ENTITIES_KEY | DESCRIBE_ENTITIES_NAME | DESCRIBE_ENTITIES_UID_ONLY
@@ -522,6 +522,8 @@ def _describe(
                 else ln.Project.get(uid)
                 if entity == "project"
                 else ln.ULabel.get(uid)
+                if entity == "ulabel"
+                else ln.Branch.get(uid)
             )
         else:
             if name is None:
@@ -534,6 +536,8 @@ def _describe(
                 else ln.Project.filter(name=name).one()
                 if entity == "project"
                 else ln.ULabel.filter(name=name).one()
+                if entity == "ulabel"
+                else ln.Branch.get(name=name)
             )
     else:  # uid-only (run)
         if uid is None:
@@ -548,7 +552,7 @@ def _describe(
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity (artifact, transform, collection).")
-@click.option("--name", help="The name for the entity (record, project, ulabel).")
+@click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
 def describe(
     entity: str = "artifact",
     uid: str | None = None,
@@ -569,6 +573,7 @@ def describe(
     lamin describe record --name "Experiment 1"
     lamin describe project --name "My Project"
     lamin describe ulabel --name "My ULabel"
+    lamin describe branch --name main
     # via URL
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/transform/uDVvTANB0f48
@@ -584,7 +589,7 @@ def describe(
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity (artifact, transform, collection).")
-@click.option("--name", help="The name for the entity (record, project, ulabel).")
+@click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
 def get(
     entity: str = "artifact",
     uid: str | None = None,

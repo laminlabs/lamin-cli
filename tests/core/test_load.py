@@ -24,6 +24,29 @@ def test_decompose_url():
     assert entity == "run"
     assert uid == "Abc123XyZ"
 
+    # project and ulabel URLs
+    instance_slug, entity, uid = decompose_url(
+        "https://lamin.ai/laminlabs/benchmarks/project/ProjUid123"
+    )
+    assert instance_slug == "laminlabs/benchmarks"
+    assert entity == "project"
+    assert uid == "ProjUid123"
+
+    instance_slug, entity, uid = decompose_url(
+        "https://lamin.ai/laminlabs/benchmarks/ulabel/ULabelUid456"
+    )
+    assert instance_slug == "laminlabs/benchmarks"
+    assert entity == "ulabel"
+    assert uid == "ULabelUid456"
+
+    # branch URL (name or uid after branch/)
+    instance_slug, entity, uid = decompose_url(
+        "https://lamin.ai/laminlabs/benchmarks/branch/main"
+    )
+    assert instance_slug == "laminlabs/benchmarks"
+    assert entity == "branch"
+    assert uid == "main"
+
 
 def test_load_transform():
     # check via a renamed instance

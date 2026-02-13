@@ -208,6 +208,30 @@ def test_describe_ulabel_by_name_and_uid():
     ulabel.delete()
 
 
+def test_describe_branch_by_name_and_uid():
+    """Describe branch by --name and by --uid."""
+    branch = ln.Branch(name="describe_test_branch_xyz").save()
+
+    result = subprocess.run(
+        "lamin describe branch --name describe_test_branch_xyz",
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert branch.uid in result.stdout or "Branch" in result.stdout
+
+    result = subprocess.run(
+        f"lamin describe branch --uid {branch.uid}",
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+
+    branch.delete()
+
+
 def test_describe_collection_by_uid_and_key():
     """Describe collection by --uid and by --key."""
     # Create an artifact first (key suffix must match path)
