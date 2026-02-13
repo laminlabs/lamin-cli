@@ -465,31 +465,100 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     return load_(entity, uid=uid, key=key, with_env=with_env)
 
 
-def _describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+DESCRIBE_ENTITIES_KEY = {"artifact", "transform", "collection"}
+DESCRIBE_ENTITIES_NAME = {"record", "project", "ulabel", "branch"}
+DESCRIBE_ENTITIES_UID_ONLY = {"run"}
+DESCRIBE_ENTITIES = (
+    DESCRIBE_ENTITIES_KEY | DESCRIBE_ENTITIES_NAME | DESCRIBE_ENTITIES_UID_ONLY
+)
+
+
+def _describe(
+    entity: str = "artifact",
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+):
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact"}:
-        raise SystemExit("Entity has to be a laminhub URL or 'artifact'")
+    elif entity not in DESCRIBE_ENTITIES:
+        raise SystemExit(
+            f"Entity must be a laminhub URL or one of: "
+            f"{', '.join(sorted(DESCRIBE_ENTITIES))}"
+        )
     else:
         instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
     import lamindb as ln
 
-    if uid is not None:
-        artifact = ln.Artifact.get(uid)
-    else:
-        artifact = ln.Artifact.get(key=key)
-    artifact.describe()
+    if entity in DESCRIBE_ENTITIES_KEY:
+        if uid is None and key is None:
+            raise SystemExit(
+                f"For entity '{entity}' you must pass --uid or --key"
+            )
+        if uid is not None:
+            record = (
+                ln.Artifact.get(uid)
+                if entity == "artifact"
+                else ln.Transform.get(uid)
+                if entity == "transform"
+                else ln.Collection.get(uid)
+            )
+        else:
+            record = (
+                ln.Artifact.get(key=key)
+                if entity == "artifact"
+                else ln.Transform.get(key=key)
+                if entity == "transform"
+                else ln.Collection.get(key=key)
+            )
+    elif entity in DESCRIBE_ENTITIES_NAME:
+        if uid is not None:
+            record = (
+                ln.Record.get(uid)
+                if entity == "record"
+                else ln.Project.get(uid)
+                if entity == "project"
+                else ln.ULabel.get(uid)
+                if entity == "ulabel"
+                else ln.Branch.get(uid)
+            )
+        else:
+            if name is None:
+                raise SystemExit(
+                    f"For entity '{entity}' you must pass --uid or --name"
+                )
+            record = (
+                ln.Record.filter(name=name).one()
+                if entity == "record"
+                else ln.Project.filter(name=name).one()
+                if entity == "project"
+                else ln.ULabel.filter(name=name).one()
+                if entity == "ulabel"
+                else ln.Branch.get(name=name)
+            )
+    else:  # uid-only (run)
+        if uid is None:
+            raise SystemExit(f"For entity '{entity}' you must pass --uid")
+        record = ln.Run.get(uid)
+
+    record.describe()
 
 
 @main.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
-def describe(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+@click.option("--key", help="The key for the entity (artifact, transform, collection).")
+@click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
+def describe(
+    entity: str = "artifact",
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+):
     """Describe an object.
 
     Examples:
@@ -499,27 +568,40 @@ def describe(entity: str = "artifact", uid: str | None = None, key: str | None =
     lamin describe --key example_datasets/mini_immuno/dataset1.h5ad
     # via registry and --uid
     lamin describe artifact --uid e2G7k9EVul4JbfsE
+    lamin describe transform --uid Vul4JbfsEYAy5
+    lamin describe run --uid RunUid123
+    lamin describe record --name "Experiment 1"
+    lamin describe project --name "My Project"
+    lamin describe ulabel --name "My ULabel"
+    lamin describe branch --name main
     # via URL
     lamin describe https://lamin.ai/laminlabs/lamin-site-assets/artifact/6sofuDVvTANB0f48
+    lamin describe https://lamin.ai/laminlabs/lamin-site-assets/transform/uDVvTANB0f48
     ```
 
     → Python/R alternative: {meth}`~lamindb.Artifact.describe`
     """
-    _describe(entity=entity, uid=uid, key=key)
+    _describe(entity=entity, uid=uid, key=key, name=name)
 
 
 @main.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
-@click.option("--key", help="The key for the entity.")
-def get(entity: str = "artifact", uid: str | None = None, key: str | None = None):
+@click.option("--key", help="The key for the entity (artifact, transform, collection).")
+@click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
+def get(
+    entity: str = "artifact",
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+):
     """Query metadata about an object.
 
     Currently equivalent to `lamin describe`.
     """
     logger.warning("please use `lamin describe` instead of `lamin get` to describe")
-    _describe(entity=entity, uid=uid, key=key)
+    _describe(entity=entity, uid=uid, key=key, name=name)
 
 
 @main.command()
