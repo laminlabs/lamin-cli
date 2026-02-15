@@ -66,7 +66,8 @@ def test_merge():
     ulabel = ln.ULabel.get(name="merge_test_record")
     assert ulabel.branch.name == "main"
     exit_status = os.system("lamin delete branch --name merge_test_branch")
-    assert exit_status == 0
+    # raises "cannot delete branch because it is linked to an artifact"
+    assert exit_status == 256
 
 
 def test_merge_nonexistent_branch():
