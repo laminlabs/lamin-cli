@@ -436,7 +436,10 @@ def save(
             logger.important(
                 f"found no run, creating Run('{run.uid}') to display the html"
             )
-        if reference is not None:
+        if reference is not None and (
+            transform.reference != reference
+            or transform.reference_type != reference_type
+        ):
             transform.reference = reference
             transform.reference_type = reference_type
             transform.save()
