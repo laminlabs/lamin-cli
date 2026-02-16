@@ -671,7 +671,7 @@ def save(
     export LAMINDB_SYNC_GIT_REPO=https://github.com/org/repo
     ```
 
-    Also see: :ref:`sync-code-with-git`
+    Also see: {ref}`sync-code-with-git`
 
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
