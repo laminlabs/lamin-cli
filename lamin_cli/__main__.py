@@ -711,30 +711,33 @@ def finish():
 @main.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default=None, required=False)
-@click.option("--key", type=str, default=None, help="The key of an artifact or transform.")
-@click.option("--uid", type=str, default=None, help="The uid of an artifact or transform.")
+@click.option("--key", type=str, default=None, help="The key of an artifact, transform, or collection.")
+@click.option("--uid", type=str, default=None, help="The uid of an artifact, transform, or collection.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--ulabel", type=str, default=None, help="A valid ulabel name or uid.")
 @click.option("--record", type=str, default=None, help="A valid record name or uid.")
-@click.option("--features", multiple=True, help="Feature annotations. Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, features: tuple):
-    """Annotate an artifact or transform.
+@click.option("--version", type=str, default=None, help="A version tag for the artifact, transform, or collection.")
+@click.option("--features", multiple=True, help="Feature annotations (artifact/transform only). Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
+def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, version: str, features: tuple):
+    r"""Annotate an artifact, transform, or collection.
 
-    You can annotate with projects, ulabels, records, and valid features & values. For example,
+    You can annotate with projects, ulabels, records, version tags, and (for artifacts/transforms) valid features & values. For example,
 
     ```
     # via --key
     lamin annotate --key raw/sample.fastq --project "My Project"
     lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
+    lamin annotate --key raw/sample.fastq --version "1.0"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key my-notebook.ipynb --project "My Project"
     # via registry and --uid
     lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
+    lamin annotate collection --uid abc123 --version "1.0"
     # via URL
     lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
     ```
 
-    → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values` and `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`
+    → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values`, `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`, and `artifact.version_tag = \"1.0\"; artifact.save()` for version tags.
     """
     from lamin_cli._annotate import _parse_features_list
     from lamin_cli._save import infer_registry_from_path
@@ -743,9 +746,9 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
     if entity is not None and entity.startswith("https://"):
         url = entity
         instance, registry, uid = decompose_url(url)
-        if registry not in {"artifact", "transform"}:
+        if registry not in {"artifact", "transform", "collection"}:
             raise click.ClickException(
-                f"Annotate does not support {registry}. Use artifact or transform URLs."
+                f"Annotate does not support {registry}. Use artifact, transform, or collection URLs."
             )
         ln_setup.connect(instance)
     else:
@@ -757,9 +760,9 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             registry = infer_registry_from_path(key) if key is not None else "artifact"
         else:
             registry = entity
-        if registry not in {"artifact", "transform"}:
+        if registry not in {"artifact", "transform", "collection"}:
             raise click.ClickException(
-                f"Annotate does not support {registry}. Use artifact or transform URLs."
+                f"Annotate does not support {registry}. Use artifact, transform, or collection."
             )
 
     # import lamindb after connect went through
@@ -767,10 +770,12 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
 
     if registry == "artifact":
         model = ln.Artifact
-    else:
+    elif registry == "transform":
         model = ln.Transform
+    else:
+        model = ln.Collection
 
-    # Get the artifact or transform
+    # Get the artifact, transform, or collection
     if key is not None:
         artifact = model.get(key=key)
     elif uid is not None:
@@ -813,8 +818,17 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             )
         artifact.records.add(record_record)
 
-    # Handle feature annotations
+    # Handle version tag annotation (artifact, transform, and collection all have version_tag)
+    if version is not None:
+        model.filter(uid=artifact.uid).update(version_tag=version)
+        artifact.refresh_from_db()
+
+    # Handle feature annotations (artifact and transform only; collection has no features)
     if features:
+        if registry == "collection":
+            raise click.ClickException(
+                "Feature annotations are not supported for collections. Use artifact or transform."
+            )
         feature_dict = _parse_features_list(features)
         artifact.features.add_values(feature_dict)
 

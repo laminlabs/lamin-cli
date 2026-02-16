@@ -104,6 +104,19 @@ def test_save_and_annotate_local_file():
     features = artifact.features.get_values()
     assert features["perturbation"] == {"DMSO", "IFNG"}
     assert project in artifact.projects.all()
+
+    # annotate with version tag
+    result = subprocess.run(
+        f"lamin annotate --uid {artifact.uid} --version 1.0",
+        shell=True,
+        capture_output=True,
+    )
+    print(result.stdout.decode())
+    print(result.stderr.decode())
+    assert result.returncode == 0
+    artifact = ln.Artifact.get(key="mytest", branch=branch)
+    assert artifact.version_tag == "1.0"
+
     # can't find by key here because the artifact is not in the main branch
     result = subprocess.run(
         f"lamin describe --uid {artifact.uid}",
@@ -121,17 +134,21 @@ def test_save_and_annotate_local_file():
     assert result.returncode == 0
 
 
-def test_annotate_rejects_collection_url():
-    """Annotate supports artifact/transform URLs (like load/delete) but not collection."""
+def test_annotate_rejects_unsupported_registry_url():
+    """Annotate supports artifact, transform, and collection URLs but not e.g. run."""
     result = subprocess.run(
-        "lamin annotate https://lamin.ai/foo/bar/collection/abc123 --project x",
+        "lamin annotate https://lamin.ai/foo/bar/run/abc123 --project x",
         shell=True,
         capture_output=True,
     )
     assert result.returncode != 0
     err = (result.stderr or b"").decode() + (result.stdout or b"").decode()
-    assert "collection" in err.lower()
-    assert "artifact" in err.lower() or "transform" in err.lower()
+    assert "run" in err.lower()
+    assert (
+        "artifact" in err.lower()
+        or "transform" in err.lower()
+        or "collection" in err.lower()
+    )
 
 
 def test_save_cloud_file():
