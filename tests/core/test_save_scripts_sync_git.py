@@ -1,9 +1,6 @@
-"""Test that transform reference and reference_type are correctly set with sync_git.
+"""Test that lamin save sets transform reference and reference_type when LAMINDB_SYNC_GIT_REPO is set."""
 
-Uses the same setup as lamindb core test_run_external_script: run the script
-with python so sync_git_repo is set and ln.track creates the transform with reference.
-"""
-
+import os
 import subprocess
 from pathlib import Path
 
@@ -12,24 +9,34 @@ import lamindb as ln
 scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
-def test_transform_reference_and_reference_type_set_with_sync_git():
-    """Transform created via script with sync_git_repo has reference and reference_type set."""
-    script_path = scripts_dir / "run-track-and-finish-sync-git.py"
+def test_lamin_save_sets_reference_with_sync_git_env():
+    """lamin save with LAMINDB_SYNC_GIT_REPO sets transform.reference and reference_type."""
+    env = os.environ.copy()
+    env["LAMIN_TESTING"] = "true"
+    env["LAMINDB_SYNC_GIT_REPO"] = "https://github.com/laminlabs/lamin-cli"
+
+    # Use dummy script dedicated to this test (not mutated by other tests)
+    script_path = scripts_dir / "dummy_sync_git_save.py"
+
     result = subprocess.run(
-        f"python {script_path}",
+        f"lamin save {script_path}",
         shell=True,
         capture_output=True,
+        env=env,
     )
     assert result.returncode == 0, result.stderr.decode()
-    assert "created Transform" in result.stdout.decode()
-    assert "started new Run" in result.stdout.decode()
 
-    transform = ln.Transform.get(key="run-track-and-finish-sync-git.py")
+    transform = ln.Transform.get(key="dummy_sync_git_save.py")
     assert transform.reference is not None
-    assert transform.reference.endswith(
-        "/tests/scripts/run-track-and-finish-sync-git.py"
-    )
+    assert "dummy_sync_git_save.py" in transform.reference
     assert transform.reference.startswith(
         "https://github.com/laminlabs/lamin-cli/blob/"
     )
     assert transform.reference_type == "url"
+
+    # Clean up
+    subprocess.run(
+        "lamin delete transform --key dummy_sync_git_save.py --permanent",
+        shell=True,
+        capture_output=True,
+    )
