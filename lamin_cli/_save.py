@@ -296,6 +296,16 @@ def save(
         else:
             key = ppath.name
 
+        reference, reference_type = None, None
+        if ln.settings.sync_git_repo is not None and ppath.suffix != ".ipynb":
+            from lamindb.core._sync_git import get_transform_reference_from_git_repo
+            from lamindb.errors import BlobHashNotFound
+
+            reference, reference_type = (
+                get_transform_reference_from_git_repo(ppath),
+                "url",
+            )
+
         if uid is not None:
             logger.important(f"mapped '{ppath.name}' on uid '{uid}'")
             if len(uid) == 16:
@@ -326,7 +336,10 @@ def save(
                         if transform.key != key:
                             transform.key = key
                             logger.important(f"updated key to '{key}'")
-                            transform.save()
+                        if reference is not None:
+                            transform.reference = reference
+                            transform.reference_type = reference_type
+                        transform.save()
                         return None
                     if os.getenv("LAMIN_TESTING") == "true":
                         response = "y"
@@ -391,6 +404,8 @@ def save(
                 key=key,
                 type="script" if ppath.suffix in {".R", ".py", ".sh"} else "notebook",
                 revises=revises,
+                reference=reference,
+                reference_type=reference_type,
             )
             if space is not None:
                 transform.space = space_record
@@ -421,6 +436,13 @@ def save(
             logger.important(
                 f"found no run, creating Run('{run.uid}') to display the html"
             )
+        if reference is not None and (
+            transform.reference != reference
+            or transform.reference_type != reference_type
+        ):
+            transform.reference = reference
+            transform.reference_type = reference_type
+            transform.save()
         return_code = save_context_core(
             run=run,
             transform=transform,
