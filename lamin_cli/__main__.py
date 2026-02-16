@@ -339,9 +339,13 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
+    from lamindb.errors import ObjectDoesNotExist
     from lamindb.setup import switch as switch_
 
-    switch_(target, space=space, create=create)
+    try:
+        switch_(target, space=space, create=create)
+    except ObjectDoesNotExist as e:
+        raise click.ClickException(str(e)) from e
 
 
 # fmt: off

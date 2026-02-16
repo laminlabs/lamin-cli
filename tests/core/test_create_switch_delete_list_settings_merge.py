@@ -83,6 +83,23 @@ def test_merge_nonexistent_branch():
     assert "not found" in err_output or "nonexistent" in err_output
 
 
+def test_switch_nonexistent_branch():
+    """Switch to a non-existent branch (without --create) exits non-zero with clear error."""
+    result = subprocess.run(
+        "lamin switch nonexistent_branch_xyz",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.returncode != 0
+    err_output = (result.stderr + result.stdout).lower()
+    assert (
+        "branch" in err_output
+        or "not found" in err_output
+        or "nonexistent" in err_output
+    )
+
+
 def test_space():
     exit_status = os.system("lamin switch --space non_existent")
     assert exit_status == 256
