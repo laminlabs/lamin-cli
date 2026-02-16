@@ -612,6 +612,7 @@ def get(
 @click.argument("path", type=str)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
+@click.option("--kind", type=str, default=None, help="Artifact kind (e.g. 'plan', 'dataset', 'model'). Overrides auto-inferred kind for plan files.")
 @click.option("--stem-uid", type=str, default=None, help="The stem uid of the artifact or transform.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--space", type=str, default=None, help="A valid space name or uid.")
@@ -626,6 +627,7 @@ def save(
     path: str,
     key: str,
     description: str,
+    kind: str,
     stem_uid: str,
     project: str,
     space: str,
@@ -647,9 +649,16 @@ def save(
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
+    **Agent plans (Cursor / Claude Code):** Plan files are detected by suffix ``.plan.md`` (Cursor)
+    or by being under ``.claude/plans/`` (Claude Code). For such paths, no ``--key`` or ``--description``
+    are required: the key defaults to ``.plans/<filename>``, the artifact ``kind`` is set to ``plan``,
+    and the description is taken from the markdown front matter (``name:`` and ``overview:``). The stored
+    artifact contains only the body (the YAML front matter is stripped). Override the kind with ``--kind``
+    if needed.
+
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
-    if save_(path=path, key=key, description=description, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
+    if save_(path=path, key=key, description=description, kind=kind, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
 @main.command()

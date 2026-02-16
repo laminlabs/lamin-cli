@@ -78,10 +78,67 @@ def parse_title_r_notebook(content: str) -> str | None:
         return None
 
 
+def is_plan_file(path: Path | str) -> bool:
+    """True if path is an agent plan: .plan.md (Cursor) or under .claude/plans/ (Claude Code)."""
+    if isinstance(path, str):
+        path = Path(path)
+    if path.name.endswith(".plan.md"):
+        return True
+    # Claude Code stores plans under .claude/plans/
+    try:
+        parts = path.resolve().parts
+    except (OSError, RuntimeError):
+        parts = Path(path).parts
+    for i in range(len(parts) - 1):
+        if parts[i] == ".claude" and parts[i + 1] == "plans":
+            return True
+    return False
+
+
+def strip_plan_header(content: str) -> str | None:
+    """Remove YAML front matter (--- ... ---) from the start of plan markdown.
+
+    Returns the body (content after the closing ---) or None if no front matter.
+    """
+    front_matter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n?", content, re.DOTALL)
+    if not front_matter_match:
+        return None
+    return content[front_matter_match.end() :].lstrip("\n")
+
+
+def parse_plan_markdown(content: str) -> str | None:
+    """Parse description from plan markdown front matter (name + overview).
+
+    Expects optional YAML-like header between --- with name: and overview:.
+    Returns concatenated description or None if neither field exists.
+    """
+    # Match --- ... --- at start of file (front matter)
+    front_matter_match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
+    if not front_matter_match:
+        return None
+    block = front_matter_match.group(1)
+    name = None
+    overview = None
+    for line in block.split("\n"):
+        if line.startswith("name:"):
+            name = line[5:].strip()
+        elif line.startswith("overview:"):
+            overview = line[9:].strip()
+        elif name or overview:
+            # Continuation of previous field (indented)
+            if line.startswith(" ") and overview is not None:
+                overview += " " + line.strip()
+            elif line.startswith(" ") and name is not None:
+                name += " " + line.strip()
+    parts = [p for p in (name, overview) if p]
+    return ". ".join(parts) if parts else None
+
+
 def save(
     path: Path | str,
     key: str | None = None,
     description: str | None = None,
+    kind: str | None = None,
     stem_uid: str | None = None,
     project: str | None = None,
     space: str | None = None,
@@ -107,6 +164,31 @@ def save(
 
     if registry is None:
         registry = infer_registry_from_path(ppath)
+
+    plan_tmp_path: str | None = None
+    saving_plan = False
+    # Agent plan files (.plan.md from Cursor, or under .claude/plans/ in Claude Code)
+    if is_plan_file(ppath):
+        saving_plan = True
+        logger.important('saving artifact as `kind="plan"`')
+        registry = "artifact"
+        if key is None:
+            key = f".plans/{ppath.name}"
+        content = ppath.read_text()
+        if description is None:
+            description = parse_plan_markdown(content)
+        # Store artifact body only (strip front matter)
+        stripped = strip_plan_header(content)
+        if stripped is not None:
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".md", delete=False, encoding="utf-8"
+            ) as f:
+                f.write(stripped)
+                plan_tmp_path = f.name
+            ppath = create_path(plan_tmp_path)
+            assert isinstance(ppath, UPath)
 
     if project is not None:
         project_record = ln.Project.filter(
@@ -155,15 +237,20 @@ def save(
             logger.error("Please pass a key or description via --key or --description")
             return "missing-key-or-description"
 
+        if kind is None:
+            kind = "plan" if saving_plan else None
         artifact = ln.Artifact(
             ppath,
             key=key,
             description=description,
+            kind=kind,
             revises=revises,
             branch=branch_record,
             space=space_record,
             run=current_run,
         ).save()
+        if plan_tmp_path is not None and Path(plan_tmp_path).exists():
+            Path(plan_tmp_path).unlink()
         logger.important(f"saved: {artifact}")
         logger.important(f"storage path: {artifact.path}")
         if artifact.storage.type == "s3":
