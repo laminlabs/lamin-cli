@@ -296,20 +296,15 @@ def save(
         else:
             key = ppath.name
 
-        reference = None
-        reference_type = None
+        reference, reference_type = None, None
         if ln.settings.sync_git_repo is not None and ppath.suffix != ".ipynb":
-            try:
-                from lamindb.core._sync_git import get_transform_reference_from_git_repo
-                from lamindb.errors import BlobHashNotFound
+            from lamindb.core._sync_git import get_transform_reference_from_git_repo
+            from lamindb.errors import BlobHashNotFound
 
-                reference = get_transform_reference_from_git_repo(ppath)
-                reference_type = "url"
-            except BlobHashNotFound as e:
-                logger.warning(
-                    f"{e} Not setting transform reference. Commit & push the file, "
-                    "then run `lamin save` again to set the reference."
-                )
+            reference, reference_type = (
+                get_transform_reference_from_git_repo(ppath),
+                "url",
+            )
 
         if uid is not None:
             logger.important(f"mapped '{ppath.name}' on uid '{uid}'")
