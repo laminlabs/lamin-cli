@@ -649,12 +649,20 @@ def save(
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
-    **Agent plans (Cursor / Claude Code):** Plan files are detected by suffix ``.plan.md`` (Cursor)
-    or by being under ``.claude/plans/`` (Claude Code). For such paths, no ``--key`` or ``--description``
-    are required: the key defaults to ``.plans/<filename>``, the artifact ``kind`` is set to ``plan``,
-    and the description is taken from the markdown front matter (``name:`` and ``overview:``). The stored
-    artifact contains only the body (the YAML front matter is stripped). Override the kind with ``--kind``
-    if needed.
+    **Agent plans (Cursor / Claude Code):** Save a plan file with no `--key` or `--description`:
+
+    ```
+    lamin save /path/to/.cursor/plans/my_plan.plan.md
+    lamin save /path/to/.claude/plans/my_plan.md
+    ```
+
+    .. dropdown:: How plan files are handled
+
+        Plan files are detected by suffix `.plan.md` (Cursor) or by being under `.claude/plans/`
+        (Claude Code). For such paths, the key defaults to `.plans/<filename>`, the artifact `kind`
+        is set to `plan`, and the description is taken from the markdown front matter (`name:` and
+        `overview:`). The stored artifact contains only the body (the YAML front matter is stripped).
+        Override the kind with `--kind` if needed.
 
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """

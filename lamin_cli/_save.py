@@ -78,10 +78,8 @@ def parse_title_r_notebook(content: str) -> str | None:
         return None
 
 
-def is_plan_file(path: Path | str) -> bool:
+def is_plan_file(path: Path) -> bool:
     """True if path is an agent plan: .plan.md (Cursor) or under .claude/plans/ (Claude Code)."""
-    if isinstance(path, str):
-        path = Path(path)
     if path.name.endswith(".plan.md"):
         return True
     # Claude Code stores plans under .claude/plans/
@@ -187,8 +185,7 @@ def save(
             ) as f:
                 f.write(stripped)
                 plan_tmp_path = f.name
-            ppath = create_path(plan_tmp_path)
-            assert isinstance(ppath, UPath)
+            ppath = Path(plan_tmp_path)
 
     if project is not None:
         project_record = ln.Project.filter(
