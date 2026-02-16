@@ -665,6 +665,14 @@ def save(
 
     ```
 
+    git: When saving scripts, files will be synced with a git repo if you set:
+
+    ```
+    export LAMINDB_SYNC_GIT_REPO=https://github.com/org/repo
+    ```
+
+    Also see: :ref:`sync-code-with-git`
+
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
     if save_(path=path, key=key, description=description, kind=kind, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
