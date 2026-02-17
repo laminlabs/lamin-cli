@@ -1,4 +1,4 @@
-"""Tests for `lamin annotate --readme`."""
+"""Tests for `lamin annotate --readme` and `lamin annotate --comment`."""
 
 import subprocess
 import tempfile
@@ -81,3 +81,43 @@ def test_annotate_with_readme(registry, create_entity, annotate_args):
         readme_path.unlink(missing_ok=True)
         for x in to_delete:
             x.delete(permanent=True)
+
+
+@pytest.mark.parametrize(
+    "registry,create_entity,annotate_args",
+    [
+        ("artifact", _create_artifact, lambda obj: f"--uid {obj.uid}"),
+        (
+            "transform",
+            lambda: ln.Transform(key="comment_transform").save(),
+            lambda obj: f"--uid {obj.uid}",
+        ),
+    ],
+)
+def test_annotate_with_comment(registry, create_entity, annotate_args):
+    """Create entity, annotate with comment string via CLI, delete entity."""
+    obj = create_entity()
+    to_delete = [obj]
+
+    assert obj.ablocks.filter(kind="comment").count() == 0
+
+    result = subprocess.run(
+        [
+            "lamin",
+            "annotate",
+            registry,
+            *annotate_args(obj).split(),
+            "--comment",
+            "QC passed on 2024-01-15",
+        ],
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+
+    obj.refresh_from_db()
+    blocks = obj.ablocks.filter(kind="comment")
+    assert blocks.count() == 1
+    assert "QC passed on 2024-01-15" in blocks.one().content
+
+    for x in to_delete:
+        x.delete(permanent=True)

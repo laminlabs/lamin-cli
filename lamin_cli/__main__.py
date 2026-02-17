@@ -748,10 +748,11 @@ def finish():
 @click.option("--version", type=str, default=None, help="A version tag for the artifact, transform, or collection.")
 @click.option("--features", multiple=True, help="Feature annotations (artifact/transform only). Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
 @click.option("--readme", "readme_path", type=click.Path(exists=True, path_type=Path), default=None, help="Path to a README file to attach as a readme block to the entity.")
-def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None):
+@click.option("--comment", type=str, default=None, help="Comment text to attach as a comment block to the entity.")
+def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None, comment: str | None):
     r"""Annotate an artifact, transform, or collection.
 
-    You can annotate with projects, labels, records, version tags, a readme,and (for artifacts/transforms) valid features & values. For example,
+    You can annotate with projects, labels, records, version tags, a readme, a comment, and, for artifacts, with features. For example,
 
     ```
     # via registry and --uid for any registry
@@ -774,6 +775,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     lamin annotate --key raw/sample.fastq --version "1.0"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key raw/sample.fastq --readme README.md  # adds a readme to the artifact
+    lamin annotate --key raw/sample.fastq --comment "I think we should revisit this, tomorrow, WDYT?"
     lamin annotate --key my-notebook.ipynb --project "My Project"
     ```
 
@@ -790,7 +792,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
         REGISTRIES_WITH_FEATURES,
         REGISTRIES_WITH_PROJECT_ULABEL_RECORD,
         REGISTRIES_WITH_VERSION,
-        _add_readme_block,
+        _add_block,
         _get_obj,
         _parse_features_list,
     )
@@ -876,7 +878,11 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     # Handle readme annotation
     if readme_path is not None:
         readme_content = readme_path.read_text(encoding="utf-8")
-        _add_readme_block(obj, registry, readme_content)
+        _add_block(obj, registry, readme_content, kind="readme")
+
+    # Handle comment annotation
+    if comment is not None:
+        _add_block(obj, registry, comment, kind="comment")
 
     obj_rep = (
         obj.key
