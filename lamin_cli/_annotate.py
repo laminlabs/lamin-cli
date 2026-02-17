@@ -63,14 +63,14 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
                 "space": ln.Space.get,
             }[registry](uid)
         return {
-            "record": lambda: ln.Record.filter(name=name).one(),
-            "project": lambda: ln.Project.filter(name=name).one(),
-            "ulabel": lambda: ln.ULabel.filter(name=name).one(),
-            "branch": lambda: ln.Branch.get(name=name),
-            "feature": lambda: ln.Feature.get(name=name),
-            "schema": lambda: ln.Schema.get(name=name),
-            "space": lambda: ln.Space.filter(name=name).one(),
-        }[registry]()
+            "record": ln.Record.get,
+            "project": ln.Project.get,
+            "ulabel": ln.ULabel.get,
+            "branch": ln.Branch.get,
+            "feature": ln.Feature.get,
+            "schema": ln.Schema.get,
+            "space": ln.Space.get,
+        }[registry](name=name)
     # run - uid only
     if uid is None:
         raise ln.errors.InvalidArgument("For run pass --uid")
