@@ -736,14 +736,15 @@ def finish():
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact, transform, or collection.")
-@click.option("--uid", type=str, default=None, help="The uid of an artifact, transform, or collection.")
+@click.option("--uid", type=str, default=None, help="The uid of the entity.")
+@click.option("--name", type=str, default=None, help="The name of the entity (record, project, ulabel, branch, feature, schema, space).")
 @click.option("--project", type=str, default=None, help="A valid project name or uid.")
 @click.option("--ulabel", type=str, default=None, help="A valid ulabel name or uid.")
 @click.option("--record", type=str, default=None, help="A valid record name or uid.")
 @click.option("--version", type=str, default=None, help="A version tag for the artifact, transform, or collection.")
 @click.option("--features", multiple=True, help="Feature annotations (artifact/transform only). Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
 @click.option("--readme", "readme_path", type=click.Path(exists=True, path_type=Path), default=None, help="Path to a README file to attach as a readme block to the entity.")
-def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None):
+def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None):
     r"""Annotate an artifact, transform, or collection.
 
     You can annotate with projects, ulabels, records, version tags, and (for artifacts/transforms) valid features & values. For example,
@@ -759,23 +760,33 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
     # via registry and --uid
     lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
     lamin annotate collection --uid abc123 --version "1.0"
-    lamin annotate schema --uid abc123 --readme README.md  # adds a readme to the schema
+    lamin annotate schema --name my_schema --readme README.md
+    lamin annotate branch --readme README.md  # current branch; or --name my_branch
     # via URL
     lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
     ```
 
     → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values`, `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`, and `artifact.version_tag = \"1.0\"; artifact.save()` for version tags.
     """
-    from lamin_cli._annotate import _parse_features_list
+    from lamin_cli._annotate import (
+        ANNOTATE_REGISTRIES,
+        REGISTRIES_WITH_FEATURES,
+        REGISTRIES_WITH_PROJECT_ULABEL_RECORD,
+        REGISTRIES_WITH_VERSION,
+        _add_readme_block,
+        _get_obj,
+        _parse_features_list,
+    )
     from lamin_cli._save import infer_registry_from_path
 
     # Handle URL: decompose and connect (same pattern as load/delete)
     if entity is not None and entity.startswith("https://"):
         url = entity
         instance, registry, uid = decompose_url(url)
-        if registry not in {"artifact", "transform", "collection"}:
+        if registry not in ANNOTATE_REGISTRIES:
             raise click.ClickException(
-                f"Annotate does not support {registry}. Use artifact, transform, or collection URLs."
+                f"Annotate does not support {registry}. "
+                f"Use: {', '.join(sorted(ANNOTATE_REGISTRIES))}"
             )
         ln_setup.connect(instance)
     else:
@@ -787,33 +798,19 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             registry = infer_registry_from_path(key) if key is not None else "artifact"
         else:
             registry = entity
-        if registry not in {"artifact", "transform", "collection"}:
+        if registry not in ANNOTATE_REGISTRIES:
             raise click.ClickException(
-                f"Annotate does not support {registry}. Use artifact, transform, or collection."
+                f"Annotate does not support {registry}. "
+                f"Use: {', '.join(sorted(ANNOTATE_REGISTRIES))}"
             )
 
     # import lamindb after connect went through
     import lamindb as ln
 
-    if registry == "artifact":
-        model = ln.Artifact
-    elif registry == "transform":
-        model = ln.Transform
-    else:
-        model = ln.Collection
+    obj = _get_obj(registry, key, uid, name)
 
-    # Get the artifact, transform, or collection
-    if key is not None:
-        obj = model.get(key=key)
-    elif uid is not None:
-        obj = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
-    else:
-        raise ln.errors.InvalidArgument(
-            "Either pass a URL as entity or provide --key or --uid"
-        )
-
-    # Handle project annotation
-    if project is not None:
+    # Handle project annotation (artifact, transform, collection only)
+    if project is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
         project_record = ln.Project.filter(
             ln.Q(name=project) | ln.Q(uid=project)
         ).one_or_none()
@@ -823,8 +820,8 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             )
         obj.projects.add(project_record)
 
-    # Handle ulabel annotation
-    if ulabel is not None:
+    # Handle ulabel annotation (artifact, transform, collection only)
+    if ulabel is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
         ulabel_record = ln.ULabel.filter(
             ln.Q(name=ulabel) | ln.Q(uid=ulabel)
         ).one_or_none()
@@ -834,8 +831,8 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             )
         obj.ulabels.add(ulabel_record)
 
-    # Handle record annotation
-    if record is not None:
+    # Handle record annotation (artifact, transform, collection only)
+    if record is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
         record_record = ln.Record.filter(
             ln.Q(name=record) | ln.Q(uid=record)
         ).one_or_none()
@@ -845,38 +842,34 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             )
         obj.records.add(record_record)
 
-    # Handle version tag annotation (artifact, transform, and collection all have version_tag)
-    if version is not None:
-        model.filter(uid=obj.uid).update(version_tag=version)
+    # Handle version tag annotation (artifact, transform, collection only)
+    if version is not None and registry in REGISTRIES_WITH_VERSION:
+        obj.__class__.filter(uid=obj.uid).update(version_tag=version)
         obj.refresh_from_db()
 
-    # Handle feature annotations (artifact and transform only; collection has no features)
-    if features:
-        if registry == "collection":
-            raise click.ClickException(
-                "Feature annotations are not supported for collections. Use artifact or transform."
-            )
+    # Handle feature annotations (artifact and transform only)
+    if features and registry in REGISTRIES_WITH_FEATURES:
         feature_dict = _parse_features_list(features)
         obj.features.add_values(feature_dict)
+    elif features:
+        raise click.ClickException(
+            "Feature annotations are only supported for artifact and transform."
+        )
 
     # Handle readme annotation
     if readme_path is not None:
         readme_content = readme_path.read_text(encoding="utf-8")
-        if registry == "artifact":
-            block = ln.models.ArtifactBlock(
-                artifact=obj, content=readme_content, kind="readme"
-            )
-        elif registry == "transform":
-            block = ln.models.TransformBlock(
-                transform=obj, content=readme_content, kind="readme"
-            )
-        else:
-            block = ln.models.CollectionBlock(
-                collection=obj, content=readme_content, kind="readme"
-            )
-        obj.ablocks.add(block, bulk=False)
+        _add_readme_block(obj, registry, readme_content)
 
-    obj_rep = obj.key if obj.key else obj.description if obj.description else obj.uid
+    obj_rep = (
+        obj.key
+        if hasattr(obj, "key") and obj.key
+        else obj.description
+        if hasattr(obj, "description") and obj.description
+        else obj.name
+        if hasattr(obj, "name") and obj.name
+        else obj.uid
+    )
     logger.important(f"annotated {registry}: {obj_rep}")
 
 

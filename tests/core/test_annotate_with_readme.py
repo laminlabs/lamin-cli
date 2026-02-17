@@ -10,32 +10,53 @@ import pytest
 test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
 
 
+def _create_artifact():
+    return ln.Artifact(test_file, key="readme_artifact").save()
+
+
+def _create_collection():
+    artifact = ln.Artifact(test_file, key="readme_artifact").save()
+    collection = ln.Collection(artifact, key="readme_collection").save()
+    return collection, artifact
+
+
 @pytest.mark.parametrize(
-    "registry,create_entity,delete_cmd",
+    "registry,create_entity,annotate_args",
     [
-        (
-            "artifact",
-            lambda: ln.Artifact(test_file, key="readme_artifact").save(),
-            "lamin delete artifact --key readme_artifact --permanent",
-        ),
+        ("artifact", _create_artifact, lambda obj: f"--uid {obj.uid}"),
         (
             "transform",
             lambda: ln.Transform(key="readme_transform").save(),
-            "lamin delete transform --key readme_transform --permanent",
+            lambda obj: f"--uid {obj.uid}",
+        ),
+        ("collection", _create_collection, lambda obj: f"--uid {obj.uid}"),
+        (
+            "branch",
+            lambda: ln.Branch(name="readme_test_branch").save(),
+            lambda obj: f"--name {obj.name}",
         ),
         (
-            "collection",
-            lambda: ln.Collection(
-                ln.Artifact(test_file, key="readme_artifact").save(),
-                key="readme_collection",
-            ).save(),
-            "lamin delete collection --key readme_collection --permanent",
+            "feature",
+            lambda: ln.Feature(name="readme_test_feature", dtype="str").save(),
+            lambda obj: f"--name {obj.name}",
+        ),
+        (
+            "schema",
+            lambda: ln.Schema(name="readme_test_schema", itype=ln.Feature).save(),
+            lambda obj: f"--name {obj.name}",
         ),
     ],
 )
-def test_annotate_with_readme(registry, create_entity, delete_cmd):
+def test_annotate_with_readme(registry, create_entity, annotate_args):
     """Create entity, annotate with readme via CLI, delete entity."""
-    obj = create_entity()
+    result = create_entity()
+    if isinstance(result, tuple):
+        obj, *extra = result
+        to_delete = [obj] + extra
+    else:
+        obj = result
+        to_delete = [obj]
+
     assert obj.ablocks.filter(kind="readme").count() == 0
 
     with tempfile.NamedTemporaryFile(
@@ -46,7 +67,7 @@ def test_annotate_with_readme(registry, create_entity, delete_cmd):
 
     try:
         result = subprocess.run(
-            f"lamin annotate {registry} --uid {obj.uid} --readme {readme_path}",
+            f"lamin annotate {registry} {annotate_args(obj)} --readme {readme_path}",
             shell=True,
             capture_output=True,
         )
@@ -58,10 +79,5 @@ def test_annotate_with_readme(registry, create_entity, delete_cmd):
         assert "Test Readme" in blocks.one().content
     finally:
         readme_path.unlink(missing_ok=True)
-        subprocess.run(delete_cmd, shell=True, capture_output=True)
-        if registry == "collection":
-            subprocess.run(
-                "lamin delete artifact --key readme_artifact --permanent",
-                shell=True,
-                capture_output=True,
-            )
+        for x in to_delete:
+            x.delete(permanent=True)
