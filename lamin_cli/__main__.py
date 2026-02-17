@@ -747,24 +747,36 @@ def finish():
 def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None):
     r"""Annotate an artifact, transform, or collection.
 
-    You can annotate with projects, ulabels, records, version tags, and (for artifacts/transforms) valid features & values. For example,
+    You can annotate with projects, labels, records, version tags, a readme,and (for artifacts/transforms) valid features & values. For example,
 
     ```
-    # via --key alone for artifacts / transforms
+    # via registry and --uid for any registry
+    lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
+    lamin annotate collection --uid abc123 --version "1.0"
+    # via registry and --name for any registry that has a name field
+    lamin annotate schema --name my_schema --readme README.md
+    # via registry and --key for any registry that as a key field
+    lamin annotate collection --key my_collection --version "1.0"
+    # via URL for any registry
+    lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
+    lamin annotate https://lamin.ai/account/instance/schema/123456ABCDEF --readme README.md
+    ```
+
+    Annotating artifacts and transforms works via `--key` alone:
+
+    ```
     lamin annotate --key raw/sample.fastq --project "My Project"
     lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
     lamin annotate --key raw/sample.fastq --version "1.0"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key raw/sample.fastq --readme README.md  # adds a readme to the artifact
     lamin annotate --key my-notebook.ipynb --project "My Project"
-    # via registry and --uid or --name for most registries
-    lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
-    lamin annotate collection --uid abc123 --version "1.0"
-    lamin annotate schema --name my_schema --readme README.md
+    ```
+
+    Branch defaults to the current branch:
+
+    ```
     lamin annotate branch --readme README.md  # current branch; or --name my_branch
-    # via URL for any registry
-    lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
-    lamin annotate https://lamin.ai/account/instance/schema/123456ABCDEF --readme README.md
     ```
 
     → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values`, `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`, and `artifact.version_tag = \"1.0\"; artifact.save()` for version tags.
