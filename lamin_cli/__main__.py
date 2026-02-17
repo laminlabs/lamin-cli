@@ -750,20 +750,21 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     You can annotate with projects, ulabels, records, version tags, and (for artifacts/transforms) valid features & values. For example,
 
     ```
-    # via --key
+    # via --key alone for artifacts / transforms
     lamin annotate --key raw/sample.fastq --project "My Project"
     lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
     lamin annotate --key raw/sample.fastq --version "1.0"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key raw/sample.fastq --readme README.md  # adds a readme to the artifact
     lamin annotate --key my-notebook.ipynb --project "My Project"
-    # via registry and --uid
+    # via registry and --uid or --name for most registries
     lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
     lamin annotate collection --uid abc123 --version "1.0"
     lamin annotate schema --name my_schema --readme README.md
     lamin annotate branch --readme README.md  # current branch; or --name my_branch
-    # via URL
+    # via URL for any registry
     lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
+    lamin annotate https://lamin.ai/account/instance/schema/123456ABCDEF --readme README.md
     ```
 
     → Python/R alternative: `artifact.features.add_values()` via {meth}`~lamindb.models.FeatureManager.add_values`, `artifact.projects.add()`, `artifact.ulabels.add()`, `artifact.records.add()`, ... via {meth}`~lamindb.models.RelatedManager.add`, and `artifact.version_tag = \"1.0\"; artifact.save()` for version tags.
