@@ -77,11 +77,11 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
     return ln.Run.get(uid)
 
 
-def _add_readme_block(obj, registry: str, content: str):
-    """Create and add readme block to entity."""
+def _add_block(obj, registry: str, content: str, *, kind: str = "readme"):
+    """Create and add a block (readme or comment) to entity."""
     import lamindb as ln
 
-    block_kwargs = {"content": content, "kind": "readme"}
+    block_kwargs = {"content": content, "kind": kind}
     block = {
         "artifact": lambda: ln.models.ArtifactBlock(artifact=obj, **block_kwargs),
         "transform": lambda: ln.models.TransformBlock(transform=obj, **block_kwargs),
