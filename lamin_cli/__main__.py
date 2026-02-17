@@ -308,7 +308,7 @@ def list_(registry: Literal["branch", "space"]):
 
 # fmt: off
 @main.command()
-@click.argument("target", type=str, nargs=-1, required=False)
+@click.argument("target", type=str, nargs=-1, required=False)  # TODO: remove nargs=-1 once deprecated form is removed
 @click.option("--space", is_flag=True, default=False, help="Switch space instead of branch.")
 @click.option("-c", "--create", is_flag=True, default=False, help="Create branch if it does not exist.")
 # fmt: on
