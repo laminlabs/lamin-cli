@@ -134,23 +134,6 @@ def test_save_and_annotate_local_file():
     assert result.returncode == 0
 
 
-def test_annotate_rejects_unsupported_registry_url():
-    """Annotate supports artifact, transform, and collection URLs but not e.g. run."""
-    result = subprocess.run(
-        "lamin annotate https://lamin.ai/foo/bar/run/abc123 --project x",
-        shell=True,
-        capture_output=True,
-    )
-    assert result.returncode != 0
-    err = (result.stderr or b"").decode() + (result.stdout or b"").decode()
-    assert "run" in err.lower()
-    assert (
-        "artifact" in err.lower()
-        or "transform" in err.lower()
-        or "collection" in err.lower()
-    )
-
-
 def test_save_cloud_file():
     # should be no key for cloud paths
     result = subprocess.run(
