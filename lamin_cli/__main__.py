@@ -775,7 +775,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     lamin annotate --key raw/sample.fastq --version "1.0"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
     lamin annotate --key raw/sample.fastq --readme README.md  # adds a readme to the artifact
-    lamin annotate --key raw/sample.fastq --comment "QC passed"
+    lamin annotate --key raw/sample.fastq --comment "I think we should revisit this, tomorrow, WDYT?"
     lamin annotate --key my-notebook.ipynb --project "My Project"
     ```
 
