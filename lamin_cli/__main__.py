@@ -742,7 +742,8 @@ def finish():
 @click.option("--record", type=str, default=None, help="A valid record name or uid.")
 @click.option("--version", type=str, default=None, help="A version tag for the artifact, transform, or collection.")
 @click.option("--features", multiple=True, help="Feature annotations (artifact/transform only). Supports: feature=value, feature=val1,val2, or feature=\"val1\",\"val2\"")
-def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, version: str, features: tuple):
+@click.option("--readme", "readme_path", type=click.Path(exists=True, path_type=Path), default=None, help="Path to a README file to attach as a readme block to the entity.")
+def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None):
     r"""Annotate an artifact, transform, or collection.
 
     You can annotate with projects, ulabels, records, version tags, and (for artifacts/transforms) valid features & values. For example,
@@ -753,10 +754,12 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
     lamin annotate --key raw/sample.fastq --ulabel "My ULabel" --record "Experiment 1"
     lamin annotate --key raw/sample.fastq --version "1.0"
     lamin annotate --key raw/sample.fastq --features perturbation=IFNG,DMSO cell_line=HEK297
+    lamin annotate --key raw/sample.fastq --readme README.md  # adds a readme to the artifact
     lamin annotate --key my-notebook.ipynb --project "My Project"
     # via registry and --uid
     lamin annotate artifact --uid e2G7k9EVul4JbfsE --project "My Project"
     lamin annotate collection --uid abc123 --version "1.0"
+    lamin annotate schema --uid abc123 --readme README.md  # adds a readme to the schema
     # via URL
     lamin annotate https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE --project "My Project"
     ```
@@ -801,9 +804,9 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
 
     # Get the artifact, transform, or collection
     if key is not None:
-        artifact = model.get(key=key)
+        obj = model.get(key=key)
     elif uid is not None:
-        artifact = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
+        obj = model.get(uid)  # do not use uid=uid, because then no truncated uids would work
     else:
         raise ln.errors.InvalidArgument(
             "Either pass a URL as entity or provide --key or --uid"
@@ -818,7 +821,7 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             raise ln.errors.InvalidArgument(
                 f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
             )
-        artifact.projects.add(project_record)
+        obj.projects.add(project_record)
 
     # Handle ulabel annotation
     if ulabel is not None:
@@ -829,7 +832,7 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             raise ln.errors.InvalidArgument(
                 f"ULabel '{ulabel}' not found, either create it with `ln.ULabel(name='...').save()` or fix typos."
             )
-        artifact.ulabels.add(ulabel_record)
+        obj.ulabels.add(ulabel_record)
 
     # Handle record annotation
     if record is not None:
@@ -840,12 +843,12 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
             raise ln.errors.InvalidArgument(
                 f"Record '{record}' not found, either create it with `ln.Record(name='...').save()` or fix typos."
             )
-        artifact.records.add(record_record)
+        obj.records.add(record_record)
 
     # Handle version tag annotation (artifact, transform, and collection all have version_tag)
     if version is not None:
-        model.filter(uid=artifact.uid).update(version_tag=version)
-        artifact.refresh_from_db()
+        model.filter(uid=obj.uid).update(version_tag=version)
+        obj.refresh_from_db()
 
     # Handle feature annotations (artifact and transform only; collection has no features)
     if features:
@@ -854,10 +857,27 @@ def annotate(entity: str | None, key: str, uid: str, project: str, ulabel: str, 
                 "Feature annotations are not supported for collections. Use artifact or transform."
             )
         feature_dict = _parse_features_list(features)
-        artifact.features.add_values(feature_dict)
+        obj.features.add_values(feature_dict)
 
-    artifact_rep = artifact.key if artifact.key else artifact.description if artifact.description else artifact.uid
-    logger.important(f"annotated {registry}: {artifact_rep}")
+    # Handle readme annotation
+    if readme_path is not None:
+        readme_content = readme_path.read_text(encoding="utf-8")
+        if registry == "artifact":
+            block = ln.models.ArtifactBlock(
+                artifact=obj, content=readme_content, kind="readme"
+            )
+        elif registry == "transform":
+            block = ln.models.TransformBlock(
+                transform=obj, content=readme_content, kind="readme"
+            )
+        else:
+            block = ln.models.CollectionBlock(
+                collection=obj, content=readme_content, kind="readme"
+            )
+        obj.ablocks.add(block, bulk=False)
+
+    obj_rep = obj.key if obj.key else obj.description if obj.description else obj.uid
+    logger.important(f"annotated {registry}: {obj_rep}")
 
 
 @main.command()
