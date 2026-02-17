@@ -9,135 +9,104 @@ import tempfile
 from pathlib import Path
 
 import lamindb as ln
+import pytest
 
 scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 test_file = Path(__file__).parent.parent.parent.resolve() / ".gitignore"
 
 
-def test_annotate_artifact_with_readme():
-    """Annotate an artifact with a readme file via --readme."""
+def _setup_artifact():
+    """Create artifact, return (obj, readme_content, cleanup_func)."""
     ln.Project(name="test_project_readme").save()
     branch = ln.Branch(name="contrib_readme").save()
-
-    # Save artifact
     result = subprocess.run(
         f"lamin save {test_file} --key readme_test_artifact --project test_project_readme --branch contrib_readme",
         shell=True,
         capture_output=True,
     )
     assert result.returncode == 0, result.stderr.decode()
+    obj = ln.Artifact.get(key="readme_test_artifact", branch=branch)
 
-    artifact = ln.Artifact.get(key="readme_test_artifact", branch=branch)
-    assert artifact.ablocks.filter(kind="readme").count() == 0
-
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, prefix="readme_"
-    ) as f:
-        f.write("# My Artifact Readme\n\nThis describes the artifact.")
-        readme_path = Path(f.name)
-
-    try:
-        result = subprocess.run(
-            f"lamin annotate --uid {artifact.uid} --readme {readme_path}",
+    def cleanup():
+        subprocess.run(
+            "lamin delete artifact --key readme_test_artifact --permanent",
             shell=True,
             capture_output=True,
         )
-        print(result.stdout.decode())
-        print(result.stderr.decode())
-        assert result.returncode == 0
 
-        artifact.refresh_from_db()
-        readme_blocks = artifact.ablocks.filter(kind="readme")
-        assert readme_blocks.count() == 1
-        block = readme_blocks.one()
-        assert "My Artifact Readme" in block.content
-        assert "describes the artifact" in block.content
-    finally:
-        readme_path.unlink(missing_ok=True)
-
-    # Cleanup
-    subprocess.run(
-        "lamin delete artifact --key readme_test_artifact --permanent",
-        shell=True,
-        capture_output=True,
-    )
+    return obj, "# My Artifact Readme\n\nThis describes the artifact.", cleanup
 
 
-def test_annotate_transform_with_readme():
-    """Annotate a transform with a readme file via --readme."""
+def _setup_transform():
+    """Create transform, return (obj, readme_content, cleanup_func)."""
     subprocess.run("lamin settings dev-dir unset", shell=True, capture_output=True)
-
     script_path = scripts_dir / "readme_test_transform.py"
     script_path.write_text("print('hello')")
-
     result = subprocess.run(
         f"lamin save {script_path}",
         shell=True,
         capture_output=True,
     )
     assert result.returncode == 0, result.stderr.decode()
+    obj = ln.Transform.filter(key="readme_test_transform.py").first()
+    assert obj is not None
 
-    transform = ln.Transform.filter(key="readme_test_transform.py").first()
-    assert transform is not None
-    assert transform.ablocks.filter(kind="readme").count() == 0
-
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, prefix="readme_"
-    ) as f:
-        f.write("# Transform Documentation\n\nHow to run this script.")
-        readme_path = Path(f.name)
-
-    try:
-        result = subprocess.run(
-            f"lamin annotate transform --uid {transform.uid} --readme {readme_path}",
+    def cleanup():
+        script_path.unlink(missing_ok=True)
+        subprocess.run(
+            "lamin delete transform --key readme_test_transform.py --permanent",
             shell=True,
             capture_output=True,
         )
-        print(result.stdout.decode())
-        print(result.stderr.decode())
-        assert result.returncode == 0
 
-        transform.refresh_from_db()
-        readme_blocks = transform.ablocks.filter(kind="readme")
-        assert readme_blocks.count() == 1
-        block = readme_blocks.one()
-        assert "Transform Documentation" in block.content
-    finally:
-        readme_path.unlink(missing_ok=True)
-
-    # Cleanup
-    script_path.unlink(missing_ok=True)
-    subprocess.run(
-        "lamin delete transform --key readme_test_transform.py --permanent",
-        shell=True,
-        capture_output=True,
-    )
+    return obj, "# Transform Documentation\n\nHow to run this script.", cleanup
 
 
-def test_annotate_collection_with_readme():
-    """Annotate a collection with a readme file via --readme."""
-    # Create artifact and collection (use main branch, no --branch)
+def _setup_collection():
+    """Create collection, return (obj, readme_content, cleanup_func)."""
     result = subprocess.run(
         f"lamin save {test_file} --key readme_coll_artifact --registry artifact",
         shell=True,
         capture_output=True,
     )
     assert result.returncode == 0, result.stderr.decode()
-
     artifact = ln.Artifact.filter(key="readme_coll_artifact").first()
     assert artifact is not None
-    collection = ln.Collection([artifact], key="readme_test_collection").save()
-    assert collection.ablocks.filter(kind="readme").count() == 0
+    obj = ln.Collection([artifact], key="readme_test_collection").save()
+
+    def cleanup():
+        obj.delete(permanent=True)
+        subprocess.run(
+            "lamin delete artifact --key readme_coll_artifact --permanent",
+            shell=True,
+            capture_output=True,
+        )
+
+    return obj, "# Collection Overview\n\nThis collection groups related data.", cleanup
+
+
+@pytest.mark.parametrize(
+    "registry,setup_fn,expected_in_content",
+    [
+        ("artifact", _setup_artifact, "My Artifact Readme"),
+        ("transform", _setup_transform, "Transform Documentation"),
+        ("collection", _setup_collection, "Collection Overview"),
+    ],
+)
+def test_annotate_with_readme_parametrized(registry, setup_fn, expected_in_content):
+    """Parametrized test: annotate artifact, transform, or collection with a readme."""
+    obj, readme_content, cleanup = setup_fn()
+    assert obj.ablocks.filter(kind="readme").count() == 0
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", delete=False, prefix="readme_"
     ) as f:
-        f.write("# Collection Overview\n\nThis collection groups related data.")
+        f.write(readme_content)
         readme_path = Path(f.name)
 
     try:
         result = subprocess.run(
-            f"lamin annotate collection --uid {collection.uid} --readme {readme_path}",
+            f"lamin annotate {registry} --uid {obj.uid} --readme {readme_path}",
             shell=True,
             capture_output=True,
         )
@@ -145,21 +114,14 @@ def test_annotate_collection_with_readme():
         print(result.stderr.decode())
         assert result.returncode == 0
 
-        collection.refresh_from_db()
-        readme_blocks = collection.ablocks.filter(kind="readme")
+        obj.refresh_from_db()
+        readme_blocks = obj.ablocks.filter(kind="readme")
         assert readme_blocks.count() == 1
         block = readme_blocks.one()
-        assert "Collection Overview" in block.content
+        assert expected_in_content in block.content
     finally:
         readme_path.unlink(missing_ok=True)
-
-    # Cleanup
-    collection.delete(permanent=True)
-    subprocess.run(
-        "lamin delete artifact --key readme_coll_artifact --permanent",
-        shell=True,
-        capture_output=True,
-    )
+        cleanup()
 
 
 def test_annotate_rejects_feature_and_ulabel():
