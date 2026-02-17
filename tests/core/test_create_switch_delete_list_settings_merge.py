@@ -100,6 +100,24 @@ def test_switch_nonexistent_branch():
     )
 
 
+def test_switch_backward_compat():
+    """Backward compat: lamin switch branch X and lamin switch space Y still work (deprecated)."""
+    exit_status = os.system("lamin switch branch archive")
+    assert exit_status == 0
+    result = subprocess.run(
+        "lamin settings get branch",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip().split("\n")[-1] == "archive"
+    exit_status = os.system("lamin switch branch main")
+    # lamin switch space <name> should switch space
+    exit_status = os.system("lamin switch space all")
+    assert exit_status == 0
+
+
 def test_space():
     exit_status = os.system("lamin switch --space non_existent")
     assert exit_status == 256
