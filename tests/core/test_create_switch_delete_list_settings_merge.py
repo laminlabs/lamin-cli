@@ -55,6 +55,9 @@ def test_merge():
     """Merge a branch into main: create branch, add record, switch to main, merge."""
     exit_status = os.system("lamin switch -c merge_test_branch")
     assert exit_status == 0
+    ln_setup.settings.branch = (
+        "merge_test_branch"  # refresh in-process; CLI wrote to file
+    )
     ulabel = ln.ULabel(name="merge_test_record").save()
     assert ulabel.branch.name == "merge_test_branch"
     exit_status = os.system("lamin switch main")
