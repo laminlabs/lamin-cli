@@ -208,6 +208,18 @@ def test_describe_ulabel_by_name_and_uid():
     ulabel.delete()
 
 
+def test_describe_branch_defaults_to_current():
+    """Describe branch without --name defaults to current branch."""
+    result = subprocess.run(
+        "lamin describe branch",
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert "Branch" in result.stdout
+
+
 def test_describe_branch_by_name_and_uid():
     """Describe branch by --name and by --uid."""
     branch = ln.Branch(name="describe_test_branch_xyz").save()

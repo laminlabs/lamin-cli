@@ -545,11 +545,14 @@ def _describe(
                 if entity == "ulabel"
                 else ln.Branch.get(uid)
             )
+        elif entity == "branch" and name is None:
+            # Default to current branch (like lamin annotate)
+            record = ln_setup.settings.branch
+        elif name is None:
+            raise SystemExit(
+                f"For entity '{entity}' you must pass --uid or --name"
+            )
         else:
-            if name is None:
-                raise SystemExit(
-                    f"For entity '{entity}' you must pass --uid or --name"
-                )
             record = (
                 ln.Record.filter(name=name).one()
                 if entity == "record"
@@ -596,6 +599,7 @@ def describe(
     lamin describe record --name "Experiment 1"
     lamin describe project --name "My Project"
     lamin describe ulabel --name "My ULabel"
+    lamin describe branch  # defaults to current branch
     lamin describe branch --name main
     ```
 
