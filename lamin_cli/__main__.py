@@ -608,9 +608,8 @@ def describe(
     lamin describe project --name "My Project"
     lamin describe ulabel --name "My ULabel"
     lamin describe branch  # defaults to current branch
+    lamin describe branch --include comments
     lamin describe branch --name main
-    # with readme and comment blocks
-    lamin describe artifact --key my_artifact.parquet --include comments
     ```
 
     → Python/R alternative: {meth}`~lamindb.Artifact.describe`
