@@ -124,7 +124,6 @@ def test_annotate_with_comment(registry, create_entity, annotate_args):
 
 
 def test_raise_incomplete_annotate_call():
-    """Annotate artifact without --key or --uid raises ClickException (no traceback)."""
     result = subprocess.run(
         ["lamin", "annotate", "--comment", "test"],
         capture_output=True,
