@@ -339,7 +339,7 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
-    from lamindb.errors import ObjectDoesNotExist
+    from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
     from lamindb.setup import switch as switch_
 
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
@@ -350,7 +350,7 @@ def switch(
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
         try:
             switch_(name, space=(kind == "space"), create=create)
-        except ObjectDoesNotExist as e:
+        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
             raise click.ClickException(str(e)) from e
         return
 
@@ -360,7 +360,7 @@ def switch(
     target_str = target[0] if len(target) == 1 else None
     try:
         switch_(target_str, space=space, create=create)
-    except ObjectDoesNotExist as e:
+    except (ObjectDoesNotExist, BranchAlreadyExists) as e:
         raise click.ClickException(str(e)) from e
 
 
