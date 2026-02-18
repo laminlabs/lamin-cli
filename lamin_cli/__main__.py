@@ -826,51 +826,55 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     # import lamindb after connect went through
     import lamindb as ln
 
-    obj = _get_obj(registry, key, uid, name)
+    try:
+        obj = _get_obj(registry, key, uid, name)
 
-    # Handle project annotation (artifact, transform, collection only)
-    if project is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
-        project_record = ln.Project.filter(
-            ln.Q(name=project) | ln.Q(uid=project)
-        ).one_or_none()
-        if project_record is None:
-            raise ln.errors.InvalidArgument(
-                f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
-            )
-        obj.projects.add(project_record)
+        # Handle project annotation (artifact, transform, collection only)
+        if project is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
+            project_record = ln.Project.filter(
+                ln.Q(name=project) | ln.Q(uid=project)
+            ).one_or_none()
+            if project_record is None:
+                raise ln.errors.InvalidArgument(
+                    f"Project '{project}' not found, either create it with `ln.Project(name='...').save()` or fix typos."
+                )
+            obj.projects.add(project_record)
 
-    # Handle ulabel annotation (artifact, transform, collection only)
-    if ulabel is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
-        ulabel_record = ln.ULabel.filter(
-            ln.Q(name=ulabel) | ln.Q(uid=ulabel)
-        ).one_or_none()
-        if ulabel_record is None:
-            raise ln.errors.InvalidArgument(
-                f"ULabel '{ulabel}' not found, either create it with `ln.ULabel(name='...').save()` or fix typos."
-            )
-        obj.ulabels.add(ulabel_record)
+        # Handle ulabel annotation (artifact, transform, collection only)
+        if ulabel is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
+            ulabel_record = ln.ULabel.filter(
+                ln.Q(name=ulabel) | ln.Q(uid=ulabel)
+            ).one_or_none()
+            if ulabel_record is None:
+                raise ln.errors.InvalidArgument(
+                    f"ULabel '{ulabel}' not found, either create it with `ln.ULabel(name='...').save()` or fix typos."
+                )
+            obj.ulabels.add(ulabel_record)
 
-    # Handle record annotation (artifact, transform, collection only)
-    if record is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
-        record_record = ln.Record.filter(
-            ln.Q(name=record) | ln.Q(uid=record)
-        ).one_or_none()
-        if record_record is None:
-            raise ln.errors.InvalidArgument(
-                f"Record '{record}' not found, either create it with `ln.Record(name='...').save()` or fix typos."
-            )
-        obj.records.add(record_record)
+        # Handle record annotation (artifact, transform, collection only)
+        if record is not None and registry in REGISTRIES_WITH_PROJECT_ULABEL_RECORD:
+            record_record = ln.Record.filter(
+                ln.Q(name=record) | ln.Q(uid=record)
+            ).one_or_none()
+            if record_record is None:
+                raise ln.errors.InvalidArgument(
+                    f"Record '{record}' not found, either create it with `ln.Record(name='...').save()` or fix typos."
+                )
+            obj.records.add(record_record)
 
-    # Handle version tag annotation (artifact, transform, collection only)
-    if version is not None and registry in REGISTRIES_WITH_VERSION:
-        obj.__class__.filter(uid=obj.uid).update(version_tag=version)
-        obj.refresh_from_db()
+        # Handle version tag annotation (artifact, transform, collection only)
+        if version is not None and registry in REGISTRIES_WITH_VERSION:
+            obj.__class__.filter(uid=obj.uid).update(version_tag=version)
+            obj.refresh_from_db()
 
-    # Handle feature annotations (artifact and transform only)
-    if features and registry in REGISTRIES_WITH_FEATURES:
-        feature_dict = _parse_features_list(features)
-        obj.features.add_values(feature_dict)
-    elif features:
+        # Handle feature annotations (artifact and transform only)
+        if features and registry in REGISTRIES_WITH_FEATURES:
+            feature_dict = _parse_features_list(features)
+            obj.features.add_values(feature_dict)
+    except ln.errors.InvalidArgument as e:
+        raise click.ClickException(str(e)) from None
+
+    if features and registry not in REGISTRIES_WITH_FEATURES:
         raise click.ClickException(
             "Feature annotations are only supported for artifact and transform."
         )
