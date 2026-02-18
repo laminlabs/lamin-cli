@@ -371,15 +371,17 @@ def switch(
 def merge(branch: str):
     """Merge a branch into the current branch.
 
-    Pass the `name` or `uid` of the branch to merge into the current branch.
+    Pass the `name` or `uid` of the source branch to merge into the current branch.
 
-    Everything that was on the given branch will then be on the current branch.
-    Run this on the branch that should receive the objects (e.g. `main`):
+    All `SQLRecord` objects that have `branch_id` equal to the source branch's id
+    are updated to the current branch's id. Example:
 
     ```
     lamin switch main  # swich to the main branch
     lamin merge my_branch  # after this all objects on my_branch will be on main
     ```
+
+    Find more info in the :class:`~lamindb.Branch` document.
 
     → Python/R alternative: {func}`~lamindb.setup.merge`
     """
