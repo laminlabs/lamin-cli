@@ -498,6 +498,7 @@ def _describe(
     uid: str | None = None,
     key: str | None = None,
     name: str | None = None,
+    include: str | None = None,
 ):
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
@@ -567,7 +568,7 @@ def _describe(
             raise SystemExit(f"For entity '{entity}' you must pass --uid")
         record = ln.Run.get(uid)
 
-    record.describe()
+    record.describe(include=include if include == "comments" else None)
 
 
 @main.command()
@@ -576,11 +577,18 @@ def _describe(
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity (artifact, transform, collection).")
 @click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
+@click.option(
+    "--include",
+    type=click.Choice(["comments"]),
+    default=None,
+    help="Include additional content (e.g. 'comments' for readme and comment blocks).",
+)
 def describe(
     entity: str = "artifact",
     uid: str | None = None,
     key: str | None = None,
     name: str | None = None,
+    include: str | None = None,
 ):
     """Describe an object.
 
@@ -601,11 +609,13 @@ def describe(
     lamin describe ulabel --name "My ULabel"
     lamin describe branch  # defaults to current branch
     lamin describe branch --name main
+    # with readme and comment blocks
+    lamin describe artifact --key my_artifact.parquet --include comments
     ```
 
     → Python/R alternative: {meth}`~lamindb.Artifact.describe`
     """
-    _describe(entity=entity, uid=uid, key=key, name=name)
+    _describe(entity=entity, uid=uid, key=key, name=name, include=include)
 
 
 @main.command()
@@ -614,18 +624,25 @@ def describe(
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity (artifact, transform, collection).")
 @click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
+@click.option(
+    "--include",
+    type=click.Choice(["comments"]),
+    default=None,
+    help="Include additional content (e.g. 'comments' for readme and comment blocks).",
+)
 def get(
     entity: str = "artifact",
     uid: str | None = None,
     key: str | None = None,
     name: str | None = None,
+    include: str | None = None,
 ):
     """Query metadata about an object.
 
     Currently equivalent to `lamin describe`.
     """
     logger.warning("please use `lamin describe` instead of `lamin get` to describe")
-    _describe(entity=entity, uid=uid, key=key, name=name)
+    _describe(entity=entity, uid=uid, key=key, name=name, include=include)
 
 
 @main.command()
