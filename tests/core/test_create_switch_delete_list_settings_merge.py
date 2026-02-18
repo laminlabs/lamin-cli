@@ -103,6 +103,20 @@ def test_switch_nonexistent_branch():
     )
 
 
+def test_switch_create_existing_branch_raises():
+    """Switch with -c/--create and existing branch exits non-zero with hint to omit -c."""
+    result = subprocess.run(
+        "lamin switch -c main",
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    assert result.returncode != 0
+    err_output = result.stderr + result.stdout
+    assert "already exists" in err_output.lower()
+    assert "-c/--create" in err_output or "Omit" in err_output
+
+
 def test_switch_backward_compat():
     """Backward compat: lamin switch branch X and lamin switch space Y still work (deprecated)."""
     exit_status = os.system("lamin switch branch archive")
