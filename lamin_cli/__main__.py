@@ -35,24 +35,24 @@ if TYPE_CHECKING:
 COMMAND_GROUPS = {
     "lamin": [
         {
-            "name": "Manage connections",
+            "name": "Manage the default database",
             "commands": ["connect", "info", "init", "disconnect"],
         },
         {
-            "name": "Load, save, create & delete data",
+            "name": "Load, save, create & delete",
             "commands": ["load", "save", "create", "delete"],
         },
         {
-            "name": "Tracking within shell scripts",
-            "commands": ["track", "finish"],
+            "name": "Describe, update, annotate & list",
+            "commands": ["describe", "annotate", "update", "get", "list"],
         },
         {
-            "name": "Describe, annotate & list data",
-            "commands": ["describe", "annotate", "list"],
-        },
-        {
-            "name": "Change management",
+            "name": "Manage changes",
             "commands": ["switch", "merge"],
+        },
+        {
+            "name": "Track within shell scripts",
+            "commands": ["track", "finish"],
         },
         {
             "name": "Configure",
@@ -493,6 +493,28 @@ DESCRIBE_ENTITIES_UID_ONLY = {"run"}
 DESCRIBE_ENTITIES = (
     DESCRIBE_ENTITIES_KEY | DESCRIBE_ENTITIES_NAME | DESCRIBE_ENTITIES_UID_ONLY
 )
+UPDATE_ENTITIES_KEY = {"artifact", "transform", "collection"}
+UPDATE_ENTITIES_NAME = {"project", "branch"}
+UPDATE_ENTITIES = UPDATE_ENTITIES_KEY | UPDATE_ENTITIES_NAME
+STATUS_FIELD_ENTITIES = {"branch"}
+DESCRIPTION_FIELD_ENTITIES = UPDATE_ENTITIES_KEY | {"project"}
+BRANCH_STATUSES = ["standalone", "draft", "review", "merged", "closed"]
+
+
+def _resolve_entity_for_get_update(
+    entity: str,
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+):
+    import lamindb as ln
+
+    from lamin_cli._annotate import _get_obj
+
+    try:
+        return _get_obj(entity, key=key, uid=uid, name=name)
+    except ln.errors.InvalidArgument as e:
+        raise click.ClickException(str(e)) from None
 
 
 def _describe(
@@ -631,19 +653,138 @@ def describe(
     default=None,
     help="Include additional content (e.g. 'comments' for readme and comment blocks).",
 )
+@click.option(
+    "--status",
+    "status_field",
+    is_flag=True,
+    default=False,
+    help="Read branch status.",
+)
+@click.option(
+    "--description",
+    "description_field",
+    is_flag=True,
+    default=False,
+    help="Read the description field.",
+)
 def get(
-    entity: str = "artifact",
+    entity: str | None = None,
     uid: str | None = None,
     key: str | None = None,
     name: str | None = None,
     include: str | None = None,
+    status_field: bool = False,
+    description_field: bool = False,
 ):
-    """Query metadata about an object.
+    """Get a field value or describe an object.
 
-    Currently equivalent to `lamin describe`.
+    If no field flag is passed, this behaves like `lamin describe`.
+    If a field flag is passed, it reads that field from the resolved entity.
+
+    Examples:
+
+    ```
+    lamin get branch --status                # current branch status
+    lamin get branch --name my_branch --status
+    lamin get artifact --key my_file.parquet --description
+    ```
     """
-    logger.warning("please use `lamin describe` instead of `lamin get` to describe")
-    _describe(entity=entity, uid=uid, key=key, name=name, include=include)
+    if status_field and description_field:
+        raise click.ClickException("Pass only one of --status or --description.")
+    if include is not None and (status_field or description_field):
+        raise click.ClickException(
+            "--include can only be used in describe mode (without --status/--description)."
+        )
+
+    if status_field:
+        if entity is None:
+            raise click.ClickException(
+                "Pass an entity when reading a field, e.g. 'lamin get branch --status'."
+            )
+        if entity not in STATUS_FIELD_ENTITIES:
+            raise click.ClickException("--status is only supported for entity 'branch'.")
+        branch = _resolve_entity_for_get_update(entity, uid=uid, key=key, name=name)
+        click.echo(branch.status)
+        return
+
+    if description_field:
+        if entity is None:
+            raise click.ClickException(
+                "Pass an entity when reading a field, e.g. 'lamin get artifact --description'."
+            )
+        if entity not in DESCRIPTION_FIELD_ENTITIES:
+            raise click.ClickException(
+                "--description is only supported for: artifact, transform, collection, project."
+            )
+        record = _resolve_entity_for_get_update(entity, uid=uid, key=key, name=name)
+        click.echo(record.description)
+        return
+
+    _describe(entity=entity or "artifact", uid=uid, key=key, name=name, include=include)
+
+
+@main.command()
+@click.argument(
+    "entity", type=click.Choice(["artifact", "transform", "collection", "project", "branch"])
+)
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity (artifact, transform, collection).")
+@click.option("--name", help="The name for the entity (project, branch).")
+@click.option(
+    "--status",
+    type=click.Choice(BRANCH_STATUSES),
+    default=None,
+    help="Set branch status (branch only).",
+)
+@click.option(
+    "--description",
+    type=str,
+    default=None,
+    help="Set description (artifact, transform, collection, project).",
+)
+def update(
+    entity: Literal["artifact", "transform", "collection", "project", "branch"],
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+    status: str | None = None,
+    description: str | None = None,
+):
+    """Update mutable fields of an entity.
+
+    Examples:
+
+    ```
+    lamin update branch --status review                  # current branch
+    lamin update branch --name my_branch --status draft
+    lamin update artifact --key my_file.parquet --description "new description"
+    lamin update project --name my_project --description "updated project notes"
+    ```
+    """
+    if status is not None and description is not None:
+        raise click.ClickException("Pass only one of --status or --description.")
+    if status is None and description is None:
+        raise click.ClickException("Pass one of: --status or --description.")
+
+    if status is not None and entity != "branch":
+        raise click.ClickException("--status is only supported for entity 'branch'.")
+
+    if description is not None and entity not in DESCRIPTION_FIELD_ENTITIES:
+        raise click.ClickException(
+            "--description is only supported for: artifact, transform, collection, project."
+        )
+
+    record = _resolve_entity_for_get_update(entity, uid=uid, key=key, name=name)
+
+    if status is not None:
+        record.status = status
+        record.save()
+        logger.important(f"updated {entity}: status='{status}'")
+        return
+
+    record.description = description
+    record.save()
+    logger.important(f"updated {entity}: description")
 
 
 @main.command()
