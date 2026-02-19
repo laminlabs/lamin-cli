@@ -597,7 +597,7 @@ def _describe(
 
 @main.command()
 # entity can be a registry or an object in the registry
-@click.argument("entity", type=str, required=False)
+@click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity (artifact, transform, collection).")
 @click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
