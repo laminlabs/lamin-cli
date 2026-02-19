@@ -687,7 +687,6 @@ def get(
     lamin get branch --status                # current branch status
     lamin get branch --name my_branch --status
     lamin get artifact --key my_file.parquet --description
-    lamin get                                # same behavior as lamin describe
     ```
     """
     if status_field and description_field:
