@@ -35,24 +35,24 @@ if TYPE_CHECKING:
 COMMAND_GROUPS = {
     "lamin": [
         {
-            "name": "Manage connections",
+            "name": "Manage the default database",
             "commands": ["connect", "info", "init", "disconnect"],
         },
         {
-            "name": "Load, save, create & delete data",
-            "commands": ["load", "save", "create", "update", "get", "delete"],
+            "name": "Load, save, create & delete",
+            "commands": ["load", "save", "create", "delete"],
         },
         {
-            "name": "Tracking within shell scripts",
-            "commands": ["track", "finish"],
+            "name": "Describe, update, annotate & list",
+            "commands": ["describe", "annotate", "update", "get", "list"],
         },
         {
-            "name": "Describe, annotate & list data",
-            "commands": ["describe", "annotate", "list"],
-        },
-        {
-            "name": "Change management",
+            "name": "Manage changes",
             "commands": ["switch", "merge"],
+        },
+        {
+            "name": "Track within shell scripts",
+            "commands": ["track", "finish"],
         },
         {
             "name": "Configure",
