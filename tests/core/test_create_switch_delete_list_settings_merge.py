@@ -130,6 +130,9 @@ def test_switch_backward_compat():
     assert result.returncode == 0
     assert result.stdout.strip().split("\n")[-1] == "archive"
     exit_status = os.system("lamin switch branch main")
+    # lamin switch --branch <name> (hidden flag, same as lamin switch <name>)
+    exit_status = os.system("lamin switch --branch main")
+    assert exit_status == 0
     # lamin switch space <name> should switch space
     exit_status = os.system("lamin switch space all")
     assert exit_status == 0
