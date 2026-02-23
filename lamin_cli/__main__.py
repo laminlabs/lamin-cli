@@ -310,11 +310,13 @@ def list_(registry: Literal["branch", "space"]):
 @main.command()
 @click.argument("target", type=str, nargs=-1, required=False)  # TODO: remove nargs=-1 once deprecated form is removed
 @click.option("--space", is_flag=True, default=False, help="Switch space instead of branch.")
+@click.option("--branch", is_flag=True, default=False, hidden=True)  # backward compat, no effect
 @click.option("-c", "--create", is_flag=True, default=False, help="Create branch if it does not exist.")
 # fmt: on
 def switch(
     target: tuple[str, ...],
     space: bool = False,
+    branch: bool = False,  # backward compat, no effect
     create: bool = False,
 ):
     """Switch between branches.
