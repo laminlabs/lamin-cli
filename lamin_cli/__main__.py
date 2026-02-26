@@ -416,6 +416,18 @@ def info(schema: bool):
         click.echo(settings_)
 
 
+@main.command()
+@click.argument("instance", type=str, default=None)
+def repl(instance: str):
+    """Run a tracked interactive python shell."""
+    from lamindb_setup import settings as settings_
+
+    from lamin_cli._repl import LaminConsole
+
+    settings_.auto_connect = False
+    LaminConsole().tracked_interact(instance)
+
+
 # fmt: off
 @main.command()
 # entity can be a registry or an object in the registry
