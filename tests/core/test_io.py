@@ -24,7 +24,7 @@ def test_snapshot():
         assert exit_status == 0
         after_snapshot = datetime.now(timezone.utc)
 
-        path = UPath("s3://lamin-site-assets/.lamindb/lamin.db.gz")
+        path = UPath.from_auth("s3://lamin-site-assets/.lamindb/lamin.db.gz")
         assert path.exists()
 
         stat = path.stat()
