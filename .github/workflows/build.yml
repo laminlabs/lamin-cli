@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_groups: ${{ steps.set-matrix.outputs.has_groups }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -26,15 +25,12 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          BASE_GROUPS=$(jq -n -c '[]')
-          # Run everything on push or when modal paths change
+          BASE_GROUPS=$(jq -n -c '["core"]')
+          # Run modal on push or when modal paths change
           if [[ "${{ github.event_name }}" == "push" || "${{ steps.changes.outputs.modal }}" == "true" ]]; then
             MATRIX=$(jq -n -c --argjson groups "$BASE_GROUPS" '{group: ($groups + ["modal"])}')
-            echo "has_groups=true" >> $GITHUB_OUTPUT
-          # Otherwise only run base groups
           else
             MATRIX=$(jq -n -c --argjson groups "$BASE_GROUPS" '{group: $groups}')
-            echo "has_groups=false" >> $GITHUB_OUTPUT
           fi
           # Output as single line for GitHub Actions
           echo "matrix=$(echo "$MATRIX" | jq -c .)" >> $GITHUB_OUTPUT
@@ -44,7 +40,6 @@ jobs:
 
   test:
     needs: pre-filter
-    if: needs.pre-filter.outputs.has_groups == 'true'
     runs-on: ubuntu-latest
     env:
       LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
@@ -66,8 +61,14 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
       - run: pip install git+https://github.com/laminlabs/laminci
-      - run: uv pip install --system modal pytest
+      - run: uv pip install --system pytest
+      - run: uv pip install --system modal
+        if: ${{ matrix.group == 'modal' }}
       - run: modal token set --token-id ${{ secrets.MODAL_DEV_TOKEN_ID }} --token-secret ${{ secrets.MODAL_DEV_TOKEN_SECRET }}
+        if: ${{ matrix.group == 'modal' }}
       - run: nox -s setup
       - run: lamin login
+      - run: pytest tests/core
+        if: ${{ matrix.group == 'core' }}
       - run: pytest tests/modal
+        if: ${{ matrix.group == 'modal' }}
