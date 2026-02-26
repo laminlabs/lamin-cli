@@ -105,31 +105,34 @@ def strip_plan_header(content: str) -> str | None:
 
 
 def parse_plan_markdown(content: str) -> str | None:
-    """Parse description from plan markdown front matter (name + overview).
+    """Parse description from plan markdown front matter (overview only).
 
-    Expects optional YAML-like header between --- with name: and overview:.
-    Returns concatenated description or None if neither field exists.
+    Expects optional YAML-like header between --- and returns `overview`.
+    Returns None if `overview` doesn't exist.
     """
     # Match --- ... --- at start of file (front matter)
     front_matter_match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
     if not front_matter_match:
         return None
     block = front_matter_match.group(1)
-    name = None
     overview = None
+    current_field = None
     for line in block.split("\n"):
-        if line.startswith("name:"):
-            name = line[5:].strip()
-        elif line.startswith("overview:"):
-            overview = line[9:].strip()
-        elif name or overview:
-            # Continuation of previous field (indented)
-            if line.startswith(" ") and overview is not None:
-                overview += " " + line.strip()
-            elif line.startswith(" ") and name is not None:
-                name += " " + line.strip()
-    parts = [p for p in (name, overview) if p]
-    return ". ".join(parts) if parts else None
+        stripped = line.strip()
+        if ":" in line and not line.startswith(" "):
+            key, _, value = line.partition(":")
+            current_field = key.strip()
+            if current_field == "overview":
+                overview = value.strip()
+            continue
+        # only continue multiline value when we are still in the overview field
+        if (
+            line.startswith(" ")
+            and current_field == "overview"
+            and overview is not None
+        ):
+            overview += " " + stripped
+    return overview or None
 
 
 def save(
