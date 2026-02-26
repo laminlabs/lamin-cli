@@ -68,6 +68,11 @@ jobs:
         if: ${{ matrix.group == 'modal' }}
       - run: nox -s setup
       - run: lamin login
+        env:
+          LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER2 }}
+      - run: lamin login
+        env:
+          LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
       - run: pytest tests/core
         if: ${{ matrix.group == 'core' }}
       - run: pytest tests/modal
