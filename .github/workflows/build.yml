@@ -61,7 +61,7 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
       - run: pip install git+https://github.com/laminlabs/laminci
-      - run: uv pip install --system pytest
+      - run: uv pip install --system pytest nbproject_test
       - run: uv pip install --system modal
         if: ${{ matrix.group == 'modal' }}
       - run: modal token set --token-id ${{ secrets.MODAL_DEV_TOKEN_ID }} --token-secret ${{ secrets.MODAL_DEV_TOKEN_SECRET }}
