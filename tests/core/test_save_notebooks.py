@@ -9,14 +9,14 @@ import pytest
 from nbclient.exceptions import CellExecutionError
 from nbproject.dev import read_notebook, write_notebook
 
-notebook_dir = "./sub/lamin-cli/tests/notebooks/"
+notebook_dir = Path(__file__).resolve().parents[1] / "notebooks"
 
 
 def test_save_not_initialized():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     result = subprocess.run(
-        f"lamin save {notebook_dir}not-initialized.ipynb",
+        f"lamin save {notebook_dir / 'not-initialized.ipynb'}",
         shell=True,
         capture_output=True,
         env=env,
@@ -28,7 +28,7 @@ def test_save_non_consecutive():
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     notebook_path = Path(
-        f"{notebook_dir}with-title-and-initialized-non-consecutive.ipynb"
+        notebook_dir / "with-title-and-initialized-non-consecutive.ipynb"
     ).resolve()
 
     # here, we're mimicking a non-consecutive run
@@ -56,7 +56,7 @@ def test_save_non_consecutive():
 
 def test_save_consecutive_user_passes_uid():
     notebook_path = Path(
-        f"{notebook_dir}with-title-and-initialized-consecutive.ipynb"
+        notebook_dir / "with-title-and-initialized-consecutive.ipynb"
     ).resolve()
     env = os.environ
     env["LAMIN_TESTING"] = "true"
