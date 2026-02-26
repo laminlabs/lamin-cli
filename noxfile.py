@@ -12,4 +12,4 @@ def setup(session):
     branch = "main" if IS_PR else "release"
     install_lamindb(session, branch=branch)
     # Ensure tests use the CLI code from this checkout, not a dependency-pulled install.
-    session.install("-e", ".")
+    session.run("pip", "install", "-e", ".")
