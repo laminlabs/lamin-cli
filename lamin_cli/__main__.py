@@ -333,11 +333,25 @@ def switch(
     lamin switch -c my_branch
     ```
 
+    To annotate the current branch with a `README.md`, run:
+
+    ```
+    lamin annotate branch --readme README.md
+    ```
+
+    To comment on the current branch, run:
+
+    ```
+    lamin annotate branch --comment "I think we should revisit this, tomorrow, WDYT?"
+    ```
+
     To switch to a target space, pass `--space`:
 
     ```
     lamin switch --space my_space
     ```
+
+    Find more info in the {class}`~lamindb.Branch` and {class}`~lamindb.Space` documents.
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
@@ -383,7 +397,7 @@ def merge(branch: str):
     lamin merge my_branch  # after this all objects on my_branch will be on main
     ```
 
-    Find more info in the :class:`~lamindb.Branch` document.
+    Find more info in the {class}`~lamindb.Branch` document.
 
     → Python/R alternative: {func}`~lamindb.setup.merge`
     """
