@@ -6,6 +6,7 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
+from lamindb_setup.core._settings_store import current_modules_file
 
 
 def test_create_project():
@@ -272,3 +273,24 @@ def test_settings_cache_get_set_reset():
         )
         if tmp_dir.exists():
             shutil.rmtree(tmp_dir)
+
+
+def test_settings_modules_set():
+    path = current_modules_file()
+    original = path.read_text().strip() if path.exists() else None
+
+    try:
+        result_set = subprocess.run(
+            "lamin settings modules set bionty,pertdb",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result_set.returncode == 0
+        assert path.exists()
+        assert path.read_text().strip() == "bionty,pertdb"
+    finally:
+        if original is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_text(original)
