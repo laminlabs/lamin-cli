@@ -277,7 +277,7 @@ def test_settings_cache_get_set_reset():
 
 def test_settings_modules_set():
     path = current_modules_file()
-    original = path.read_text().strip() if path.exists() else None
+    original = path.read_text() if path.exists() else None
 
     try:
         result_set = subprocess.run(
@@ -289,6 +289,16 @@ def test_settings_modules_set():
         assert result_set.returncode == 0
         assert path.exists()
         assert path.read_text().strip() == "bionty,pertdb"
+
+        result_set_empty = subprocess.run(
+            'lamin settings modules set ""',
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result_set_empty.returncode == 0
+        assert path.exists()
+        assert path.read_text() == ""
     finally:
         if original is None:
             path.unlink(missing_ok=True)
