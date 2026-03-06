@@ -12,12 +12,13 @@ else:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage development & cache directories, branch, and space settings.
+    """Manage development, cache, modules, branch, and space settings.
 
     Get or set a setting by name:
 
     - `dev-dir` → development directory {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
     - `cache-dir` → cache directory {attr}`~lamindb.setup.core.SetupSettings.cache_dir`
+    - `modules` → environment schema modules {attr}`~lamindb.setup.core.SetupSettings.modules`
     - `branch` → branch {attr}`~lamindb.setup.core.SetupSettings.branch`
     - `space` → space {attr}`~lamindb.setup.core.SetupSettings.space`
 
@@ -35,6 +36,10 @@ def settings(ctx):
     lamin settings cache-dir get
     lamin settings cache-dir set /path/to/cache
     lamin settings cache-dir clear
+    # modules
+    lamin settings modules get
+    lamin settings modules set bionty,pertdb
+    lamin settings modules unset
     # branch
     lamin settings branch get
     lamin settings branch set main
@@ -43,7 +48,7 @@ def settings(ctx):
     lamin settings space set all
     ```
 
-    → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
+    → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.modules`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
     if ctx.invoked_subcommand is None:
         from lamindb_setup import settings as settings_
@@ -91,6 +96,48 @@ def dev_dir_unset():
 
 
 settings.add_command(dev_dir_group)
+
+
+# -----------------------------------------------------------------------------
+# modules group (pattern: lamin settings modules get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("modules")
+def modules_group():
+    """Get or set environment schema modules."""
+
+
+@modules_group.command("get")
+def modules_get():
+    """Show current environment schema modules."""
+    from lamindb_setup import settings as settings_
+
+    modules = sorted(settings_.modules)
+    click.echo(",".join(modules) if modules else "None")
+
+
+@modules_group.command("set")
+@click.argument("value", type=str)
+def modules_set(value: str):
+    """Set environment schema modules as a comma-separated string."""
+    from lamindb_setup import settings as settings_
+
+    if value.lower() == "none":
+        settings_.modules = None
+    else:
+        settings_.modules = value
+
+
+@modules_group.command("unset")
+def modules_unset():
+    """Unset environment schema modules."""
+    from lamindb_setup import settings as settings_
+
+    settings_.modules = None
+
+
+settings.add_command(modules_group)
 
 
 # -----------------------------------------------------------------------------
