@@ -393,7 +393,7 @@ def merge(branch: str):
     are updated to the current branch's id. Example:
 
     ```
-    lamin switch main  # swich to the main branch
+    lamin switch main  # switch to the main branch
     lamin merge my_branch  # after this all objects on my_branch will be on main
     ```
 
