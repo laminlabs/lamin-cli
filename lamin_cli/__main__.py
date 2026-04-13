@@ -846,19 +846,17 @@ def save(
     lamin save my_script.py --key my_scripts/my_script.py --project my_project
     ```
 
-    Transforms: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
+    The `save` command defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
-    Save a **markdown file** as a record:
+    Save a **markdown file** as a record (resolving `my-topic` as a record type):
 
     ```
     lamin save my-topic/my-note.md  # omit --key
     ```
 
-    This resolves `my-topic` as a record type.
-
-    Plans: Saves agent plans as artifacts with inferred `key`, `kind`, and `description`, e.g.:
+    Saves **agent plans** as artifacts with inferred `key`, `kind`, and `description` (detects `.plan.md` suffix or `.claude/plans/` folder):
 
     ```
     lamin save /path/to/.cursor/plans/my_task.plan.md
@@ -874,7 +872,7 @@ def save(
 
     ```
 
-    git: When saving scripts, files will be synced with a git repo if you set:
+    **git:** When saving scripts, files will be synced with a git repo if you set:
 
     ```
     export LAMINDB_SYNC_GIT_REPO=https://github.com/org/repo
