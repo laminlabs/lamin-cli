@@ -26,17 +26,18 @@ def test_save_markdown_note_creates_record_and_recordblock():
     note_path.write_text("# First version\n\nhello")
 
     try:
+        ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
 
-        result = run_lamin("save", str(note_path), "--branch", branch.name)
+        result = run_lamin("save", str(note_path))
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
         assert "saved note:" in result.stdout
 
         note_record = (
-            ln.Record.filter(name=note_name, type=type_record, branch=branch)
+            ln.Record.filter(name=note_name, type=type_record)
             .order_by("-created_at")
             .first()
         )
@@ -48,7 +49,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert "First version" in readmes.first().content
 
         note_path.write_text("# Second version\n\nhello again")
-        result = run_lamin("save", str(note_path), "--branch", branch.name)
+        result = run_lamin("save", str(note_path))
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -58,6 +59,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert "Second version" in readmes.last().content
         assert readmes.last().is_latest
     finally:
+        ln.setup.switch("main")
         run_lamin("settings", "dev-dir", "unset")
         note_path.unlink(missing_ok=True)
         if note_dir.exists() and not any(note_dir.iterdir()):

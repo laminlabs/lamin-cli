@@ -153,23 +153,15 @@ def _save_note_markdown(
     *,
     topic: str,
     note_name: str,
-    branch_record,
 ) -> None:
     import lamindb as ln
 
     from lamin_cli._annotate import _add_block
 
-    main_branch = ln.Branch.get(name="main")
     type_record = ln.Record.filter(
         name=topic,
         is_type=True,
     ).one_or_none()
-    if type_record is None and branch_record.id != main_branch.id:
-        type_record = ln.Record.filter(
-            name=topic,
-            is_type=True,
-            branch=main_branch,
-        ).one_or_none()
     if type_record is None:
         raise click.ClickException(
             f"Record type '{topic}' not found. Create it explicitly first, e.g. "
@@ -184,7 +176,6 @@ def _save_note_markdown(
         note_record = ln.Record(
             name=note_name,
             type=type_record,
-            is_type=True,  # notes are types and should show up in the hierarchy on the sidebar
         ).save()
         logger.important(
             f"created note record: Record('{note_record.uid}', name='{note_record.name}')"
@@ -196,12 +187,9 @@ def _save_note_markdown(
         "record",
         content,
         kind="readme",
-        branch=branch_record,
     )
     logger.important(f"saved note readme block: RecordBlock('{block.uid}')")
-    logger.important(
-        f"saved note: type='{type_record.name}' note='{note_record.name}' branch='{branch_record.name}'"
-    )
+    logger.important(f"saved note: type='{type_record.name}' note='{note_record.name}'")
 
 
 def save(
@@ -298,7 +286,6 @@ def save(
             Path(ppath),
             topic=topic,
             note_name=note_name,
-            branch_record=branch_record,
         )
         return None
 
