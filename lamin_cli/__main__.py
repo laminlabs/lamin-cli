@@ -849,8 +849,9 @@ def save(
     lamin save my-topic/my-note.md  # omit --key, this resolves `my-topic` as a record type
     ```
 
-    The `save` command defaults to saving `.md` files as {class}`~lamindb.Record` if ommitting `--key` and to saving
-    `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform`.
+    The `save` command defaults to saving
+    `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform`
+    and - if ommitting `--key` - to saving `.md` files as {class}`~lamindb.Record`.
     You can enforce saving a file as an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
     You can pass a project to `--project` to label the artifact by project.
