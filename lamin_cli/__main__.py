@@ -837,9 +837,6 @@ def save(
     lamin save my_table.csv --key my_tables/my_table.csv
     ```
 
-    You can pass a project to `--project` to label the artifact by project.
-    If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
-
     Save **source code** as {class}`~lamindb.Transform`:
 
     ```
@@ -856,14 +853,17 @@ def save(
     `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform`.
     You can enforce saving a file as an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
-    Save an **agent plan** as artifacts with inferred `key`, `kind`, and `description` (detects `.plan.md` suffix or `.claude/plans/` folder):
+    You can pass a project to `--project` to label the artifact by project.
+    If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
+
+    Save an **agent plan** as {class}`~lamindb.Artifact`:
 
     ```
     lamin save /path/to/.cursor/plans/my_task.plan.md
     lamin save /path/to/.claude/plans/my_task.md
     ```
 
-    ```{dropdown} How are plans handled?
+    ```{dropdown} How are agent plans handled?
 
     Plan files are detected by suffix `.plan.md` (Cursor) or by being under `.claude/plans/`
     (Claude Code). For such paths, the `key` defaults to `.plans/<filename>`, the artifact `kind`
