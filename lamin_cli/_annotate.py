@@ -77,11 +77,35 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
     return ln.Run.get(uid)
 
 
-def _add_block(obj, registry: str, content: str, *, kind: str = "readme"):
+def _resolve_block_branch(obj, branch=None):
+    if branch is not None:
+        return branch
+    obj_branch = getattr(obj, "branch", None)
+    if obj_branch is not None:
+        return obj_branch
+    import lamindb_setup as ln_setup
+
+    return ln_setup.settings.branch
+
+
+def _add_block(
+    obj,
+    registry: str,
+    content: str,
+    *,
+    kind: str = "readme",
+    branch=None,
+):
     """Create and add a block (readme or comment) to entity."""
     import lamindb as ln
 
-    block_kwargs = {"content": content, "kind": kind}
+    block_branch = _resolve_block_branch(obj, branch=branch)
+    block_kwargs = {
+        "content": content,
+        "kind": kind,
+        "branch": block_branch,
+        "created_on": block_branch,
+    }
     block = {
         "artifact": lambda: ln.models.ArtifactBlock(artifact=obj, **block_kwargs),
         "transform": lambda: ln.models.TransformBlock(transform=obj, **block_kwargs),
@@ -96,6 +120,7 @@ def _add_block(obj, registry: str, content: str, *, kind: str = "readme"):
         "space": lambda: ln.models.SpaceBlock(space=obj, **block_kwargs),
     }[registry]()
     obj.ablocks.add(block, bulk=False)
+    return block
 
 
 def _parse_features_list(features_list: tuple) -> dict:

@@ -135,6 +135,78 @@ def parse_plan_markdown(content: str) -> str | None:
     return overview or None
 
 
+def _extract_note_target(path: Path, *, dev_dir: Path | None) -> tuple[str, str] | None:
+    """Parse <topic>/<note>.md from a path under dev-dir."""
+    if path.suffix != ".md" or dev_dir is None:
+        return None
+    try:
+        relative_path = path.resolve().relative_to(dev_dir.resolve())
+    except ValueError:
+        return None
+    if relative_path.parent == Path():
+        return None
+    return relative_path.parent.as_posix(), relative_path.stem
+
+
+def _save_note_markdown(
+    ppath: Path,
+    *,
+    topic: str,
+    note_name: str,
+    branch_record,
+) -> None:
+    import lamindb as ln
+
+    from lamin_cli._annotate import _add_block
+
+    main_branch = ln.Branch.get(name="main")
+    type_record = ln.Record.filter(
+        name=topic,
+        is_type=True,
+        branch=branch_record,
+    ).one_or_none()
+    if type_record is None and branch_record.id != main_branch.id:
+        type_record = ln.Record.filter(
+            name=topic,
+            is_type=True,
+            branch=main_branch,
+        ).one_or_none()
+    if type_record is None:
+        raise click.ClickException(
+            f"Record type '{topic}' not found. Create it explicitly first, e.g. "
+            f"`ln.Record(name={topic!r}, is_type=True).save()`."
+        )
+
+    note_record = ln.Record.filter(
+        name=note_name,
+        type=type_record,
+        branch=branch_record,
+    ).one_or_none()
+    if note_record is None:
+        note_record = ln.Record(
+            name=note_name,
+            type=type_record,
+            branch=branch_record,
+            branch_id=branch_record.id,
+        ).save()
+        logger.important(
+            f"created note record: Record('{note_record.uid}', name='{note_record.name}')"
+        )
+
+    content = ppath.read_text()
+    block = _add_block(
+        note_record,
+        "record",
+        content,
+        kind="readme",
+        branch=branch_record,
+    )
+    logger.important(f"saved note readme block: RecordBlock('{block.uid}')")
+    logger.important(
+        f"saved note: type='{type_record.name}' note='{note_record.name}' branch='{branch_record.name}'"
+    )
+
+
 def save(
     path: Path | str,
     key: str | None = None,
@@ -214,8 +286,24 @@ def save(
             raise click.ClickException(
                 f"Branch '{branch}' not found, either create it with `ln.Branch(name='...').save()` or fix typos."
             )
+    if branch_record is None:
+        branch_record = ln_setup.settings.branch
 
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
+    note_target = (
+        _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
+        if isinstance(ppath, LocalPathClasses) and key is None and not saving_plan
+        else None
+    )
+    if note_target is not None:
+        topic, note_name = note_target
+        _save_note_markdown(
+            Path(ppath),
+            topic=topic,
+            note_name=note_name,
+            branch_record=branch_record,
+        )
+        return None
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True

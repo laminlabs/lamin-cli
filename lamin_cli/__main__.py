@@ -829,9 +829,9 @@ def save(
     branch: str,
     registry: Literal["artifact", "transform"] | None,
 ):
-    """Save a file or folder as an artifact or transform.
+    """Save a file or folder as an artifact, transform, or record.
 
-    Example:
+    Save a **file or folder** as an artifact:
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv --project my_project
@@ -840,9 +840,23 @@ def save(
     By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
     If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
 
+    Save source code as a transform:
+
+    ```
+    lamin save my_script.py --key my_scripts/my_script.py --project my_project
+    ```
+
     Transforms: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
     other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
     an {class}`~lamindb.Artifact` by passing `--registry artifact`.
+
+    Save a **markdown file** as a record:
+
+    ```
+    lamin save my-topic/my-note.md  # omit --key
+    ```
+
+    This resolves `my-topic` as a record type.
 
     Plans: Saves agent plans as artifacts with inferred `key`, `kind`, and `description`, e.g.:
 
