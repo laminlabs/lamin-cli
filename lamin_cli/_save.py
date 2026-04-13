@@ -163,7 +163,6 @@ def _save_note_markdown(
     type_record = ln.Record.filter(
         name=topic,
         is_type=True,
-        branch=branch_record,
     ).one_or_none()
     if type_record is None and branch_record.id != main_branch.id:
         type_record = ln.Record.filter(
@@ -180,14 +179,12 @@ def _save_note_markdown(
     note_record = ln.Record.filter(
         name=note_name,
         type=type_record,
-        branch=branch_record,
     ).one_or_none()
     if note_record is None:
         note_record = ln.Record(
             name=note_name,
             type=type_record,
-            branch=branch_record,
-            branch_id=branch_record.id,
+            is_type=True,  # notes are types and should show up in the hierarchy on the sidebar
         ).save()
         logger.important(
             f"created note record: Record('{note_record.uid}', name='{note_record.name}')"
