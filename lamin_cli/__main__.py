@@ -831,32 +831,32 @@ def save(
 ):
     """Save a file or folder as an `artifact`, `transform`, or `record`.
 
-    Save a **dataset** or **model** as an `artifact`:
+    Save a **dataset** or **model** as {class}`~lamindb.Artifact`:
 
     ```
-    lamin save my_table.csv --key my_tables/my_table.csv --project my_project
+    lamin save my_table.csv --key my_tables/my_table.csv
     ```
 
-    By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
+    You can pass a project to `--project` to label the artifact by project.
     If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
 
-    Save **source code** as a `transform`:
+    Save **source code** as {class}`~lamindb.Transform`:
 
     ```
-    lamin save my_script.py --key my_scripts/my_script.py --project my_project
+    lamin save my_script.py --key my_scripts/my_script.py
     ```
 
-    The `save` command defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
-    other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
-    an {class}`~lamindb.Artifact` by passing `--registry artifact`.
-
-    Save a **markdown notes** as a `record` by omitting `--key`:
+    Save a **markdown note** as {class}`~lamindb.Record`:
 
     ```
-    lamin save my-topic/my-note.md  # this resolves `my-topic` as a record type
+    lamin save my-topic/my-note.md  # omit --key, this resolves `my-topic` as a record type
     ```
 
-    Saves **agent plans** as artifacts with inferred `key`, `kind`, and `description` (detects `.plan.md` suffix or `.claude/plans/` folder):
+    The `save` command defaults to saving `.md` files as {class}`~lamindb.Record` if ommitting `--key` and to saving
+    `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform`.
+    You can enforce saving a file as an {class}`~lamindb.Artifact` by passing `--registry artifact`.
+
+    Save an **agent plan** as artifacts with inferred `key`, `kind`, and `description` (detects `.plan.md` suffix or `.claude/plans/` folder):
 
     ```
     lamin save /path/to/.cursor/plans/my_task.plan.md
