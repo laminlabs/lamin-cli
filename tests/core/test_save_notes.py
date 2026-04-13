@@ -34,7 +34,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        assert "saved note:" in result.stdout
+        assert "saved note" in result.stdout
 
         note_record = (
             ln.Record.filter(name=note_name, type=type_record)
@@ -100,3 +100,51 @@ def test_save_markdown_note_requires_existing_type():
             note_dir.rmdir()
         if notes_root.exists() and not any(notes_root.iterdir()):
             notes_root.rmdir()
+
+
+def test_save_markdown_note_type_match_is_case_insensitive():
+    topic_type_name = "Blog"
+    topic_folder_name = "blog"
+    note_name = "case-sensitive-note"
+    branch = ln.Branch(name="cli_notes_case_branch").save()
+    type_record = ln.Record(name=topic_type_name, is_type=True).save()
+
+    notes_root = Path(__file__).parent / "notes_case_insensitive"
+    note_dir = notes_root / topic_folder_name
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / f"{note_name}.md"
+    note_path.write_text("# Case mapping")
+
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+
+        result = run_lamin("save", str(note_path))
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+
+        note_record = (
+            ln.Record.filter(name=note_name, type=type_record)
+            .order_by("-created_at")
+            .first()
+        )
+        assert note_record is not None
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset")
+        note_path.unlink(missing_ok=True)
+        if note_dir.exists() and not any(note_dir.iterdir()):
+            note_dir.rmdir()
+        if notes_root.exists() and not any(notes_root.iterdir()):
+            notes_root.rmdir()
+        note_record = ln.Record.filter(
+            name=note_name, type=type_record, branch=branch
+        ).one_or_none()
+        if note_record is not None:
+            note_record.delete(permanent=True)
+        if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
+            type_record.refresh_from_db()
+            type_record.delete(permanent=True)
+        branch.delete(permanent=True)

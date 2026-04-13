@@ -159,7 +159,7 @@ def _save_note_markdown(
     from lamin_cli._annotate import _add_block
 
     type_record = ln.Record.filter(
-        name=topic,
+        name__iexact=topic,
         is_type=True,
     ).one_or_none()
     if type_record is None:

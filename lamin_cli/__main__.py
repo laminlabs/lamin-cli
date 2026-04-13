@@ -35,12 +35,12 @@ if TYPE_CHECKING:
 COMMAND_GROUPS = {
     "lamin": [
         {
-            "name": "Manage the default database",
+            "name": "Configure your environment",
             "commands": ["connect", "info", "init", "disconnect"],
         },
         {
-            "name": "Load, save, create & delete",
-            "commands": ["load", "save", "create", "delete"],
+            "name": "Save, load, create & delete",
+            "commands": ["save", "load", "create", "delete"],
         },
         {
             "name": "Describe, update, annotate & list",
@@ -55,7 +55,7 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Configure",
+            "name": "Manage settings and migrations",
             "commands": ["settings", "migrate"],
         },
         {
@@ -178,9 +178,9 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Initialize an instance.
+    """Initialize a database instance.
 
-    This initializes a LaminDB instance, for example:
+    Examples:
 
     ```
     lamin init --storage ./mydata
