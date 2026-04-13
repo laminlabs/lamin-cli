@@ -290,6 +290,16 @@ def save(
         branch_record = ln_setup.settings.branch
 
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
+    if (
+        isinstance(ppath, LocalPathClasses)
+        and key is None
+        and not saving_plan
+        and not user_passed_registry
+        and _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
+        is not None
+    ):
+        registry = "record"
+
     if registry == "record":
         if ppath.suffix.lower() != ".md":
             raise click.ClickException(
@@ -300,21 +310,6 @@ def save(
                 "key is ignored for records, record identity comes from path"
             )
         topic, note_name = _resolve_note_target_or_raise(Path(ppath))
-        _save_note_markdown(Path(ppath), topic=topic, note_name=note_name)
-        return None
-
-    note_target = (
-        _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
-        if (
-            isinstance(ppath, LocalPathClasses)
-            and key is None
-            and not saving_plan
-            and not user_passed_registry
-        )
-        else None
-    )
-    if note_target is not None:
-        topic, note_name = note_target
         _save_note_markdown(Path(ppath), topic=topic, note_name=note_name)
         return None
 
