@@ -176,6 +176,7 @@ def _save_note_markdown(
         note_record = ln.Record(
             name=note_name,
             type=type_record,
+            is_type=True,  # notes should appear in the type hierarchy
         ).save()
         logger.important(
             f"created note record: Record('{note_record.uid}', name='{note_record.name}')"
@@ -188,8 +189,11 @@ def _save_note_markdown(
         content,
         kind="readme",
     )
-    logger.important(f"saved note readme block: RecordBlock('{block.uid}')")
-    logger.important(f"saved note: type='{type_record.name}' note='{note_record.name}'")
+    logger.important(f"saved note content: RecordBlock('{block.uid}')")
+    if ln.setup.settings.instance.is_remote:
+        slug = ln.setup.settings.instance.slug
+        ui_url = ln.setup.settings.instance.ui_url
+        logger.important(f"go to: {ui_url}/{slug}/record/{note_record.uid}")
 
 
 def save(

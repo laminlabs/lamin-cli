@@ -42,6 +42,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
             .first()
         )
         assert note_record is not None
+        assert note_record.is_type is True
         assert note_record.branch == branch
         readmes = note_record.ablocks.filter(kind="readme").order_by("created_at")
         assert readmes.count() == 1
