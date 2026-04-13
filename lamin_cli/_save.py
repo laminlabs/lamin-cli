@@ -196,6 +196,16 @@ def _save_note_markdown(
         logger.important(f"go to: {ui_url}/{slug}/record/{note_record.uid}")
 
 
+def _resolve_note_target_or_raise(ppath: Path) -> tuple[str, str]:
+    note_target = _extract_note_target(ppath, dev_dir=ln_setup.settings.dev_dir)
+    if note_target is None:
+        raise click.ClickException(
+            "To save as record, pass a markdown path under dev-dir in the form "
+            "<topic>/<note>.md."
+        )
+    return note_target
+
+
 def save(
     path: Path | str,
     key: str | None = None,
@@ -224,6 +234,7 @@ def save(
     if not ppath.exists():
         raise click.BadParameter(f"Path {ppath} does not exist", param_hint="path")
 
+    user_passed_registry = registry is not None
     if registry is None:
         registry = infer_registry_from_path(ppath)
 
@@ -279,18 +290,32 @@ def save(
         branch_record = ln_setup.settings.branch
 
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
+    if registry == "record":
+        if ppath.suffix.lower() != ".md":
+            raise click.ClickException(
+                "Saving as registry='record' requires a .md file."
+            )
+        if key is not None:
+            logger.warning(
+                "key is ignored for records, record identity comes from path"
+            )
+        topic, note_name = _resolve_note_target_or_raise(Path(ppath))
+        _save_note_markdown(Path(ppath), topic=topic, note_name=note_name)
+        return None
+
     note_target = (
         _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
-        if isinstance(ppath, LocalPathClasses) and key is None and not saving_plan
+        if (
+            isinstance(ppath, LocalPathClasses)
+            and key is None
+            and not saving_plan
+            and not user_passed_registry
+        )
         else None
     )
     if note_target is not None:
         topic, note_name = note_target
-        _save_note_markdown(
-            Path(ppath),
-            topic=topic,
-            note_name=note_name,
-        )
+        _save_note_markdown(Path(ppath), topic=topic, note_name=note_name)
         return None
 
     if registry == "artifact":
@@ -531,5 +556,5 @@ def save(
         return return_code
     else:
         raise click.ClickException(
-            "Allowed values for '--registry' are: 'artifact', 'transform'"
+            "Allowed values for '--registry' are: 'artifact', 'transform', 'record'"
         )

@@ -814,9 +814,9 @@ def update(
 @click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
 @click.option(
     "--registry",
-    type=click.Choice(["artifact", "transform"]),
+    type=click.Choice(["artifact", "transform", "record"]),
     default=None,
-    help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.",
+    help="Either 'artifact', 'transform', or 'record'. If not passed, chooses based on path suffix.",
 )
 def save(
     path: str,
@@ -827,7 +827,7 @@ def save(
     project: str,
     space: str,
     branch: str,
-    registry: Literal["artifact", "transform"] | None,
+    registry: Literal["artifact", "transform", "record"] | None,
 ):
     """Save a file or folder as an `artifact`, `transform`, or `record`.
 
