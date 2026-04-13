@@ -77,7 +77,13 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
     return ln.Run.get(uid)
 
 
-def _add_block(obj, registry: str, content: str, *, kind: str = "readme"):
+def _add_block(
+    obj,
+    registry: str,
+    content: str,
+    *,
+    kind: str = "readme",
+):
     """Create and add a block (readme or comment) to entity."""
     import lamindb as ln
 
@@ -96,6 +102,7 @@ def _add_block(obj, registry: str, content: str, *, kind: str = "readme"):
         "space": lambda: ln.models.SpaceBlock(space=obj, **block_kwargs),
     }[registry]()
     obj.ablocks.add(block, bulk=False)
+    return block
 
 
 def _parse_features_list(features_list: tuple) -> dict:

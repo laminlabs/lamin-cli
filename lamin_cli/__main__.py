@@ -35,12 +35,12 @@ if TYPE_CHECKING:
 COMMAND_GROUPS = {
     "lamin": [
         {
-            "name": "Manage the default database",
+            "name": "Configure your environment",
             "commands": ["connect", "info", "init", "disconnect"],
         },
         {
-            "name": "Load, save, create & delete",
-            "commands": ["load", "save", "create", "delete"],
+            "name": "Save, load, create & delete",
+            "commands": ["save", "load", "create", "delete"],
         },
         {
             "name": "Describe, update, annotate & list",
@@ -55,7 +55,7 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Configure",
+            "name": "Manage settings and migrations",
             "commands": ["settings", "migrate"],
         },
         {
@@ -178,9 +178,9 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Initialize an instance.
+    """Initialize a database instance.
 
-    This initializes a LaminDB instance, for example:
+    Examples:
 
     ```
     lamin init --storage ./mydata
@@ -219,7 +219,7 @@ def connect(instance: str):
 
 @main.command()
 def disconnect():
-    """Unset the default instance for auto-connection.
+    """Unset the default database instance for this environment.
 
     Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
 
@@ -814,9 +814,9 @@ def update(
 @click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
 @click.option(
     "--registry",
-    type=click.Choice(["artifact", "transform"]),
+    type=click.Choice(["artifact", "transform", "record"]),
     default=None,
-    help="Either 'artifact' or 'transform'. If not passed, chooses based on path suffix.",
+    help="Either 'artifact', 'transform', or 'record'. If not passed, chooses based on path suffix.",
 )
 def save(
     path: str,
@@ -827,31 +827,44 @@ def save(
     project: str,
     space: str,
     branch: str,
-    registry: Literal["artifact", "transform"] | None,
+    registry: Literal["artifact", "transform", "record"] | None,
 ):
-    """Save a file or folder as an artifact or transform.
+    """Save a file or folder as an `artifact`, `transform`, or `record`.
 
-    Example:
+    Save a **dataset** or **model** as {class}`~lamindb.Artifact`:
 
     ```
-    lamin save my_table.csv --key my_tables/my_table.csv --project my_project
+    lamin save my_table.csv --key my_tables/my_table.csv
     ```
 
-    By passing a `--project` identifier, the artifact will be labeled with the corresponding project.
+    Save **source code** as {class}`~lamindb.Transform`:
+
+    ```
+    lamin save my_script.py --key my_scripts/my_script.py
+    ```
+
+    Save a **markdown note** as {class}`~lamindb.Record`:
+
+    ```
+    lamin save my-topic/my-note.md  # omit --key, this resolves `my-topic` as a record type
+    ```
+
+    The `save` command defaults to saving
+    `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` files as {class}`~lamindb.Transform`
+    and - if ommitting `--key` - `.md` files as {class}`~lamindb.Record`.
+    You can enforce saving a file as an {class}`~lamindb.Artifact` by passing `--registry artifact`.
+
+    You can pass a project to `--project` to label the artifact by project.
     If you pass a `--space` or `--branch` identifier, you save the artifact in the corresponding {class}`~lamindb.Space` or on the corresponding {class}`~lamindb.Branch`.
 
-    Transforms: Defaults to saving `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` as {class}`~lamindb.Transform` and
-    other file types and folders as {class}`~lamindb.Artifact`. You can enforce saving a file as
-    an {class}`~lamindb.Artifact` by passing `--registry artifact`.
-
-    Plans: Saves agent plans as artifacts with inferred `key`, `kind`, and `description`, e.g.:
+    Save an **agent plan** as {class}`~lamindb.Artifact`:
 
     ```
     lamin save /path/to/.cursor/plans/my_task.plan.md
     lamin save /path/to/.claude/plans/my_task.md
     ```
 
-    ```{dropdown} How are plans handled?
+    ```{dropdown} How are agent plans handled?
 
     Plan files are detected by suffix `.plan.md` (Cursor) or by being under `.claude/plans/`
     (Claude Code). For such paths, the `key` defaults to `.plans/<filename>`, the artifact `kind`
@@ -860,7 +873,7 @@ def save(
 
     ```
 
-    git: When saving scripts, files will be synced with a git repo if you set:
+    **git:** When saving scripts, files will be synced with a git repo if you set:
 
     ```
     export LAMINDB_SYNC_GIT_REPO=https://github.com/org/repo

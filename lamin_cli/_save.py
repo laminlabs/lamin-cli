@@ -135,6 +135,77 @@ def parse_plan_markdown(content: str) -> str | None:
     return overview or None
 
 
+def _extract_note_target(path: Path, *, dev_dir: Path | None) -> tuple[str, str] | None:
+    """Parse <topic>/<note>.md from a path under dev-dir."""
+    if path.suffix != ".md" or dev_dir is None:
+        return None
+    try:
+        relative_path = path.resolve().relative_to(dev_dir.resolve())
+    except ValueError:
+        return None
+    if relative_path.parent == Path():
+        return None
+    return relative_path.parent.as_posix(), relative_path.stem
+
+
+def _save_note_markdown(
+    ppath: Path,
+    *,
+    topic: str,
+    note_name: str,
+) -> None:
+    import lamindb as ln
+
+    from lamin_cli._annotate import _add_block
+
+    type_record = ln.Record.filter(
+        name__iexact=topic,
+        is_type=True,
+    ).one_or_none()
+    if type_record is None:
+        raise click.ClickException(
+            f"Record type '{topic}' not found. Create it explicitly first, e.g. "
+            f"`ln.Record(name={topic!r}, is_type=True).save()`."
+        )
+
+    note_record = ln.Record.filter(
+        name=note_name,
+        type=type_record,
+    ).one_or_none()
+    if note_record is None:
+        note_record = ln.Record(
+            name=note_name,
+            type=type_record,
+            is_type=True,  # notes should appear in the type hierarchy
+        ).save()
+        logger.important(
+            f"created note record: Record('{note_record.uid}', name='{note_record.name}')"
+        )
+
+    content = ppath.read_text()
+    block = _add_block(
+        note_record,
+        "record",
+        content,
+        kind="readme",
+    )
+    logger.important(f"saved note content: RecordBlock('{block.uid}')")
+    if ln.setup.settings.instance.is_remote:
+        slug = ln.setup.settings.instance.slug
+        ui_url = ln.setup.settings.instance.ui_url
+        logger.important(f"go to: {ui_url}/{slug}/record/{note_record.uid}")
+
+
+def _resolve_note_target_or_raise(ppath: Path) -> tuple[str, str]:
+    note_target = _extract_note_target(ppath, dev_dir=ln_setup.settings.dev_dir)
+    if note_target is None:
+        raise click.ClickException(
+            "To save as record, pass a markdown path under dev-dir in the form "
+            "<topic>/<note>.md."
+        )
+    return note_target
+
+
 def save(
     path: Path | str,
     key: str | None = None,
@@ -163,6 +234,7 @@ def save(
     if not ppath.exists():
         raise click.BadParameter(f"Path {ppath} does not exist", param_hint="path")
 
+    user_passed_registry = registry is not None
     if registry is None:
         registry = infer_registry_from_path(ppath)
 
@@ -214,8 +286,32 @@ def save(
             raise click.ClickException(
                 f"Branch '{branch}' not found, either create it with `ln.Branch(name='...').save()` or fix typos."
             )
+    if branch_record is None:
+        branch_record = ln_setup.settings.branch
 
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
+    if (
+        isinstance(ppath, LocalPathClasses)
+        and key is None
+        and not saving_plan
+        and not user_passed_registry
+        and _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
+        is not None
+    ):
+        registry = "record"
+
+    if registry == "record":
+        if ppath.suffix.lower() != ".md":
+            raise click.ClickException(
+                "Saving as registry='record' requires a .md file."
+            )
+        if key is not None:
+            logger.warning(
+                "key is ignored for records, record identity comes from path"
+            )
+        topic, note_name = _resolve_note_target_or_raise(Path(ppath))
+        _save_note_markdown(Path(ppath), topic=topic, note_name=note_name)
+        return None
 
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
@@ -455,5 +551,5 @@ def save(
         return return_code
     else:
         raise click.ClickException(
-            "Allowed values for '--registry' are: 'artifact', 'transform'"
+            "Allowed values for '--registry' are: 'artifact', 'transform', 'record'"
         )
