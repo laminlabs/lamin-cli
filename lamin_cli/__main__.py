@@ -219,7 +219,7 @@ def connect(instance: str):
 
 @main.command()
 def disconnect():
-    """Unset the default instance for auto-connection.
+    """Unset the default database instance for this environment.
 
     Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
 
