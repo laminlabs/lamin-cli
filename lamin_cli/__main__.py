@@ -198,8 +198,9 @@ def init(
 # fmt: off
 @main.command()
 @click.argument("instance", type=str)
+@click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
-def connect(instance: str):
+def connect(instance: str, here: bool):
     """Set the default database instance for this environment.
 
     This command updates your local configuration to target the specified instance:
@@ -210,15 +211,17 @@ def connect(instance: str):
     ```
     lamin connect laminlabs/cellxgene
     lamin connect https://lamin.ai/laminlabs/cellxgene
+    lamin connect laminlabs/cellxgene --here
     ```
 
     → Python/R alternative: create a database object via {class}`~lamindb.DB` or set the default database of your Python/R session via {func}`~lamindb.connect`
     """
-    return connect_(instance)
+    return connect_(instance, here=here)
 
 
 @main.command()
-def disconnect():
+@click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
+def disconnect(here: bool):
     """Unset the default database instance for this environment.
 
     Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
@@ -227,11 +230,12 @@ def disconnect():
 
     ```
     lamin disconnect
+    lamin disconnect --here
     ```
 
     → Python/R alternative: {func}`~lamindb.setup.disconnect`
     """
-    return disconnect_()
+    return disconnect_(here=here)
 
 
 # fmt: off
