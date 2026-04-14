@@ -4,20 +4,12 @@ from pathlib import Path
 
 import lamindb_setup as ln_setup
 from lamin_utils import logger
-from lamindb_setup._connect_instance import _connect_cli
+from lamindb_setup._connect_instance import _connect_cli, get_owner_name_from_identifier
 from lamindb_setup.core._settings_store import (
     find_local_current_instance_file,
     remove_local_current_instance,
     write_local_current_instance,
 )
-
-
-def _parse_owner_name(instance_slug: str) -> tuple[str, str] | None:
-    split = instance_slug.split("/", maxsplit=1)
-    if len(split) != 2 or split[0].strip() == "" or split[1].strip() == "":
-        return None
-    owner, name = split
-    return owner, name
 
 
 def connect(
@@ -53,12 +45,14 @@ def disconnect(*, here: bool = False) -> None:
         return None
 
     instance_slug = marker.read_text().strip()
-    owner_name = _parse_owner_name(instance_slug)
-    if owner_name is not None:
-        owner, name = owner_name
+    try:
+        owner, name = get_owner_name_from_identifier(instance_slug)
+    except ValueError:
+        owner = name = ""
+    if owner and name:
         dev_dir_path = ln_setup.settings.settings_dir / f"dev-dir--{owner}--{name}.txt"
         dev_dir_path.unlink(missing_ok=True)
-    removed_marker = remove_local_current_instance()
+    removed_marker = remove_local_current_instance(marker=marker)
     if removed_marker is None:
         logger.info("no local instance marker found")
         return None
