@@ -8,11 +8,11 @@ The root API here is used by LaminR to replicate the CLI functionality.
 
 __version__ = "1.15.0"
 
-from lamindb_setup import disconnect, logout
-from lamindb_setup._connect_instance import _connect_cli as connect
+from lamindb_setup import logout
 from lamindb_setup._init_instance import init
 from lamindb_setup._setup_user import login
 
+from ._connect import connect, disconnect
 from ._delete import delete
 from ._save import save
 
