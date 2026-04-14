@@ -201,17 +201,20 @@ def init(
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
 def connect(instance: str, here: bool):
-    """Set the default database instance for this environment.
+    """Set the default database instance for this environment or directory.
 
     This command updates your local configuration to target the specified instance:
-    all subsequent Python/R sessions and CLI commands will auto-connect to this instance.
+    all subsequent CLI commands and Python/R sessions will auto-connect to this instance.
 
-    Pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`), for example:
+    You can pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
     ```
+    # set a default instance for the current environment
     lamin connect laminlabs/cellxgene
-    lamin connect https://lamin.ai/laminlabs/cellxgene
+    # set a default instance for the current directory
     lamin connect laminlabs/cellxgene --here
+    # use a URL instead of a slug
+    lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
 
     → Python/R alternative: create a database object via {class}`~lamindb.DB` or set the default database of your Python/R session via {func}`~lamindb.connect`
@@ -222,9 +225,11 @@ def connect(instance: str, here: bool):
 @main.command()
 @click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
 def disconnect(here: bool):
-    """Unset the default database instance for this environment.
+    """Unset the default database instance for this environment or directory.
 
-    Python/R sessions and CLI commands will no longer auto-connect to a LaminDB instance.
+    - Without `--here`, it clears the global default instance.
+    - With `--here`, it removes the nearest local marker from the current
+      directory hierarchy and unsets `dev-dir` for that instance.
 
     For example:
 
