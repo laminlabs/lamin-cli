@@ -135,8 +135,10 @@ def parse_plan_markdown(content: str) -> str | None:
     return overview or None
 
 
-def _extract_note_target(path: Path, *, dev_dir: Path | None) -> tuple[str, str] | None:
-    """Parse <topic>/<note>.md from a path under dev-dir."""
+def _extract_note_target(
+    path: Path, *, dev_dir: Path | None
+) -> tuple[str | None, str] | None:
+    """Parse <topic>/<note>.md or <note>.md from a path under dev-dir."""
     if path.suffix != ".md" or dev_dir is None:
         return None
     try:
@@ -144,34 +146,33 @@ def _extract_note_target(path: Path, *, dev_dir: Path | None) -> tuple[str, str]
     except ValueError:
         return None
     if relative_path.parent == Path():
-        return None
+        return None, relative_path.stem
     return relative_path.parent.as_posix(), relative_path.stem
 
 
 def _save_note_markdown(
     ppath: Path,
     *,
-    topic: str,
+    topic: str | None,
     note_name: str,
 ) -> None:
     import lamindb as ln
 
     from lamin_cli._annotate import _add_block
 
-    type_record = ln.Record.filter(
-        name__iexact=topic,
-        is_type=True,
-    ).one_or_none()
-    if type_record is None:
-        raise click.ClickException(
-            f"Record type '{topic}' not found. Create it explicitly first, e.g. "
-            f"`ln.Record(name={topic!r}, is_type=True).save()`."
-        )
+    type_record = None
+    if topic is not None:
+        type_record = ln.Record.filter(
+            name__iexact=topic,
+            is_type=True,
+        ).one_or_none()
+        if type_record is None:
+            raise click.ClickException(
+                f"Record type '{topic}' not found. Create it explicitly first, e.g. "
+                f"`ln.Record(name={topic!r}, is_type=True).save()`."
+            )
 
-    note_record = ln.Record.filter(
-        name=note_name,
-        type=type_record,
-    ).one_or_none()
+    note_record = ln.Record.filter(name=note_name, type=type_record).one_or_none()
     if note_record is None:
         note_record = ln.Record(
             name=note_name,
@@ -196,14 +197,18 @@ def _save_note_markdown(
         logger.important(f"go to: {ui_url}/{slug}/record/{note_record.uid}")
 
 
-def _resolve_note_target_or_raise(ppath: Path) -> tuple[str, str]:
+def _resolve_note_target_or_raise(ppath: Path) -> tuple[str | None, str]:
     note_target = _extract_note_target(ppath, dev_dir=ln_setup.settings.dev_dir)
     if note_target is None:
         raise click.ClickException(
             "To save as record, pass a markdown path under dev-dir in the form "
-            "<topic>/<note>.md."
+            "<topic>/<note>.md or <note>.md."
         )
     return note_target
+
+
+def _is_readme_artifact_save(ppath, key: str | None) -> bool:
+    return key == "README.md" or ppath.name == "README.md"
 
 
 def save(
@@ -295,6 +300,7 @@ def save(
         and key is None
         and not saving_plan
         and not user_passed_registry
+        and ppath.name != "README.md"
         and _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
         is not None
     ):
@@ -316,6 +322,8 @@ def save(
     if registry == "artifact":
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
+        if not is_cloud_path and key is None and ppath.name == "README.md":
+            key = "README.md"
         if stem_uid is not None:
             revises = (
                 ln.Artifact.filter(uid__startswith=stem_uid)
@@ -345,6 +353,19 @@ def save(
             space=space_record,
             run=current_run,
         ).save()
+        if _is_readme_artifact_save(ppath, key):
+            logger.warning(
+                "Saving README as an artifact is transitional and will be phased out; "
+                "README is currently saved as both an Artifact and a Block."
+            )
+            readme_content = ppath.read_text(encoding="utf-8")
+            ln.models.Block(
+                key="README.md",
+                content=readme_content,
+                kind="readme",
+                branch=branch_record,
+                space=space_record,
+            ).save()
         if plan_tmp_path is not None and Path(plan_tmp_path).exists():
             Path(plan_tmp_path).unlink()
         logger.important(f"saved: {artifact}")
