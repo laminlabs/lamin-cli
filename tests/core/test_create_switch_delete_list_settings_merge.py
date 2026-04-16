@@ -6,7 +6,10 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
-from lamindb_setup.core._settings_store import current_modules_file
+from lamindb_setup.core._settings_store import (
+    current_modules_file,
+    local_current_instance_file,
+)
 
 
 def test_create_project():
@@ -147,7 +150,7 @@ def test_space():
     assert ln_setup.settings.space.uid == 12 * "a"
 
 
-def test_dev_dir():
+def test_dev_dir(tmp_path: Path):
     """Test lamin settings dev-dir get/set (new pattern: lamin settings dev-dir ...)."""
     # default dev-dir is None
     result = subprocess.run(
@@ -159,9 +162,11 @@ def test_dev_dir():
     assert result.returncode == 0
     assert result.stdout.strip().split("\n")[-1] == "None"
     assert ln_setup.settings.dev_dir is None
-    # set dev-dir to parent dir
-    this_path = Path(__file__).resolve()
-    exit_status = os.system(f"lamin settings dev-dir set {this_path.parent}")
+    # set dev-dir to temp dir
+    target_dir = tmp_path / "dev-dir-target"
+    target_dir.mkdir()
+    marker_path = local_current_instance_file(target_dir)
+    exit_status = os.system(f"lamin settings dev-dir set {target_dir}")
     assert exit_status == 0
     result = subprocess.run(
         "lamin settings dev-dir get",
@@ -170,8 +175,10 @@ def test_dev_dir():
         shell=True,
     )
     assert result.returncode == 0
-    assert result.stdout.strip().split("\n")[-1] == str(this_path.parent)
-    assert ln_setup.settings.dev_dir == this_path.parent
+    assert result.stdout.strip().split("\n")[-1] == str(target_dir)
+    assert ln_setup.settings.dev_dir == target_dir
+    assert marker_path.exists()
+    assert marker_path.read_text().strip() == ln_setup.settings.instance.slug
     # unset dev-dir
     exit_status = os.system("lamin settings dev-dir unset")
     assert exit_status == 0
@@ -184,6 +191,7 @@ def test_dev_dir():
     assert result.returncode == 0
     assert result.stdout.strip().split("\n")[-1] == "None"
     assert ln_setup.settings.dev_dir is None
+    assert not marker_path.exists()
 
 
 def test_dev_dir_legacy_get_set():
