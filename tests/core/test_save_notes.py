@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import lamindb as ln
@@ -253,4 +254,152 @@ def test_save_markdown_note_registry_artifact_forces_artifact():
         if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
             type_record.refresh_from_db()
             type_record.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_save_markdown_note_at_dev_dir_root_creates_record_and_recordblock():
+    unique = time.time_ns()
+    note_name = "root-note"
+    branch = ln.Branch(name=f"cli_notes_root_branch_{unique}").save()
+    notes_root = Path(__file__).parent / f"notes_root_{unique}"
+    notes_root.mkdir(parents=True, exist_ok=True)
+    note_path = notes_root / f"{note_name}.md"
+    note_path.write_text("# Root note\n\nhello")
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = run_lamin("save", str(note_path))
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        note_record = ln.Record.filter(name=note_name, type=None, branch=branch).first()
+        assert note_record is not None
+        readmes = note_record.ablocks.filter(kind="readme").order_by("created_at")
+        assert readmes.count() == 1
+        assert "Root note" in readmes.first().content
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset")
+        note_path.unlink(missing_ok=True)
+        if notes_root.exists() and not any(notes_root.iterdir()):
+            notes_root.rmdir()
+        note_record = ln.Record.filter(name=note_name, type=None, branch=branch).first()
+        if note_record is not None:
+            note_record.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_notes_readme_root_branch_{unique}").save()
+    notes_root = Path(__file__).parent / f"notes_readme_root_{unique}"
+    notes_root.mkdir(parents=True, exist_ok=True)
+    readme_path = notes_root / "README.md"
+    readme_path.write_text("# README root\n\ncontent")
+    block_uids: list[str] = []
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = run_lamin("save", str(readme_path))
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        artifact = ln.Artifact.get(key="README.md", branch=branch)
+        assert artifact is not None
+        block = (
+            ln.models.Block.filter(key="README.md", branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        assert block is not None
+        block_uids.append(block.uid)
+        readme_record = ln.Record.filter(
+            name="README", type=None, branch=branch
+        ).first()
+        assert readme_record is None
+    finally:
+        ln.setup.switch(branch.name)
+        run_lamin("settings", "dev-dir", "unset")
+        readme_path.unlink(missing_ok=True)
+        if notes_root.exists() and not any(notes_root.iterdir()):
+            notes_root.rmdir()
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
+        ln.setup.switch("main")
+        branch.delete(permanent=True)
+
+
+def test_save_readme_as_artifact_also_creates_standalone_block():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_readme_branch_{unique}").save()
+    readme_path = Path(__file__).parent / f"README_{unique}.md"
+    readme_path.write_text(f"# README {unique}\n\nfirst version")
+    block_uids: list[str] = []
+    try:
+        ln.setup.switch(branch.name)
+        result = run_lamin(
+            "save",
+            str(readme_path),
+            "--key",
+            "README.md",
+            "--branch",
+            branch.name,
+            "--registry",
+            "artifact",
+        )
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        artifact = ln.Artifact.get(key="README.md", branch=branch)
+        block = (
+            ln.models.Block.filter(key="README.md", branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        assert block is not None
+        block_uids.append(block.uid)
+        assert f"README {unique}" in block.content
+        assert block.is_latest
+
+        readme_path.write_text(f"# README {unique}\n\nsecond version")
+        result = run_lamin(
+            "save",
+            str(readme_path),
+            "--key",
+            "README.md",
+            "--branch",
+            branch.name,
+            "--registry",
+            "artifact",
+        )
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        blocks = ln.models.Block.filter(key="README.md", branch=branch).order_by(
+            "created_at"
+        )
+        assert blocks.count() >= 2
+        latest = blocks.last()
+        assert latest is not None
+        block_uids.extend([b.uid for b in blocks if b.uid not in block_uids])
+        assert f"README {unique}" in latest.content
+        assert "second version" in latest.content
+        assert latest.is_latest
+        assert latest.stem_uid == block.uid[:16]
+    finally:
+        ln.setup.switch(branch.name)
+        readme_path.unlink(missing_ok=True)
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
+        ln.setup.switch("main")
         branch.delete(permanent=True)
