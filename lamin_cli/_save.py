@@ -10,6 +10,7 @@ from lamin_utils import logger
 from lamindb_setup.core.hashing import hash_file
 
 from lamin_cli._context import get_current_run_file
+from lamin_cli._notes import extract_note_target_from_path, resolve_note_record
 
 
 def infer_registry_from_path(path: Path | str) -> str:
@@ -135,53 +136,23 @@ def parse_plan_markdown(content: str) -> str | None:
     return overview or None
 
 
-def _extract_note_target(
-    path: Path, *, dev_dir: Path | None
-) -> tuple[str | None, str] | None:
-    """Parse <topic>/<note>.md or <note>.md from a path under dev-dir."""
-    if path.suffix != ".md" or dev_dir is None:
-        return None
-    try:
-        relative_path = path.resolve().relative_to(dev_dir.resolve())
-    except ValueError:
-        return None
-    if relative_path.parent == Path():
-        return None, relative_path.stem
-    return relative_path.parent.as_posix(), relative_path.stem
-
-
 def _save_note_markdown(
     ppath: Path,
     *,
-    topic: str | None,
+    type_chain: list[str],
     note_name: str,
 ) -> None:
     import lamindb as ln
 
     from lamin_cli._annotate import _add_block
 
-    type_record = None
-    if topic is not None:
-        type_record = ln.Record.filter(
-            name__iexact=topic,
-            is_type=True,
-        ).one_or_none()
-        if type_record is None:
-            raise click.ClickException(
-                f"Record type '{topic}' not found. Create it explicitly first, e.g. "
-                f"`ln.Record(name={topic!r}, is_type=True).save()`."
-            )
-
-    note_record = ln.Record.filter(name=note_name, type=type_record).one_or_none()
-    if note_record is None:
-        note_record = ln.Record(
-            name=note_name,
-            type=type_record,
-            is_type=True,  # notes should appear in the type hierarchy
-        ).save()
-        logger.important(
-            f"created note record: Record('{note_record.uid}', name='{note_record.name}')"
-        )
+    note_record = resolve_note_record(
+        ln=ln,
+        type_chain=type_chain,
+        note_name=note_name,
+        create_if_missing=True,
+    )
+    assert note_record is not None
 
     content = ppath.read_text()
     block = _add_block(
@@ -197,12 +168,14 @@ def _save_note_markdown(
         logger.important(f"go to: {ui_url}/{slug}/record/{note_record.uid}")
 
 
-def _resolve_note_target_or_raise(ppath: Path) -> tuple[str | None, str]:
-    note_target = _extract_note_target(ppath, dev_dir=ln_setup.settings.dev_dir)
+def _resolve_note_target_or_raise(ppath: Path) -> tuple[list[str], str]:
+    note_target = extract_note_target_from_path(
+        ppath, dev_dir=ln_setup.settings.dev_dir
+    )
     if note_target is None:
         raise click.ClickException(
             "To save as record, pass a markdown path under dev-dir in the form "
-            "<topic>/<note>.md or <note>.md."
+            "<topic>/<subtopic>/.../<note>.md or <note>.md."
         )
     return note_target
 
@@ -320,7 +293,9 @@ def save(
         and not saving_plan
         and not user_passed_registry
         and ppath.name != "README.md"
-        and _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
+        and extract_note_target_from_path(
+            Path(ppath), dev_dir=ln_setup.settings.dev_dir
+        )
         is not None
     ):
         registry = "record"
@@ -334,8 +309,8 @@ def save(
             logger.warning(
                 "key is ignored for records, record identity comes from path"
             )
-        topic, note_name = _resolve_note_target_or_raise(Path(ppath))
-        _save_note_markdown(Path(ppath), topic=topic, note_name=note_name)
+        type_chain, note_name = _resolve_note_target_or_raise(Path(ppath))
+        _save_note_markdown(Path(ppath), type_chain=type_chain, note_name=note_name)
         return None
 
     if registry == "artifact":
