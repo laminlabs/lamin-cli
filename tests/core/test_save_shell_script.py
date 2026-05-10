@@ -8,7 +8,7 @@ scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 
 def test_save_shell_script():
-    """Test that saving a shell script creates a transform with source_code and type='script'."""
+    """Test that saving a shell script creates a transform with source_code and kind='script'."""
     env = os.environ.copy()
     env["LAMIN_TESTING"] = "true"
 
@@ -31,8 +31,8 @@ def test_save_shell_script():
         "Transform source_code should be populated"
     )
     assert len(transform.source_code) > 0, "Transform source_code should not be empty"
-    assert transform.type == "script", (
-        f"Transform type should be 'script', got '{transform.type}'"
+    assert transform.kind == "script", (
+        f"Transform kind should be 'script', got '{transform.kind}'"
     )
 
     script_path.unlink()

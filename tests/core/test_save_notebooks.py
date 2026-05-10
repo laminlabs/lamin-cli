@@ -5,11 +5,17 @@ from pathlib import Path
 
 import lamindb as ln
 import nbproject_test
+import orjson
 import pytest
 from nbclient.exceptions import CellExecutionError
-from nbproject.dev import read_notebook, write_notebook
+from nbproject.dev import read_notebook
 
 notebook_dir = Path(__file__).resolve().parents[1] / "notebooks"
+
+
+def _write_notebook(nb, path: Path) -> None:
+    # Avoid deprecated Pydantic v2 `dict()` call in nbproject.write_notebook.
+    path.write_bytes(orjson.dumps(nb.model_dump(), option=orjson.OPT_INDENT_2))
 
 
 def test_save_not_initialized():
@@ -36,7 +42,7 @@ def test_save_non_consecutive():
         uid="HDMGkxN9rgFA0000",
         version="1",
         key="My test notebook (non-consecutive)",
-        type="notebook",
+        kind="notebook",
     ).save()
     ln.Run(transform=transform).save()
 
@@ -170,7 +176,7 @@ print("my consecutive cell")
     new_cell = nb.cells[-1].copy()
     new_cell["execution_count"] += 1
     nb.cells.append(new_cell)  # duplicate last cell
-    write_notebook(nb, notebook_path)
+    _write_notebook(nb, notebook_path)
 
     # attempt re-saving - it works but the user needs to confirm overwriting
     # source code and run report
@@ -228,7 +234,7 @@ print("my consecutive cell")
     # edit the notebook
     nb = read_notebook(new_path)
     nb.cells[-1]["source"] = ["ln.finish()"]
-    write_notebook(nb, new_path)
+    _write_notebook(nb, new_path)
 
     # run omitting the `--inplace` flag
     result = subprocess.run(

@@ -12,7 +12,7 @@ def test_save_transform_wrong_branch():
     env["LAMIN_TESTING"] = "true"
 
     transform = ln.Transform(
-        uid="s4bgVoaLOBjx0000", key="run-track-transform-branch.py", type="script"
+        uid="s4bgVoaLOBjx0000", key="run-track-transform-branch.py", kind="script"
     ).save()
     ln.Run(transform=transform).save()
     # now move the transform to trash
