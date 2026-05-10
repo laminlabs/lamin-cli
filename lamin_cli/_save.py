@@ -211,6 +211,29 @@ def _is_readme_artifact_save(ppath, key: str | None) -> bool:
     return key == "README.md" or ppath.name == "README.md"
 
 
+def _save_readme_block(
+    ppath: Path,
+    *,
+    branch,
+    space,
+) -> None:
+    import lamindb as ln
+
+    content = ppath.read_text(encoding="utf-8")
+    block = ln.models.Block(
+        key="README.md",
+        content=content,
+        kind="readme",
+        branch=branch,
+        space=space,
+    ).save()
+    logger.important(f"saved README block: Block('{block.uid}')")
+    if ln.setup.settings.instance.is_remote:
+        slug = ln.setup.settings.instance.slug
+        ui_url = ln.setup.settings.instance.ui_url
+        logger.important(f"go to: {ui_url}/{slug}/block/{block.uid}")
+
+
 def save(
     path: Path | str,
     key: str | None = None,
@@ -297,10 +320,19 @@ def save(
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
     if (
         isinstance(ppath, LocalPathClasses)
+        and ppath.name == "README.md"
         and key is None
         and not saving_plan
         and not user_passed_registry
-        and ppath.name != "README.md"
+    ):
+        _save_readme_block(ppath, branch=branch_record, space=space_record)
+        return None
+
+    if (
+        isinstance(ppath, LocalPathClasses)
+        and key is None
+        and not saving_plan
+        and not user_passed_registry
         and _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
         is not None
     ):
