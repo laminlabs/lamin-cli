@@ -792,3 +792,100 @@ def test_save_markdown_note_missing_intermediate_type_in_chain():
             topic_type.refresh_from_db()
             topic_type.delete(permanent=True)
         branch.delete(permanent=True)
+
+
+def test_load_readme_with_dev_dir_writes_to_dev_dir_root():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_load_readme_dev_dir_branch_{unique}").save()
+    notes_root = Path(__file__).parent / f"load_readme_dev_dir_{unique}"
+    notes_root.mkdir(parents=True, exist_ok=True)
+    readme_path = notes_root / "README.md"
+    readme_path.write_text("# README in dev-dir\n\ncontent")
+    block_uids: list[str] = []
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+
+        save_result = run_lamin("save", str(readme_path))
+        assert save_result.returncode == 0, (
+            f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
+        )
+        readme_path.unlink()
+
+        load_result = run_lamin("load", "README.md")
+        assert load_result.returncode == 0, (
+            f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
+        )
+        assert readme_path.exists()
+        assert "README in dev-dir" in readme_path.read_text()
+        block = (
+            ln.models.Block.filter(key="README.md", branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        if block is not None:
+            block_uids.append(block.uid)
+    finally:
+        ln.setup.switch(branch.name)
+        run_lamin("settings", "dev-dir", "unset")
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
+        ln.setup.switch("main")
+        branch.delete(permanent=True)
+
+
+def test_load_readme_without_dev_dir_writes_to_cwd_root():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_load_readme_cwd_branch_{unique}").save()
+    source_root = Path(__file__).parent / f"load_readme_source_{unique}"
+    outside_root = Path(__file__).parent / f"load_readme_cwd_{unique}"
+    source_root.mkdir(parents=True, exist_ok=True)
+    outside_root.mkdir(parents=True, exist_ok=True)
+    readme_path = source_root / "README.md"
+    readme_path.write_text("# README in cwd\n\ncontent")
+    block_uids: list[str] = []
+    try:
+        ln.setup.switch(branch.name)
+        run_lamin("settings", "dev-dir", "unset")
+
+        save_result = run_lamin("save", str(readme_path))
+        assert save_result.returncode == 0, (
+            f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
+        )
+
+        target_readme = outside_root / "README.md"
+        target_readme.unlink(missing_ok=True)
+        load_result = run_lamin("load", "README.md", cwd=outside_root)
+        assert load_result.returncode == 0, (
+            f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
+        )
+        assert target_readme.exists()
+        assert "README in cwd" in target_readme.read_text()
+        block = (
+            ln.models.Block.filter(key="README.md", branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        if block is not None:
+            block_uids.append(block.uid)
+    finally:
+        ln.setup.switch(branch.name)
+        if source_root.exists():
+            shutil.rmtree(source_root)
+        if outside_root.exists():
+            shutil.rmtree(outside_root)
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
+        ln.setup.switch("main")
+        branch.delete(permanent=True)

@@ -493,6 +493,8 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load --key mydatasets/mytable.parquet
     lamin load --key analysis.ipynb
     lamin load --key myanalyses/analysis.ipynb --with-env
+    # README at dev-dir root (or cwd if dev-dir is unset)
+    lamin load README.md
     # markdown notes (Record + latest readme block)
     lamin load my-topic/my-note
     lamin load my-topic/my-note.md
@@ -508,6 +510,8 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     from lamin_cli._load import load as load_
     from lamin_cli._notes import parse_note_target
     if entity is not None:
+        if uid is None and key is None and entity == "README.md":
+            return load_(entity=None, uid=uid, key="README.md", with_env=with_env)
         if uid is None and key is None and parse_note_target(entity) is not None:
             return load_(entity, uid=uid, key=key, with_env=with_env)
         is_slug = entity.count("/") == 1

@@ -256,6 +256,23 @@ def load(
                     elif i == 5:
                         logger.important(f"  ... {len(cache_path) - 10} more files ...")
             else:
+                if entity == "artifact" and entity_obj.key == "README.md":
+                    # TODO: switch to reading from README block in the future.
+                    # Current behavior is transitional and reads from README artifact cache.
+                    target_root = (
+                        ln_setup.settings.dev_dir
+                        if ln_setup.settings.dev_dir is not None
+                        else Path.cwd().resolve()
+                    )
+                    target_path = target_root / "README.md"
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    if target_path.exists():
+                        response = input(f"! {target_path} exists: replace? (y/n)")
+                        if response != "y":
+                            raise SystemExit("Aborted.")
+                    shutil.copyfile(Path(cache_path), target_path)
+                    logger.important(f"README is here: {target_path}")
+                    return target_path
                 logger.important(f"{entity} is here: {cache_path}")
         case _:
             raise AssertionError(f"unknown entity {entity}")
