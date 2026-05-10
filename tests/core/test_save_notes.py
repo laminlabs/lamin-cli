@@ -403,7 +403,8 @@ def test_save_readme_as_artifact_also_creates_standalone_block():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        artifact = ln.Artifact.get(key="README.md", branch=branch)
+        artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
+        assert artifact is not None
         block = (
             ln.models.Block.filter(key="README.md", branch=branch)
             .order_by("-created_at")
