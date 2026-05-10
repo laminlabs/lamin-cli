@@ -320,19 +320,10 @@ def save(
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
     if (
         isinstance(ppath, LocalPathClasses)
-        and ppath.name == "README.md"
         and key is None
         and not saving_plan
         and not user_passed_registry
-    ):
-        _save_readme_block(ppath, branch=branch_record, space=space_record)
-        return None
-
-    if (
-        isinstance(ppath, LocalPathClasses)
-        and key is None
-        and not saving_plan
-        and not user_passed_registry
+        and ppath.name != "README.md"
         and _extract_note_target(Path(ppath), dev_dir=ln_setup.settings.dev_dir)
         is not None
     ):

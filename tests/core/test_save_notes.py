@@ -290,14 +290,14 @@ def test_save_markdown_note_at_dev_dir_root_creates_record_and_recordblock():
         branch.delete(permanent=True)
 
 
-def test_save_readme_in_dev_dir_root_creates_standalone_block():
+def test_save_readme_in_dev_dir_root_creates_artifact_and_block():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_notes_readme_root_branch_{unique}").save()
     notes_root = Path(__file__).parent / f"notes_readme_root_{unique}"
     notes_root.mkdir(parents=True, exist_ok=True)
     readme_path = notes_root / "README.md"
     readme_path.write_text("# README root\n\ncontent")
-    block_uid: str | None = None
+    block_uids: list[str] = []
     try:
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
@@ -312,39 +312,38 @@ def test_save_readme_in_dev_dir_root_creates_standalone_block():
             .first()
         )
         assert block is not None
-        block_uid = block.uid
+        block_uids.append(block.uid)
         assert "README root" in block.content
         readme_record = ln.Record.filter(
             name="README", type=None, branch=branch
         ).first()
         assert readme_record is None
         readme_artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
-        assert readme_artifact is None
+        assert readme_artifact is not None
     finally:
         ln.setup.switch(branch.name)
         run_lamin("settings", "dev-dir", "unset")
         readme_path.unlink(missing_ok=True)
         if notes_root.exists() and not any(notes_root.iterdir()):
             notes_root.rmdir()
-        block = (
-            ln.models.Block.filter(uid=block_uid).one_or_none()
-            if block_uid is not None
-            else None
-        )
-        if block is not None:
-            block.delete(permanent=True)
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
         ln.setup.switch("main")
         branch.delete(permanent=True)
 
 
-def test_save_readme_outside_dev_dir_creates_standalone_block():
+def test_save_readme_outside_dev_dir_creates_artifact_and_block():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_notes_readme_outside_dev_dir_branch_{unique}").save()
     outside_root = Path(__file__).parent / f"notes_readme_outside_dev_dir_{unique}"
     outside_root.mkdir(parents=True, exist_ok=True)
     readme_path = outside_root / "README.md"
     readme_path.write_text("# README outside dev-dir\n\ncontent")
-    block_uid: str | None = None
+    block_uids: list[str] = []
     try:
         ln.setup.switch(branch.name)
         run_lamin("settings", "dev-dir", "unset")
@@ -358,26 +357,25 @@ def test_save_readme_outside_dev_dir_creates_standalone_block():
             .first()
         )
         assert block is not None
-        block_uid = block.uid
+        block_uids.append(block.uid)
         assert "outside dev-dir" in block.content
         readme_record = ln.Record.filter(
             name="README", type=None, branch=branch
         ).first()
         assert readme_record is None
         readme_artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
-        assert readme_artifact is None
+        assert readme_artifact is not None
     finally:
         ln.setup.switch(branch.name)
         readme_path.unlink(missing_ok=True)
         if outside_root.exists() and not any(outside_root.iterdir()):
             outside_root.rmdir()
-        block = (
-            ln.models.Block.filter(uid=block_uid).one_or_none()
-            if block_uid is not None
-            else None
-        )
-        if block is not None:
-            block.delete(permanent=True)
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
         ln.setup.switch("main")
         branch.delete(permanent=True)
 
