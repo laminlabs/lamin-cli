@@ -220,18 +220,14 @@ def _save_readme_block(
     import lamindb as ln
 
     content = ppath.read_text(encoding="utf-8")
-    block = ln.models.Block(
+    ln.models.Block(
         key="README.md",
         content=content,
         kind="readme",
         branch=branch,
         space=space,
     ).save()
-    logger.important(f"saved README block: Block('{block.uid}')")
-    if ln.setup.settings.instance.is_remote:
-        slug = ln.setup.settings.instance.slug
-        ui_url = ln.setup.settings.instance.ui_url
-        logger.important(f"go to: {ui_url}/{slug}/block/{block.uid}")
+    logger.important("saved README block")
 
 
 def save(
