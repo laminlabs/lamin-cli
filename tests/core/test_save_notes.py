@@ -306,7 +306,102 @@ def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        artifact = ln.Artifact.get(key="README.md", branch=branch)
+        block = (
+            ln.models.Block.filter(key="README.md", branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        assert block is not None
+        block_uids.append(block.uid)
+        assert "README root" in block.content
+        readme_record = ln.Record.filter(
+            name="README", type=None, branch=branch
+        ).first()
+        assert readme_record is None
+        readme_artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
+        assert readme_artifact is not None
+    finally:
+        ln.setup.switch(branch.name)
+        run_lamin("settings", "dev-dir", "unset")
+        readme_path.unlink(missing_ok=True)
+        if notes_root.exists() and not any(notes_root.iterdir()):
+            notes_root.rmdir()
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
+        ln.setup.switch("main")
+        branch.delete(permanent=True)
+
+
+def test_save_readme_outside_dev_dir_creates_artifact_and_block():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_notes_readme_outside_dev_dir_branch_{unique}").save()
+    outside_root = Path(__file__).parent / f"notes_readme_outside_dev_dir_{unique}"
+    outside_root.mkdir(parents=True, exist_ok=True)
+    readme_path = outside_root / "README.md"
+    readme_path.write_text("# README outside dev-dir\n\ncontent")
+    block_uids: list[str] = []
+    try:
+        ln.setup.switch(branch.name)
+        run_lamin("settings", "dev-dir", "unset")
+        result = run_lamin("save", str(readme_path))
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        block = (
+            ln.models.Block.filter(key="README.md", branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        assert block is not None
+        block_uids.append(block.uid)
+        assert "outside dev-dir" in block.content
+        readme_record = ln.Record.filter(
+            name="README", type=None, branch=branch
+        ).first()
+        assert readme_record is None
+        readme_artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
+        assert readme_artifact is not None
+    finally:
+        ln.setup.switch(branch.name)
+        readme_path.unlink(missing_ok=True)
+        if outside_root.exists() and not any(outside_root.iterdir()):
+            outside_root.rmdir()
+        for artifact in ln.Artifact.filter(key="README.md", branch=branch):
+            artifact.delete(permanent=True)
+        for uid in block_uids:
+            block = ln.models.Block.filter(uid=uid).one_or_none()
+            if block is not None:
+                block.delete(permanent=True)
+        ln.setup.switch("main")
+        branch.delete(permanent=True)
+
+
+def test_save_readme_relative_path_in_dev_dir_saves_artifact_and_block():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_notes_readme_relative_branch_{unique}").save()
+    notes_root = Path(__file__).parent / f"notes_readme_relative_{unique}"
+    notes_root.mkdir(parents=True, exist_ok=True)
+    readme_path = notes_root / "README.md"
+    readme_path.write_text("# README relative\n\ncontent")
+    block_uids: list[str] = []
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = subprocess.run(
+            [sys.executable, "-m", "lamin_cli", "save", "README.md"],
+            capture_output=True,
+            text=True,
+            cwd=notes_root,
+        )
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
         assert artifact is not None
         block = (
             ln.models.Block.filter(key="README.md", branch=branch)
@@ -315,10 +410,7 @@ def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
         )
         assert block is not None
         block_uids.append(block.uid)
-        readme_record = ln.Record.filter(
-            name="README", type=None, branch=branch
-        ).first()
-        assert readme_record is None
+        assert "README relative" in block.content
     finally:
         ln.setup.switch(branch.name)
         run_lamin("settings", "dev-dir", "unset")
@@ -356,7 +448,8 @@ def test_save_readme_as_artifact_also_creates_standalone_block():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        artifact = ln.Artifact.get(key="README.md", branch=branch)
+        artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
+        assert artifact is not None
         block = (
             ln.models.Block.filter(key="README.md", branch=branch)
             .order_by("-created_at")
