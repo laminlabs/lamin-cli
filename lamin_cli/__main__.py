@@ -486,13 +486,16 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
     """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
-    Pass a URL or `--key`. For example:
+    Pass a URL or `--key`. You can also load markdown notes by note path. For example:
 
     ```
     # via key
     lamin load --key mydatasets/mytable.parquet
     lamin load --key analysis.ipynb
     lamin load --key myanalyses/analysis.ipynb --with-env
+    # markdown notes (Record + latest readme block)
+    lamin load my-topic/my-note
+    lamin load my-topic/my-note.md
     # via registry and --uid
     lamin load artifact --uid e2G7k9EVul4JbfsE
     lamin load transform --uid Vul4JbfsEYAy5
@@ -503,7 +506,10 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     → Python/R alternative: {func}`~lamindb.Artifact.load`, no equivalent for transforms
     """
     from lamin_cli._load import load as load_
+    from lamin_cli._notes import parse_note_target
     if entity is not None:
+        if uid is None and key is None and parse_note_target(entity) is not None:
+            return load_(entity, uid=uid, key=key, with_env=with_env)
         is_slug = entity.count("/") == 1
         if is_slug:
             from lamindb_setup._connect_instance import _connect_cli

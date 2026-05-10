@@ -4,9 +4,11 @@ import re
 import shutil
 from pathlib import Path
 
+import click
 from lamin_utils import logger
 
 from ._context import get_current_run_file
+from ._notes import is_path_within, parse_note_target, resolve_note_record
 from ._save import infer_registry_from_path, parse_title_r_notebook
 from .urls import decompose_url
 
@@ -30,6 +32,12 @@ def load(
     """
     import lamindb_setup as ln_setup
 
+    note_target: tuple[list[str], str] | None = None
+    if entity is not None and uid is None and key is None:
+        note_target = parse_note_target(entity)
+        if note_target is not None:
+            entity = "record"
+
     if entity is None:
         if key is None:
             raise SystemExit("Either entity or key has to be provided.")
@@ -39,7 +47,7 @@ def load(
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact", "transform", "collection"}:
+    elif entity not in {"artifact", "transform", "collection", "record"}:
         raise SystemExit(
             "Entity has to be a laminhub URL or 'artifact', 'collection', or 'transform'"
         )
@@ -105,6 +113,56 @@ def load(
     query_by_uid = uid is not None
 
     match entity:
+        case "record":
+            if note_target is None:
+                raise click.ClickException(
+                    "For record note loads, pass a note target like <topic>/<note> or <topic>/<note>.md."
+                )
+            type_chain, note_name = note_target
+            note_record = resolve_note_record(
+                ln=ln,
+                type_chain=type_chain,
+                note_name=note_name,
+                create_if_missing=False,
+            )
+            if note_record is None:
+                note_path = (
+                    "/".join([*type_chain, note_name]) if type_chain else note_name
+                )
+                raise click.ClickException(
+                    f"Record note '{note_path}' does not exist. Save it first with `lamin save`."
+                )
+            readme_block = (
+                note_record.ablocks.filter(kind="readme")
+                .order_by("-created_at")
+                .first()
+            )
+            if readme_block is None:
+                raise click.ClickException(
+                    f"Record note '{note_name}' has no readme block to load."
+                )
+
+            cwd = Path.cwd().resolve()
+            if ln_setup.settings.dev_dir is not None and is_path_within(
+                cwd, ln_setup.settings.dev_dir
+            ):
+                target_path = (
+                    ln_setup.settings.dev_dir / Path(*type_chain) / f"{note_name}.md"
+                    if type_chain
+                    else ln_setup.settings.dev_dir / f"{note_name}.md"
+                )
+            else:
+                target_path = cwd / f"{note_name}.md"
+
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            if target_path.exists():
+                response = input(f"! {target_path} exists: replace? (y/n)")
+                if response != "y":
+                    raise SystemExit("Aborted.")
+
+            target_path.write_text(readme_block.content, encoding="utf-8")
+            logger.important(f"note is here: {target_path}")
+            return target_path
         case "transform":
             if query_by_uid:
                 # we don't use .get here because DoesNotExist is hard to catch
