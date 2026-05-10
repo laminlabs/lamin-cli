@@ -390,14 +390,7 @@ def save(
                 "Saving README as an artifact is transitional and will be phased out; "
                 "README is currently saved as both an Artifact and a Block."
             )
-            readme_content = ppath.read_text(encoding="utf-8")
-            ln.models.Block(
-                key="README.md",
-                content=readme_content,
-                kind="readme",
-                branch=branch_record,
-                space=space_record,
-            ).save()
+            _save_readme_block(ppath, branch=branch_record, space=space_record)
         if plan_tmp_path is not None and Path(plan_tmp_path).exists():
             Path(plan_tmp_path).unlink()
         logger.important(f"saved: {artifact}")
