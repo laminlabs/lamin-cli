@@ -118,13 +118,13 @@ if TYPE_CHECKING:
     from click import Command, Context
 
 try:
-    lamindb_version = version("lamindb")
+    lamindb_version = version("lamindb-core")
 except PackageNotFoundError:
-    lamindb_version = "lamindb installation not found"
+    lamindb_version = "lamindb-core installation not found"
 
 
 @lamin_group_decorator
-@click.version_option(version=lamindb_version, prog_name="lamindb")
+@click.version_option(version=lamindb_version, prog_name="lamindb-core")
 def main():
     """Manage data with LaminDB instances."""
     silence_loggers()
