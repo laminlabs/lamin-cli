@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import os
 import shutil
+import subprocess
 import sys
 import warnings
 from collections import OrderedDict
@@ -37,6 +38,10 @@ COMMAND_GROUPS = {
         {
             "name": "Configure your environment",
             "commands": ["connect", "info", "init", "disconnect"],
+        },
+        {
+            "name": "Execute programs",
+            "commands": ["exec"],
         },
         {
             "name": "Save, load, create & delete",
@@ -121,6 +126,11 @@ try:
     lamindb_version = version("lamindb-core")
 except PackageNotFoundError:
     lamindb_version = "lamindb-core installation not found"
+
+
+def classify_exec_target(target: str) -> Literal["script", "executable"]:
+    """Classify an exec target as a local script or an opaque executable."""
+    return "script" if Path(target).suffix in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"} else "executable"
 
 
 @lamin_group_decorator
@@ -241,6 +251,20 @@ def disconnect(here: bool):
     → Python/R alternative: {func}`~lamindb.setup.disconnect`
     """
     return disconnect_(here=here)
+
+
+@main.command("exec", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@click.argument("target", type=str)
+@click.pass_context
+def exec_(ctx: click.Context, target: str):
+    """Execute a local script or opaque executable.
+
+    The target is launched directly and all remaining argv tokens are passed to the
+    child process unchanged.
+    """
+    _ = classify_exec_target(target)
+    result = subprocess.run([target, *ctx.args], check=False)
+    raise SystemExit(result.returncode)
 
 
 # fmt: off
