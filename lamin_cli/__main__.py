@@ -133,6 +133,58 @@ def classify_exec_target(target: str) -> Literal["script", "executable"]:
     return "script" if Path(target).suffix in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"} else "executable"
 
 
+def parse_lamin_exec_uri(uri: str) -> tuple[str, str, Path | None]:
+    if not uri.startswith("lamin://"):
+        raise click.BadParameter("Expected a lamin:// URI.")
+
+    parts = uri.removeprefix("lamin://").split("/")
+    if len(parts) < 4:
+        raise click.BadParameter(
+            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
+        )
+
+    owner, instance, entity, uid, *subpath_parts = parts
+    if not owner or not instance or entity != "artifact":
+        raise click.BadParameter(
+            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
+        )
+
+    if len(uid) not in {16, 20}:
+        raise click.BadParameter(
+            f"Artifact uid must be 16 or 20 characters, got {len(uid)}."
+        )
+
+    if any(part == "" for part in subpath_parts):
+        raise click.BadParameter(
+            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
+        )
+
+    subpath = Path(*subpath_parts) if subpath_parts else None
+    return f"{owner}/{instance}", uid, subpath
+
+
+def _load_exec_artifact(instance_slug: str, uid: str):
+    ln_setup.connect(instance_slug)
+    import lamindb as ln
+
+    return ln.Artifact.get(uid)
+
+
+def resolve_lamin_exec_arg(arg: str) -> str:
+    if not arg.startswith("lamin://"):
+        return arg
+
+    instance_slug, uid, subpath = parse_lamin_exec_uri(arg)
+    cache_path = _load_exec_artifact(instance_slug, uid).cache()
+    if subpath is not None:
+        cache_path = cache_path / subpath
+    return str(cache_path)
+
+
+def rewrite_exec_argv(argv: list[str]) -> list[str]:
+    return [resolve_lamin_exec_arg(arg) for arg in argv]
+
+
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb-core")
 def main():
@@ -263,7 +315,7 @@ def exec_(ctx: click.Context, target: str):
     child process unchanged.
     """
     _ = classify_exec_target(target)
-    result = subprocess.run([target, *ctx.args], check=False)
+    result = subprocess.run(rewrite_exec_argv([target, *ctx.args]), check=False)
     raise SystemExit(result.returncode)
 
 
