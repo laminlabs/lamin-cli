@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 if os.environ.get("NO_RICH"):
     import click as click
@@ -182,7 +185,9 @@ def mount_storage_set(values: tuple[str, ...]):
     from lamin_cli.__main__ import parse_mount_storage_mappings
 
     if not values:
-        raise click.UsageError("Provide at least one <storage-root>=<mount-root> mapping.")
+        raise click.UsageError(
+            "Provide at least one <storage-root>=<mount-root> mapping."
+        )
     parse_mount_storage_mappings(values)
     mount_storage_config_path().write_text("\n".join(values) + "\n")
 

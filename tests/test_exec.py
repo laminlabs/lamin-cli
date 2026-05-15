@@ -1,26 +1,25 @@
 from __future__ import annotations
 
 import subprocess
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
+import click
 import lamindb as ln
 import lamindb_setup as ln_setup
-import click
 import pytest
 from click.testing import CliRunner
+from lamin_cli.__main__ import (
+    _probe_exec_version,
+    classify_exec_target,
+    main,
+    parse_lamin_exec_uri,
+    parse_mount_storage_mappings,
+    rewrite_exec_argv,
+)
 from lamindb_setup.core._settings_store import (
     current_instance_settings_file,
     instance_settings_file,
-)
-
-from lamin_cli.__main__ import (
-    classify_exec_target,
-    main,
-    _probe_exec_version,
-    parse_mount_storage_mappings,
-    parse_lamin_exec_uri,
-    rewrite_exec_argv,
 )
 
 
@@ -87,7 +86,9 @@ def test_exec_returns_clean_exit_code_for_missing_executable(monkeypatch):
     def fake_run(command, **kwargs):
         raise FileNotFoundError(command[0])
 
-    monkeypatch.setattr("lamin_cli.__main__._probe_exec_version", lambda executable: None)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._probe_exec_version", lambda executable: None
+    )
     monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
 
     _delete_exec_records("missing-command")
@@ -158,11 +159,15 @@ def test_parse_lamin_exec_uri_rejects_invalid_inputs(uri: str):
         parse_lamin_exec_uri(uri)
 
 
-def test_rewrite_exec_argv_replaces_lamin_uri_with_cached_path(monkeypatch, tmp_path: Path):
+def test_rewrite_exec_argv_replaces_lamin_uri_with_cached_path(
+    monkeypatch, tmp_path: Path
+):
     cache_path = tmp_path / "artifact-cache"
     artifact = SimpleNamespace(cache=lambda: cache_path)
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = [
         "lamin://laminlabs/demo/artifact/1234567890abcdef/path/to/data.csv",
@@ -196,7 +201,9 @@ def test_rewrite_exec_argv_prefers_mounted_storage_path_when_present(
         cache=lambda: cache_path,
     )
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef"]
 
@@ -220,7 +227,9 @@ def test_rewrite_exec_argv_falls_back_to_cache_when_mount_path_missing(
         cache=lambda: cache_path,
     )
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef"]
 
@@ -247,7 +256,9 @@ def test_rewrite_exec_argv_applies_optional_subpath_to_mounted_roots(
         cache=lambda: cache_path,
     )
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef/nested/input.csv"]
 
@@ -257,7 +268,9 @@ def test_rewrite_exec_argv_applies_optional_subpath_to_mounted_roots(
     ) == [str(mounted_path)]
 
 
-def test_rewrite_exec_argv_supports_repeated_mount_mappings(monkeypatch, tmp_path: Path):
+def test_rewrite_exec_argv_supports_repeated_mount_mappings(
+    monkeypatch, tmp_path: Path
+):
     first_storage_root = tmp_path / "storage-root-a"
     second_storage_root = tmp_path / "storage-root-b"
     artifact_path = second_storage_root / "dataset" / "input.csv"
@@ -274,7 +287,9 @@ def test_rewrite_exec_argv_supports_repeated_mount_mappings(monkeypatch, tmp_pat
         cache=lambda: cache_path,
     )
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef"]
 
@@ -306,7 +321,9 @@ def test_rewrite_exec_argv_supports_s3_mount_storage_mappings(
         cache=lambda: cache_path,
     )
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef"]
 
@@ -338,7 +355,9 @@ def test_rewrite_exec_argv_prefers_most_specific_mount_storage_mapping(
         cache=lambda: cache_path,
     )
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
 
     argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef"]
 
@@ -375,7 +394,9 @@ def test_exec_mount_storage_option_rewrites_target_before_launch(
         recorded["kwargs"] = kwargs
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
     monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
 
     result = CliRunner().invoke(
@@ -466,7 +487,9 @@ def test_exec_reads_mount_storage_mappings_from_machine_local_config(
         recorded["kwargs"] = kwargs
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
     monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
 
     result = CliRunner().invoke(
@@ -514,7 +537,9 @@ def test_exec_mount_storage_option_overrides_machine_local_config(
         recorded["kwargs"] = kwargs
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
     monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
 
     result = CliRunner().invoke(
@@ -582,7 +607,9 @@ def test_exec_reports_invalid_machine_local_mount_storage_config(tmp_path: Path)
     assert "lamin settings mount-storage set" in result.output
 
 
-@pytest.mark.parametrize("mapping", ["missing-separator", "=mount-root", "storage-root="])
+@pytest.mark.parametrize(
+    "mapping", ["missing-separator", "=mount-root", "storage-root="]
+)
 def test_parse_mount_storage_mappings_rejects_invalid_syntax(mapping: str):
     with pytest.raises(click.BadParameter):
         parse_mount_storage_mappings((mapping,))
@@ -599,7 +626,9 @@ def test_exec_rewrites_lamin_uri_before_launch(monkeypatch, tmp_path: Path):
         recorded["kwargs"] = kwargs
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr(
+        "lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact
+    )
     monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
 
     target = "lamin://laminlabs/demo/artifact/1234567890abcdef/path/to/script.py"

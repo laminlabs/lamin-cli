@@ -7,8 +7,8 @@ import shutil
 import subprocess
 import sys
 import warnings
-from datetime import datetime, timezone
 from collections import OrderedDict
+from datetime import datetime, timezone
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -132,7 +132,12 @@ except PackageNotFoundError:
 
 def classify_exec_target(target: str) -> Literal["script", "executable"]:
     """Classify an exec target as a local script or an opaque executable."""
-    return "script" if Path(target).suffix in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"} else "executable"
+    return (
+        "script"
+        if Path(target).suffix
+        in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"}
+        else "executable"
+    )
 
 
 def _probe_exec_version(executable: str) -> str | None:
@@ -164,25 +169,27 @@ def _prepare_exec_transform(target: str, target_kind: Literal["script", "executa
     target_path = Path(target)
     key = target_path.name
     if target_kind == "script":
-        return ln.Transform(
+        transform = ln.Transform(
             key=key,
             source_code=target_path.read_text(),
             kind="script",
-            branch=ln_setup.settings.branch,
-            space=ln_setup.settings.space,
-        ).save()
+        )
+        transform.branch = ln_setup.settings.branch
+        transform.space = ln_setup.settings.space
+        return transform.save()
 
     description = key
     version_output = _probe_exec_version(target)
     if version_output is not None:
         description = f"{key} ({version_output})"
-    return ln.Transform(
+    transform = ln.Transform(
         key=key,
         kind="pipeline",
         description=description,
-        branch=ln_setup.settings.branch,
-        space=ln_setup.settings.space,
-    ).save()
+    )
+    transform.branch = ln_setup.settings.branch
+    transform.space = ln_setup.settings.space
+    return transform.save()
 
 
 def parse_lamin_exec_uri(uri: str) -> tuple[str, str, Path | None]:
@@ -276,7 +283,9 @@ def _resolve_mounted_exec_path(
 
         resolved_artifact_path = str(artifact_path.resolve())
         resolved_storage_root = str(UPath(candidate_storage_root).resolve())
-        relative_path = resolved_artifact_path.removeprefix(resolved_storage_root).lstrip("/")
+        relative_path = resolved_artifact_path.removeprefix(
+            resolved_storage_root
+        ).lstrip("/")
 
         mounted_path = mount_root / Path(relative_path)
         if subpath is not None:
@@ -295,9 +304,7 @@ def resolve_lamin_exec_arg(
 
     instance_slug, uid, subpath = parse_lamin_exec_uri(arg)
     artifact = _load_exec_artifact(instance_slug, uid)
-    mounted_path = _resolve_mounted_exec_path(
-        artifact, subpath, mount_storage_mappings
-    )
+    mounted_path = _resolve_mounted_exec_path(artifact, subpath, mount_storage_mappings)
     if mounted_path is not None:
         return str(mounted_path)
 
@@ -497,6 +504,7 @@ def exec_(
     """
     import lamindb as ln
     from lamindb._finish import save_run_logs
+
     from lamin_cli._settings import read_mount_storage_config
 
     configured_mount_storage = read_mount_storage_config() if not mount_storage else ()
