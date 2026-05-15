@@ -228,14 +228,23 @@ def _load_exec_artifact(instance_slug: str, uid: str):
 def parse_mount_storage_mappings(
     mappings: tuple[str, ...],
 ) -> tuple[tuple[str, Path], ...]:
+    from lamindb_setup.core.upath import UPath
+
     parsed_mappings: list[tuple[str, Path]] = []
+    seen_storage_roots: set[str] = set()
     for mapping in mappings:
         storage_root, separator, mount_root = mapping.partition("=")
         if not separator or not storage_root or not mount_root:
             raise click.BadParameter(
                 "Expected --mount-storage <storage-root>=<mount-root>."
             )
-        parsed_mappings.append((storage_root, Path(mount_root)))
+        normalized_storage_root = str(UPath(storage_root).resolve())
+        if normalized_storage_root in seen_storage_roots:
+            raise click.BadParameter(
+                "Duplicate --mount-storage storage root after normalization."
+            )
+        seen_storage_roots.add(normalized_storage_root)
+        parsed_mappings.append((normalized_storage_root, Path(mount_root)))
     return tuple(parsed_mappings)
 
 
@@ -257,7 +266,11 @@ def _resolve_mounted_exec_path(
 
     artifact_path = UPath(str(artifact_raw_path))
 
-    for candidate_storage_root, mount_root in mount_storage_mappings:
+    for candidate_storage_root, mount_root in sorted(
+        mount_storage_mappings,
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
         if not check_path_is_child_of_root(artifact_path, candidate_storage_root):
             continue
 
@@ -487,9 +500,16 @@ def exec_(
     from lamin_cli._settings import read_mount_storage_config
 
     configured_mount_storage = read_mount_storage_config() if not mount_storage else ()
-    mount_storage_mappings = parse_mount_storage_mappings(
-        mount_storage or configured_mount_storage
-    )
+    try:
+        mount_storage_mappings = parse_mount_storage_mappings(
+            mount_storage or configured_mount_storage
+        )
+    except click.BadParameter as error:
+        if configured_mount_storage:
+            raise click.BadParameter(
+                "Invalid machine-local mount-storage mapping. Fix it with `lamin settings mount-storage set ...` or `lamin settings mount-storage unset`."
+            ) from error
+        raise
     resolved_target = resolve_lamin_exec_arg(target, mount_storage_mappings)
     target_kind = classify_exec_target(resolved_target)
     transform = _prepare_exec_transform(resolved_target, target_kind)

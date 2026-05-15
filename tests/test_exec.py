@@ -316,6 +316,43 @@ def test_rewrite_exec_argv_supports_s3_mount_storage_mappings(
     ) == [str(mounted_path)]
 
 
+def test_rewrite_exec_argv_prefers_most_specific_mount_storage_mapping(
+    monkeypatch, tmp_path: Path
+):
+    broader_storage_root = "s3://bucket"
+    specific_storage_root = "s3://bucket/prefix"
+    artifact_path = "s3://bucket/prefix/dataset/input.csv"
+    broader_mount_root = tmp_path / "mount-root-broader"
+    broader_mounted_path = broader_mount_root / "prefix" / "dataset" / "input.csv"
+    broader_mounted_path.parent.mkdir(parents=True, exist_ok=True)
+    broader_mounted_path.write_text("broader")
+    specific_mount_root = tmp_path / "mount-root-specific"
+    specific_mounted_path = specific_mount_root / "dataset" / "input.csv"
+    specific_mounted_path.parent.mkdir(parents=True, exist_ok=True)
+    specific_mounted_path.write_text("specific")
+    cache_path = tmp_path / "artifact-cache"
+
+    artifact = SimpleNamespace(
+        path=artifact_path,
+        storage=SimpleNamespace(root=specific_storage_root),
+        cache=lambda: cache_path,
+    )
+
+    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+
+    argv = ["lamin://laminlabs/demo/artifact/1234567890abcdef"]
+
+    assert rewrite_exec_argv(
+        argv,
+        parse_mount_storage_mappings(
+            (
+                f"{broader_storage_root}={broader_mount_root}",
+                f"{specific_storage_root}={specific_mount_root}",
+            )
+        ),
+    ) == [str(specific_mounted_path)]
+
+
 def test_exec_mount_storage_option_rewrites_target_before_launch(
     monkeypatch, tmp_path: Path
 ):
@@ -513,6 +550,36 @@ def test_settings_mount_storage_stays_machine_local(tmp_path: Path):
     assert _mount_storage_config_path().parent == ln_setup.settings.settings_dir
     assert current_instance_settings_file().read_text() == current_instance_before
     assert instance_settings_path.read_text() == instance_settings_before
+
+
+def test_settings_mount_storage_rejects_duplicate_normalized_storage_roots(
+    tmp_path: Path,
+):
+    runner = CliRunner()
+
+    result = runner.invoke(
+        main,
+        [
+            "settings",
+            "mount-storage",
+            "set",
+            f"s3://bucket/prefix={tmp_path / 'mount-a'}",
+            f"s3://bucket/prefix/={tmp_path / 'mount-b'}",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Duplicate --mount-storage storage root" in result.output
+
+
+def test_exec_reports_invalid_machine_local_mount_storage_config(tmp_path: Path):
+    _mount_storage_config_path().write_text("missing-separator\n")
+
+    result = CliRunner().invoke(main, ["exec", "python"])
+
+    assert result.exit_code != 0
+    assert "Invalid machine-local mount-storage mapping" in result.output
+    assert "lamin settings mount-storage set" in result.output
 
 
 @pytest.mark.parametrize("mapping", ["missing-separator", "=mount-root", "storage-root="])
