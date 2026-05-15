@@ -484,8 +484,12 @@ def exec_(
     """
     import lamindb as ln
     from lamindb._finish import save_run_logs
+    from lamin_cli._settings import read_mount_storage_config
 
-    mount_storage_mappings = parse_mount_storage_mappings(mount_storage)
+    configured_mount_storage = read_mount_storage_config() if not mount_storage else ()
+    mount_storage_mappings = parse_mount_storage_mappings(
+        mount_storage or configured_mount_storage
+    )
     resolved_target = resolve_lamin_exec_arg(target, mount_storage_mappings)
     target_kind = classify_exec_target(resolved_target)
     transform = _prepare_exec_transform(resolved_target, target_kind)

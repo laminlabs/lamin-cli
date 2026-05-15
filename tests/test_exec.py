@@ -5,9 +5,14 @@ from types import SimpleNamespace
 from pathlib import Path
 
 import lamindb as ln
+import lamindb_setup as ln_setup
 import click
 import pytest
 from click.testing import CliRunner
+from lamindb_setup.core._settings_store import (
+    current_instance_settings_file,
+    instance_settings_file,
+)
 
 from lamin_cli.__main__ import (
     classify_exec_target,
@@ -35,6 +40,18 @@ def _delete_exec_records(key: str) -> None:
         run.delete(permanent=True)
     for transform in ln.Transform.filter(key=key).all():
         transform.delete(permanent=True)
+
+
+def _mount_storage_config_path() -> Path:
+    return ln_setup.settings.settings_dir / "exec-mount-storage.txt"
+
+
+@pytest.fixture(autouse=True)
+def clear_mount_storage_config():
+    config_path = _mount_storage_config_path()
+    config_path.unlink(missing_ok=True)
+    yield
+    config_path.unlink(missing_ok=True)
 
 
 def test_exec_forwards_child_argv(monkeypatch, tmp_path: Path):
@@ -337,6 +354,165 @@ def test_exec_mount_storage_option_rewrites_target_before_launch(
     assert result.exit_code == 0, result.output
     assert recorded["command"] == [str(mounted_path)]
     assert recorded["kwargs"] == {"check": False}
+
+
+def test_settings_mount_storage_persists_one_or_more_machine_local_mappings(
+    tmp_path: Path,
+):
+    first_mapping = f"s3://bucket-a/prefix={tmp_path / 'mount-a'}"
+    second_mapping = f"s3://bucket-b/prefix={tmp_path / 'mount-b'}"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        main,
+        ["settings", "mount-storage", "set", first_mapping, second_mapping],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _mount_storage_config_path().exists()
+    assert _mount_storage_config_path().read_text().splitlines() == [
+        first_mapping,
+        second_mapping,
+    ]
+
+    get_result = runner.invoke(main, ["settings", "mount-storage", "get"])
+
+    assert get_result.exit_code == 0, get_result.output
+    assert get_result.output.strip().splitlines() == [first_mapping, second_mapping]
+
+
+def test_settings_mount_storage_get_returns_none_when_unset():
+    result = CliRunner().invoke(main, ["settings", "mount-storage", "get"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "None"
+
+
+def test_settings_mount_storage_unset_removes_machine_local_config(tmp_path: Path):
+    mapping = f"s3://bucket/prefix={tmp_path / 'mount-root'}"
+    runner = CliRunner()
+
+    set_result = runner.invoke(main, ["settings", "mount-storage", "set", mapping])
+
+    assert set_result.exit_code == 0, set_result.output
+    assert _mount_storage_config_path().exists()
+
+    unset_result = runner.invoke(main, ["settings", "mount-storage", "unset"])
+
+    assert unset_result.exit_code == 0, unset_result.output
+    assert not _mount_storage_config_path().exists()
+
+
+def test_exec_reads_mount_storage_mappings_from_machine_local_config(
+    monkeypatch, tmp_path: Path
+):
+    recorded: dict[str, object] = {}
+    storage_root = "s3://bucket/prefix"
+    mount_root = tmp_path / "mount-root"
+    mounted_path = mount_root / "dataset" / "script.py"
+    mounted_path.parent.mkdir(parents=True, exist_ok=True)
+    mounted_path.write_text("print('mounted script')\n")
+    artifact = SimpleNamespace(
+        path=f"{storage_root}/dataset/script.py",
+        storage=SimpleNamespace(root=storage_root),
+        cache=lambda: tmp_path / "artifact-cache",
+    )
+
+    set_result = CliRunner().invoke(
+        main,
+        ["settings", "mount-storage", "set", f"{storage_root}={mount_root}"],
+    )
+    assert set_result.exit_code == 0, set_result.output
+
+    def fake_run(command, **kwargs):
+        recorded["command"] = command
+        recorded["kwargs"] = kwargs
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
+
+    result = CliRunner().invoke(
+        main,
+        ["exec", "lamin://laminlabs/demo/artifact/1234567890abcdef"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert recorded["command"] == [str(mounted_path)]
+    assert recorded["kwargs"] == {"check": False}
+
+
+def test_exec_mount_storage_option_overrides_machine_local_config(
+    monkeypatch, tmp_path: Path
+):
+    recorded: dict[str, object] = {}
+    storage_root = "s3://bucket/prefix"
+    configured_mount_root = tmp_path / "configured-mount-root"
+    configured_mounted_path = configured_mount_root / "dataset" / "script.py"
+    configured_mounted_path.parent.mkdir(parents=True, exist_ok=True)
+    configured_mounted_path.write_text("print('configured')\n")
+    cli_mount_root = tmp_path / "cli-mount-root"
+    cli_mounted_path = cli_mount_root / "dataset" / "script.py"
+    cli_mounted_path.parent.mkdir(parents=True, exist_ok=True)
+    cli_mounted_path.write_text("print('cli')\n")
+    artifact = SimpleNamespace(
+        path=f"{storage_root}/dataset/script.py",
+        storage=SimpleNamespace(root=storage_root),
+        cache=lambda: tmp_path / "artifact-cache",
+    )
+
+    set_result = CliRunner().invoke(
+        main,
+        [
+            "settings",
+            "mount-storage",
+            "set",
+            f"{storage_root}={configured_mount_root}",
+        ],
+    )
+    assert set_result.exit_code == 0, set_result.output
+
+    def fake_run(command, **kwargs):
+        recorded["command"] = command
+        recorded["kwargs"] = kwargs
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("lamin_cli.__main__._load_exec_artifact", lambda instance, uid: artifact)
+    monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "exec",
+            "--mount-storage",
+            f"{storage_root}={cli_mount_root}",
+            "lamin://laminlabs/demo/artifact/1234567890abcdef",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert recorded["command"] == [str(cli_mounted_path)]
+    assert recorded["kwargs"] == {"check": False}
+
+
+def test_settings_mount_storage_stays_machine_local(tmp_path: Path):
+    first_mapping = f"s3://bucket-a/prefix={tmp_path / 'mount-a'}"
+    current_instance_before = current_instance_settings_file().read_text()
+    instance_settings_path = instance_settings_file(
+        ln_setup.settings.instance.name,
+        ln_setup.settings.instance.owner,
+    )
+    instance_settings_before = instance_settings_path.read_text()
+
+    result = CliRunner().invoke(
+        main,
+        ["settings", "mount-storage", "set", first_mapping],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _mount_storage_config_path().parent == ln_setup.settings.settings_dir
+    assert current_instance_settings_file().read_text() == current_instance_before
+    assert instance_settings_path.read_text() == instance_settings_before
 
 
 @pytest.mark.parametrize("mapping", ["missing-separator", "=mount-root", "storage-root="])
