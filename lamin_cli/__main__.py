@@ -234,6 +234,40 @@ def rewrite_exec_argv(argv: list[str]) -> list[str]:
     return [resolve_lamin_exec_arg(arg) for arg in argv]
 
 
+def _collect_exec_output_paths(
+    argv: list[str], register_outputs: tuple[str, ...]
+) -> list[Path]:
+    output_paths = [Path(output) for output in register_outputs]
+    passthrough_argv = argv[1:]
+    i = 0
+    while i < len(passthrough_argv):
+        arg = passthrough_argv[i]
+        if arg in {"--out", "--output"}:
+            if i + 1 < len(passthrough_argv):
+                value = passthrough_argv[i + 1]
+                if not value.startswith("-"):
+                    output_paths.append(Path(value))
+                    i += 2
+                    continue
+        elif arg.startswith("--out="):
+            output_paths.append(Path(arg.partition("=")[2]))
+        elif arg.startswith("--output="):
+            output_paths.append(Path(arg.partition("=")[2]))
+        i += 1
+    return output_paths
+
+
+def _register_exec_outputs(run, output_paths: list[Path]) -> None:
+    import lamindb as ln
+
+    seen_paths: set[Path] = set()
+    for output_path in output_paths:
+        if output_path in seen_paths or not output_path.exists():
+            continue
+        seen_paths.add(output_path)
+        ln.Artifact(output_path, key=output_path.name, run=run).save()
+
+
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb-core")
 def main():
@@ -356,8 +390,15 @@ def disconnect(here: bool):
 
 @main.command("exec", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
 @click.argument("target", type=str)
+@click.option(
+    "--register-output",
+    "register_outputs",
+    multiple=True,
+    type=str,
+    help="Register an output artifact path after execution.",
+)
 @click.pass_context
-def exec_(ctx: click.Context, target: str):
+def exec_(ctx: click.Context, target: str, register_outputs: tuple[str, ...]):
     """Execute a local script or opaque executable.
 
     The target is launched directly and all remaining argv tokens are passed to the
@@ -366,25 +407,33 @@ def exec_(ctx: click.Context, target: str):
     import lamindb as ln
     from lamindb._finish import save_run_logs
 
-    child_argv = rewrite_exec_argv([target, *ctx.args])
-    target_kind = classify_exec_target(child_argv[0])
-    transform = _prepare_exec_transform(child_argv[0], target_kind)
+    resolved_target = resolve_lamin_exec_arg(target)
+    target_kind = classify_exec_target(resolved_target)
+    transform = _prepare_exec_transform(resolved_target, target_kind)
     run = ln.Run(transform=transform)
     run.started_at = datetime.now(timezone.utc)
     run._status_code = -1
-    run.cli_args = shlex.join(child_argv)
     run.save()
 
+    previous_run = ln.context.run
+    ln.context._run = run
     ln.context._stream_tracker.start(run)
     returncode = 1
     try:
+        child_argv = rewrite_exec_argv([resolved_target, *ctx.args])
+        run.cli_args = shlex.join(child_argv)
+        run.save()
         result = subprocess.run(child_argv, check=False)
         returncode = result.returncode
+        _register_exec_outputs(
+            run, _collect_exec_output_paths(child_argv, register_outputs)
+        )
     finally:
         run._status_code = returncode
         run.finished_at = datetime.now(timezone.utc)
         run.save()
         ln.context._stream_tracker.finish()
+        ln.context._run = previous_run
         save_run_logs(run, save_run=True)
     raise SystemExit(returncode)
 
