@@ -142,7 +142,10 @@ def _probe_exec_version(executable: str) -> str | None:
             capture_output=True,
             check=False,
             text=True,
+            timeout=5,
         )
+    except subprocess.TimeoutExpired:
+        return None
     except OSError:
         return None
 
@@ -203,6 +206,9 @@ def parse_lamin_exec_uri(uri: str) -> tuple[str, str, Path | None]:
             f"Artifact uid must be 16 or 20 characters, got {len(uid)}."
         )
 
+    if not uid.isalnum():
+        raise click.BadParameter("Artifact uid must be alphanumeric.")
+
     if any(part == "" for part in subpath_parts):
         raise click.BadParameter(
             "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
@@ -219,19 +225,79 @@ def _load_exec_artifact(instance_slug: str, uid: str):
     return ln.Artifact.get(uid)
 
 
-def resolve_lamin_exec_arg(arg: str) -> str:
+def parse_mount_storage_mappings(
+    mappings: tuple[str, ...],
+) -> tuple[tuple[str, Path], ...]:
+    parsed_mappings: list[tuple[str, Path]] = []
+    for mapping in mappings:
+        storage_root, separator, mount_root = mapping.partition("=")
+        if not separator or not storage_root or not mount_root:
+            raise click.BadParameter(
+                "Expected --mount-storage <storage-root>=<mount-root>."
+            )
+        parsed_mappings.append((storage_root, Path(mount_root)))
+    return tuple(parsed_mappings)
+
+
+def _resolve_mounted_exec_path(
+    artifact,
+    subpath: Path | None,
+    mount_storage_mappings: tuple[tuple[str, Path], ...],
+) -> Path | None:
+    if not mount_storage_mappings:
+        return None
+
+    from lamindb.core.storage.paths import check_path_is_child_of_root
+    from lamindb_setup.core.upath import UPath
+
+    artifact_storage = getattr(artifact, "storage", None)
+    artifact_raw_path = getattr(artifact, "path", None)
+    if artifact_raw_path is None or artifact_storage is None:
+        return None
+
+    artifact_path = UPath(str(artifact_raw_path))
+
+    for candidate_storage_root, mount_root in mount_storage_mappings:
+        if not check_path_is_child_of_root(artifact_path, candidate_storage_root):
+            continue
+
+        resolved_artifact_path = str(artifact_path.resolve())
+        resolved_storage_root = str(UPath(candidate_storage_root).resolve())
+        relative_path = resolved_artifact_path.removeprefix(resolved_storage_root).lstrip("/")
+
+        mounted_path = mount_root / Path(relative_path)
+        if subpath is not None:
+            mounted_path = mounted_path / subpath
+        if mounted_path.exists():
+            return mounted_path
+
+    return None
+
+
+def resolve_lamin_exec_arg(
+    arg: str, mount_storage_mappings: tuple[tuple[str, Path], ...] = ()
+) -> str:
     if not arg.startswith("lamin://"):
         return arg
 
     instance_slug, uid, subpath = parse_lamin_exec_uri(arg)
-    cache_path = _load_exec_artifact(instance_slug, uid).cache()
+    artifact = _load_exec_artifact(instance_slug, uid)
+    mounted_path = _resolve_mounted_exec_path(
+        artifact, subpath, mount_storage_mappings
+    )
+    if mounted_path is not None:
+        return str(mounted_path)
+
+    cache_path = artifact.cache()
     if subpath is not None:
         cache_path = cache_path / subpath
     return str(cache_path)
 
 
-def rewrite_exec_argv(argv: list[str]) -> list[str]:
-    return [resolve_lamin_exec_arg(arg) for arg in argv]
+def rewrite_exec_argv(
+    argv: list[str], mount_storage_mappings: tuple[tuple[str, Path], ...] = ()
+) -> list[str]:
+    return [resolve_lamin_exec_arg(arg, mount_storage_mappings) for arg in argv]
 
 
 def _collect_exec_output_paths(
@@ -397,8 +463,20 @@ def disconnect(here: bool):
     type=str,
     help="Register an output artifact path after execution.",
 )
+@click.option(
+    "--mount-storage",
+    "mount_storage",
+    multiple=True,
+    type=str,
+    help="Map a storage root to a mounted local root for exec artifact resolution.",
+)
 @click.pass_context
-def exec_(ctx: click.Context, target: str, register_outputs: tuple[str, ...]):
+def exec_(
+    ctx: click.Context,
+    target: str,
+    register_outputs: tuple[str, ...],
+    mount_storage: tuple[str, ...],
+):
     """Execute a local script or opaque executable.
 
     The target is launched directly and all remaining argv tokens are passed to the
@@ -407,7 +485,8 @@ def exec_(ctx: click.Context, target: str, register_outputs: tuple[str, ...]):
     import lamindb as ln
     from lamindb._finish import save_run_logs
 
-    resolved_target = resolve_lamin_exec_arg(target)
+    mount_storage_mappings = parse_mount_storage_mappings(mount_storage)
+    resolved_target = resolve_lamin_exec_arg(target, mount_storage_mappings)
     target_kind = classify_exec_target(resolved_target)
     transform = _prepare_exec_transform(resolved_target, target_kind)
     run = ln.Run(transform=transform)
@@ -420,7 +499,9 @@ def exec_(ctx: click.Context, target: str, register_outputs: tuple[str, ...]):
     ln.context._stream_tracker.start(run)
     returncode = 1
     try:
-        child_argv = rewrite_exec_argv([resolved_target, *ctx.args])
+        child_argv = rewrite_exec_argv(
+            [resolved_target, *ctx.args], mount_storage_mappings
+        )
         run.cli_args = shlex.join(child_argv)
         run.save()
         result = subprocess.run(child_argv, check=False)
@@ -428,6 +509,8 @@ def exec_(ctx: click.Context, target: str, register_outputs: tuple[str, ...]):
         _register_exec_outputs(
             run, _collect_exec_output_paths(child_argv, register_outputs)
         )
+    except FileNotFoundError:
+        returncode = 127
     finally:
         run._status_code = returncode
         run.finished_at = datetime.now(timezone.utc)
