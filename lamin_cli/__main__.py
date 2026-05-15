@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import inspect
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import warnings
+from datetime import datetime, timezone
 from collections import OrderedDict
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
@@ -131,6 +133,53 @@ except PackageNotFoundError:
 def classify_exec_target(target: str) -> Literal["script", "executable"]:
     """Classify an exec target as a local script or an opaque executable."""
     return "script" if Path(target).suffix in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"} else "executable"
+
+
+def _probe_exec_version(executable: str) -> str | None:
+    try:
+        result = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    version_output = (result.stdout or result.stderr).strip()
+    if not version_output:
+        return None
+    return version_output.splitlines()[0]
+
+
+def _prepare_exec_transform(target: str, target_kind: Literal["script", "executable"]):
+    import lamindb as ln
+
+    target_path = Path(target)
+    key = target_path.name
+    if target_kind == "script":
+        return ln.Transform(
+            key=key,
+            source_code=target_path.read_text(),
+            kind="script",
+            branch=ln_setup.settings.branch,
+            space=ln_setup.settings.space,
+        ).save()
+
+    description = key
+    version_output = _probe_exec_version(target)
+    if version_output is not None:
+        description = f"{key} ({version_output})"
+    return ln.Transform(
+        key=key,
+        kind="pipeline",
+        description=description,
+        branch=ln_setup.settings.branch,
+        space=ln_setup.settings.space,
+    ).save()
 
 
 def parse_lamin_exec_uri(uri: str) -> tuple[str, str, Path | None]:
@@ -314,9 +363,30 @@ def exec_(ctx: click.Context, target: str):
     The target is launched directly and all remaining argv tokens are passed to the
     child process unchanged.
     """
-    _ = classify_exec_target(target)
-    result = subprocess.run(rewrite_exec_argv([target, *ctx.args]), check=False)
-    raise SystemExit(result.returncode)
+    import lamindb as ln
+    from lamindb._finish import save_run_logs
+
+    child_argv = rewrite_exec_argv([target, *ctx.args])
+    target_kind = classify_exec_target(child_argv[0])
+    transform = _prepare_exec_transform(child_argv[0], target_kind)
+    run = ln.Run(transform=transform)
+    run.started_at = datetime.now(timezone.utc)
+    run._status_code = -1
+    run.cli_args = shlex.join(child_argv)
+    run.save()
+
+    ln.context._stream_tracker.start(run)
+    returncode = 1
+    try:
+        result = subprocess.run(child_argv, check=False)
+        returncode = result.returncode
+    finally:
+        run._status_code = returncode
+        run.finished_at = datetime.now(timezone.utc)
+        run.save()
+        ln.context._stream_tracker.finish()
+        save_run_logs(run, save_run=True)
+    raise SystemExit(returncode)
 
 
 # fmt: off

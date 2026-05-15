@@ -4,6 +4,7 @@ import subprocess
 from types import SimpleNamespace
 from pathlib import Path
 
+import lamindb as ln
 import click
 import pytest
 from click.testing import CliRunner
@@ -14,6 +15,17 @@ from lamin_cli.__main__ import (
     parse_lamin_exec_uri,
     rewrite_exec_argv,
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def connected_instance(tmp_path_factory):
+    if ln.setup.settings._instance_exists:
+        yield
+        return
+
+    storage = tmp_path_factory.mktemp("lamin-cli-exec-storage")
+    ln.setup.init(storage=str(storage), name="lamin-cli-exec-tests")
+    yield
 
 
 def test_exec_forwards_child_argv(monkeypatch, tmp_path: Path):
@@ -130,6 +142,9 @@ def test_exec_rewrites_lamin_uri_before_launch(monkeypatch, tmp_path: Path):
     monkeypatch.setattr("lamin_cli.__main__.subprocess.run", fake_run)
 
     target = "lamin://laminlabs/demo/artifact/1234567890abcdef/path/to/script.py"
+    rewritten_target = cache_path / "path/to/script.py"
+    rewritten_target.parent.mkdir(parents=True, exist_ok=True)
+    rewritten_target.write_text("print('cached script')\n")
 
     result = CliRunner().invoke(main, ["exec", target, "--input", target])
 
