@@ -287,11 +287,6 @@ def test_run_save_with_params():
     env["LAMIN_TESTING"] = "true"
     filepath = scripts_dir / "run-track-with-params.py"
 
-    # define params
-    ln.Param(name="dataset_key", dtype="str").save()
-    ln.Param(name="learning_rate", dtype="float").save()
-    ln.Param(name="downsample", dtype="bool").save()
-
     # run the script
     result = subprocess.run(
         f"python {filepath} --dataset-key mydata --learning-rate 0.01 --downsample",
