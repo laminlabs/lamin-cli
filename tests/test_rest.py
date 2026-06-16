@@ -366,6 +366,8 @@ def test_rest_statistics_constructs_request(monkeypatch):
             "core.ULabel",
             "--model",
             "core.Artifact",
+            "--format",
+            "json",
             "--compact",
         ],
     )
@@ -388,7 +390,9 @@ def test_rest_statistics_module_scope_constructs_request(monkeypatch):
 
     calls = _patch_statistics_request_json(monkeypatch, handler)
 
-    result = CliRunner().invoke(rest, ["statistics", "core", "--compact"])
+    result = CliRunner().invoke(
+        rest, ["statistics", "core", "--format", "json", "--compact"]
+    )
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {
@@ -409,7 +413,9 @@ def test_rest_statistics_model_scope_constructs_request(monkeypatch):
 
     calls = _patch_statistics_request_json(monkeypatch, handler)
 
-    result = CliRunner().invoke(rest, ["statistics", "core", "artifact", "--compact"])
+    result = CliRunner().invoke(
+        rest, ["statistics", "core", "artifact", "--format", "json", "--compact"]
+    )
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {
@@ -432,11 +438,52 @@ def test_rest_statistics_object_scope_constructs_relation_counts_request(monkeyp
 
     result = CliRunner().invoke(
         rest,
-        ["statistics", "core", "artifact", "123", "--compact"],
+        ["statistics", "core", "artifact", "123", "--format", "json", "--compact"],
     )
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {"projects": 1, "ulabels": 2}
+    assert calls == [
+        ("get", "schema", None, None),
+        ("get", "modules/core/artifact/123/counts", None, None),
+    ]
+
+
+def test_rest_statistics_markdown_summary_by_default(monkeypatch):
+    def handler(method, path, params, body):
+        if path == "schema":
+            return _schema_payload()
+        return {"instance_size": 123, "counts": {"core": {"Artifact": 1}}}
+
+    calls = _patch_statistics_request_json(monkeypatch, handler)
+
+    result = CliRunner().invoke(rest, ["statistics", "core", "artifact"])
+
+    assert result.exit_code == 0, result.output
+    assert "# Statistics" in result.output
+    assert "- instance size: 123 bytes" in result.output
+    assert "## Counts" in result.output
+    assert "- core.Artifact: 1" in result.output
+    assert calls == [
+        ("get", "schema", None, None),
+        ("get", "statistics", {"q": ["core.Artifact"]}, None),
+    ]
+
+
+def test_rest_statistics_relation_counts_markdown_by_default(monkeypatch):
+    def handler(method, path, params, body):
+        if path == "schema":
+            return _schema_payload()
+        return {"projects": 1, "ulabels": 2}
+
+    calls = _patch_statistics_request_json(monkeypatch, handler)
+
+    result = CliRunner().invoke(rest, ["statistics", "core", "artifact", "123"])
+
+    assert result.exit_code == 0, result.output
+    assert "# Relation Counts" in result.output
+    assert "- projects: 1" in result.output
+    assert "- ulabels: 2" in result.output
     assert calls == [
         ("get", "schema", None, None),
         ("get", "modules/core/artifact/123/counts", None, None),

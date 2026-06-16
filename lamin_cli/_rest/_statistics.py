@@ -13,6 +13,61 @@ from ._schema import (
 from ._utils import _module_model_path, _print_json, request_json
 
 
+def _format_count_value(value: Any) -> str:
+    if isinstance(value, (int, float, str)):
+        return str(value)
+    return repr(value)
+
+
+def _format_statistics_markdown(data: Any) -> str:
+    lines = ["# Statistics"]
+    counts = None
+    if isinstance(data, dict):
+        if "instance_size" in data:
+            lines.append(f"- instance size: {data['instance_size']} bytes")
+        counts = data.get("counts")
+
+    lines.append("")
+    lines.append("## Counts")
+    count_lines = []
+    if isinstance(counts, dict):
+        for module, models in sorted(counts.items()):
+            if isinstance(models, dict):
+                for model, count in sorted(models.items()):
+                    count_lines.append(
+                        f"- {module}.{model}: {_format_count_value(count)}"
+                    )
+            else:
+                count_lines.append(f"- {module}: {_format_count_value(models)}")
+    lines.extend(count_lines or ["- none"])
+    return "\n".join(lines)
+
+
+def _format_relation_counts_markdown(data: Any) -> str:
+    lines = ["# Relation Counts"]
+    if isinstance(data, dict) and data:
+        for name, count in sorted(data.items()):
+            lines.append(f"- {name}: {_format_count_value(count)}")
+    else:
+        lines.append("- none")
+    return "\n".join(lines)
+
+
+def _print_statistics(
+    data: Any,
+    *,
+    format_: str,
+    compact: bool,
+    relation_counts: bool,
+) -> None:
+    if format_ == "json":
+        _print_json(data, compact=compact)
+    elif relation_counts:
+        click.echo(_format_relation_counts_markdown(data))
+    else:
+        click.echo(_format_statistics_markdown(data))
+
+
 def _statistics_models_for_scope(
     schema: dict[str, Any],
     module: str,
@@ -71,12 +126,21 @@ def _statistics_params(
         "Repeat for multiple models."
     ),
 )
+@click.option(
+    "--format",
+    "format_",
+    type=click.Choice(["markdown", "json"]),
+    default="markdown",
+    show_default=True,
+    help="Output format.",
+)
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def statistics(
     module: str | None,
     model: str | None,
     id: int | None,
     models: tuple[str, ...],
+    format_: str,
     compact: bool,
 ) -> None:
     """Read table counts or relation counts.
@@ -87,6 +151,7 @@ def statistics(
       lamin rest statistics core
       lamin rest statistics core ulabel
       lamin rest statistics core artifact 123
+      lamin rest statistics core ulabel --format json --compact
       lamin rest statistics --model core.ULabel --model core.Artifact
     """
     if id is not None:
@@ -97,12 +162,17 @@ def statistics(
                 "Object relation counts require MODULE MODEL ID."
             )
         data = request_json("get", _relation_counts_path(module, model, id))
-        _print_json(data, compact=compact)
+        _print_statistics(
+            data,
+            format_=format_,
+            compact=compact,
+            relation_counts=True,
+        )
         return
 
     params = _statistics_params(module, model, models)
     data = request_json("get", "statistics", params=params)
-    _print_json(data, compact=compact)
+    _print_statistics(data, format_=format_, compact=compact, relation_counts=False)
 
 
 @click.command(
