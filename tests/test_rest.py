@@ -63,9 +63,9 @@ def _patch_request_json(monkeypatch, target: str, handler):
 
 
 def _patch_schema_request_json(monkeypatch, handler):
-    calls = _patch_request_json(monkeypatch, "_schema", handler)
+    calls = _patch_request_json(monkeypatch, "_schema.utils", handler)
     monkeypatch.setattr(
-        "lamin_cli._rest._schema._current_schema_cache_path", lambda: None
+        "lamin_cli._rest._schema.utils._current_schema_cache_path", lambda: None
     )
     return calls
 
@@ -77,10 +77,10 @@ def _patch_statistics_request_json(monkeypatch, handler):
         calls.append((method, path, params, body))
         return handler(method, path, params, body)
 
-    monkeypatch.setattr("lamin_cli._rest._schema.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli._rest._schema.utils.request_json", fake_request_json)
     monkeypatch.setattr("lamin_cli._rest._statistics.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._schema._current_schema_cache_path", lambda: None
+        "lamin_cli._rest._schema.utils._current_schema_cache_path", lambda: None
     )
     return calls
 
@@ -301,12 +301,13 @@ def test_rest_schema_uses_cache(monkeypatch, tmp_path):
         calls.append((method, path, params, body))
         return _schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._schema.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli._rest._schema.utils.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._schema._current_instance", lambda: ("inst/1", "")
+        "lamin_cli._rest._schema.utils._current_instance", lambda: ("inst/1", "")
     )
     monkeypatch.setattr(
-        "lamin_cli._rest._schema._current_instance_schema_id", lambda: "schema:1"
+        "lamin_cli._rest._schema.utils._current_instance_schema_id",
+        lambda: "schema:1",
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
 
@@ -328,12 +329,13 @@ def test_rest_schema_refresh_bypasses_cache(monkeypatch, tmp_path):
         schema["new"] = {}
         return schema
 
-    monkeypatch.setattr("lamin_cli._rest._schema.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli._rest._schema.utils.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._schema._current_instance", lambda: ("inst/1", "")
+        "lamin_cli._rest._schema.utils._current_instance", lambda: ("inst/1", "")
     )
     monkeypatch.setattr(
-        "lamin_cli._rest._schema._current_instance_schema_id", lambda: "schema:1"
+        "lamin_cli._rest._schema.utils._current_instance_schema_id",
+        lambda: "schema:1",
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
 

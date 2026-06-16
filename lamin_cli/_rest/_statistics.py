@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from ._click import click
-from ._schema import (
+from ._schema.utils import (
     is_hidden_model,
     load_schema,
     module_schema,
