@@ -17,7 +17,11 @@ Read instance-level metadata.
 
 ```bash
 lamin rest schema
-lamin rest schema core artifact --compact
+lamin rest schema --models
+lamin rest schema core artifact
+lamin rest schema core artifact --format json --compact
+lamin rest schema core --include-hidden
+lamin rest schema core artifact --raw --refresh
 
 lamin rest statistics
 lamin rest statistics --model core.ULabel --model core.Artifact
@@ -121,3 +125,9 @@ lamin rest list core artifact --select '["uid","key"]'
 The commands are intentionally low-level wrappers. They build the REST path and
 request body, authenticate through the existing `lamindb-setup` client, and print
 JSON. The REST API remains responsible for model semantics and validation.
+
+`lamin rest schema` is the exception to the always-raw output style: by default it
+prints a compact markdown summary that is easier to use before composing
+`list`/`get` selects. Pass `--format json` for the summarized metadata as JSON or
+`--raw` for the unprocessed schema endpoint response. Schema responses are cached
+by current instance id and schema id; pass `--refresh` to rebuild the local cache.

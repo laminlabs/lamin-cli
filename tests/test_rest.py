@@ -6,6 +6,51 @@ from click.testing import CliRunner
 from lamin_cli._rest import rest
 
 
+def _schema_payload():
+    return {
+        "core": {
+            "artifact": {
+                "class_name": "Artifact",
+                "table_name": "lamindb_artifact",
+                "name_field": "key",
+                "fields": {
+                    "uid": {
+                        "type": "string",
+                        "column_name": "uid",
+                        "is_primary_key": False,
+                        "is_editable": False,
+                    },
+                    "_aux": {
+                        "type": "json",
+                        "column_name": "_aux",
+                        "is_primary_key": False,
+                        "is_editable": False,
+                    },
+                    "created_by": {
+                        "relation_type": "many-to-one",
+                        "related_schema_name": "core",
+                        "related_model_name": "user",
+                        "through": None,
+                    },
+                },
+            },
+            "user": {
+                "class_name": "User",
+                "fields": {
+                    "uid": {"type": "string"},
+                    "name": {"type": "string"},
+                    "handle": {"type": "string"},
+                },
+            },
+            "artifact__ulabels": {
+                "is_link_table": True,
+                "fields": {"artifact": {"relation_type": "many-to-one"}},
+            },
+        },
+        "bionty": {},
+    }
+
+
 def test_rest_list_constructs_request(monkeypatch):
     calls = []
 
@@ -98,26 +143,199 @@ def test_rest_get_constructs_request(monkeypatch):
     ]
 
 
-def test_rest_schema_scopes_response(monkeypatch):
+def test_rest_schema_raw_scopes_response(monkeypatch):
     calls = []
 
     def fake_request_json(method, path, *, params=None, body=None):
         calls.append((method, path, params, body))
-        return {
-            "core": {
-                "artifact": {"fields": {"uid": {"type": "string"}}},
-                "record": {"fields": {"name": {"type": "string"}}},
-            },
-            "bionty": {},
-        }
+        return _schema_payload()
 
     monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
+    )
 
-    result = CliRunner().invoke(rest, ["schema", "core", "artifact", "--compact"])
+    result = CliRunner().invoke(
+        rest, ["schema", "core", "artifact", "--raw", "--compact"]
+    )
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output) == {"fields": {"uid": {"type": "string"}}}
+    assert json.loads(result.output) == _schema_payload()["core"]["artifact"]
     assert calls == [("get", "schema", None, None)]
+
+
+def test_rest_schema_markdown_summary(monkeypatch):
+    def fake_request_json(method, path, *, params=None, body=None):
+        return _schema_payload()
+
+    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
+    )
+
+    result = CliRunner().invoke(rest, ["schema", "core", "artifact"])
+
+    assert result.exit_code == 0, result.output
+    assert "# Schema: core.artifact" in result.output
+    assert "- class: Artifact" in result.output
+    assert "- table: lamindb_artifact" in result.output
+    assert "- fields: 1 scalar, 1 relations, 1 hidden (3 total)" in result.output
+    assert "- uid: string" in result.output
+    assert "- created_by -> core.user (many-to-one)" in result.output
+    assert "select `" not in result.output
+    assert "_aux" not in result.output
+
+
+def test_rest_schema_models_matches_each_module_output(monkeypatch):
+    def fake_request_json(method, path, *, params=None, body=None):
+        return _schema_payload()
+
+    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
+    )
+
+    all_models = CliRunner().invoke(rest, ["schema", "--models"])
+    core = CliRunner().invoke(rest, ["schema", "core"])
+    bionty = CliRunner().invoke(rest, ["schema", "bionty"])
+
+    assert all_models.exit_code == 0, all_models.output
+    assert core.exit_code == 0, core.output
+    assert bionty.exit_code == 0, bionty.output
+    assert all_models.output == f"{bionty.output}\n{core.output}"
+
+
+def test_rest_schema_models_rejects_raw(monkeypatch):
+    monkeypatch.setattr(
+        "lamin_cli._rest._query.request_json", lambda *args, **kwargs: {}
+    )
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
+    )
+
+    result = CliRunner().invoke(rest, ["schema", "--models", "--raw"])
+
+    assert result.exit_code != 0
+    assert "--models cannot be combined with --raw." in result.output
+
+
+def test_rest_schema_json_summary_includes_hidden(monkeypatch):
+    def fake_request_json(method, path, *, params=None, body=None):
+        return _schema_payload()
+
+    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
+    )
+
+    result = CliRunner().invoke(
+        rest,
+        [
+            "schema",
+            "core",
+            "artifact",
+            "--format",
+            "json",
+            "--include-hidden",
+            "--compact",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == {
+        "scope": "model",
+        "module": "core",
+        "model": "artifact",
+        "class": "Artifact",
+        "table": "lamindb_artifact",
+        "name_field": "key",
+        "ontology_id_field": None,
+        "fields": 3,
+        "scalar_fields": [
+            {
+                "name": "uid",
+                "type": "string",
+                "column": "uid",
+                "primary_key": False,
+                "editable": False,
+            },
+            {
+                "name": "_aux",
+                "type": "json",
+                "column": "_aux",
+                "primary_key": False,
+                "editable": False,
+            },
+        ],
+        "relations": [
+            {
+                "name": "created_by",
+                "relation_type": "many-to-one",
+                "target": "core.user",
+                "through": None,
+            }
+        ],
+        "hidden_fields": 0,
+        "include_hidden": True,
+    }
+
+
+def test_rest_schema_uses_cache(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        calls.append((method, path, params, body))
+        return _schema_payload()
+
+    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_instance", lambda: ("inst/1", "")
+    )
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_instance_schema_id", lambda: "schema:1"
+    )
+    monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
+
+    first = CliRunner().invoke(rest, ["schema", "--format", "json", "--compact"])
+    second = CliRunner().invoke(rest, ["schema", "--format", "json", "--compact"])
+
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+    assert calls == [("get", "schema", None, None)]
+    assert json.loads(first.output) == json.loads(second.output)
+
+
+def test_rest_schema_refresh_bypasses_cache(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        calls.append((method, path, params, body))
+        schema = _schema_payload()
+        schema["new"] = {}
+        return schema
+
+    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_instance", lambda: ("inst/1", "")
+    )
+    monkeypatch.setattr(
+        "lamin_cli._rest._query._current_instance_schema_id", lambda: "schema:1"
+    )
+    monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
+
+    cached = tmp_path / "rest" / "schemas" / "inst_1" / "schema_1.json"
+    cached.parent.mkdir(parents=True)
+    cached.write_text(json.dumps(_schema_payload()))
+
+    result = CliRunner().invoke(
+        rest, ["schema", "--refresh", "--format", "json", "--compact"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [("get", "schema", None, None)]
+    assert any(
+        module["module"] == "new" for module in json.loads(result.output)["modules"]
+    )
 
 
 def test_rest_statistics_constructs_request(monkeypatch):

@@ -83,6 +83,16 @@ def _current_instance() -> tuple[str, str]:
     return str(instance_id), str(api_url).rstrip("/")
 
 
+def _current_instance_schema_id() -> str | None:
+    import lamindb_setup as ln_setup
+
+    instance = ln_setup.settings.instance
+    schema_id = getattr(instance, "schema_id", None) or getattr(
+        instance, "_schema_id", None
+    )
+    return None if schema_id is None else str(schema_id)
+
+
 def _access_token() -> tuple[str | None, bool]:
     import lamindb_setup as ln_setup
 
