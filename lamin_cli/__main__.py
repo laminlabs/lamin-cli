@@ -47,6 +47,10 @@ COMMAND_GROUPS = {
             "commands": ["describe", "annotate", "update", "get", "list"],
         },
         {
+            "name": "Query REST API",
+            "commands": ["rest"],
+        },
+        {
             "name": "Manage changes",
             "commands": ["switch", "merge"],
         },
@@ -112,6 +116,7 @@ from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._io import io
 from lamin_cli._migration import migrate
+from lamin_cli._rest import rest
 from lamin_cli._settings import settings
 
 if TYPE_CHECKING:
@@ -1206,14 +1211,17 @@ def _deprecated_cache_clear_cmd() -> None:
 def _deprecated_cache_get_cmd() -> None:
     _deprecated_cache_get()
 
+
+main.add_command(rest)
+
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
-def _generate_help():
+def _generate_help() -> dict[str, dict[str, str | None]]:
     out: dict[str, dict[str, str | None]] = {}
 
     def recursive_help(
         cmd: Command, parent: Context | None = None, name: tuple[str, ...] = ()
-    ):
+    ) -> None:
         if getattr(cmd, "hidden", False):
             return
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
