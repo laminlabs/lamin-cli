@@ -51,6 +51,40 @@ def _schema_payload():
     }
 
 
+def _patch_request_json(monkeypatch, target: str, handler):
+    calls = []
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        calls.append((method, path, params, body))
+        return handler(method, path, params, body)
+
+    monkeypatch.setattr(f"lamin_cli._rest.{target}.request_json", fake_request_json)
+    return calls
+
+
+def _patch_schema_request_json(monkeypatch, handler):
+    calls = _patch_request_json(monkeypatch, "_schema", handler)
+    monkeypatch.setattr(
+        "lamin_cli._rest._schema._current_schema_cache_path", lambda: None
+    )
+    return calls
+
+
+def _patch_statistics_request_json(monkeypatch, handler):
+    calls = []
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        calls.append((method, path, params, body))
+        return handler(method, path, params, body)
+
+    monkeypatch.setattr("lamin_cli._rest._schema.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli._rest._statistics.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli._rest._schema._current_schema_cache_path", lambda: None
+    )
+    return calls
+
+
 def test_rest_list_constructs_request(monkeypatch):
     calls = []
 
@@ -144,16 +178,10 @@ def test_rest_get_constructs_request(monkeypatch):
 
 
 def test_rest_schema_raw_scopes_response(monkeypatch):
-    calls = []
-
-    def fake_request_json(method, path, *, params=None, body=None):
-        calls.append((method, path, params, body))
+    def handler(method, path, params, body):
         return _schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    calls = _patch_schema_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(
         rest, ["schema", "core", "artifact", "--raw", "--compact"]
@@ -165,13 +193,10 @@ def test_rest_schema_raw_scopes_response(monkeypatch):
 
 
 def test_rest_schema_markdown_summary(monkeypatch):
-    def fake_request_json(method, path, *, params=None, body=None):
+    def handler(method, path, params, body):
         return _schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    _patch_schema_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(rest, ["schema", "core", "artifact"])
 
@@ -187,13 +212,10 @@ def test_rest_schema_markdown_summary(monkeypatch):
 
 
 def test_rest_schema_models_matches_each_module_output(monkeypatch):
-    def fake_request_json(method, path, *, params=None, body=None):
+    def handler(method, path, params, body):
         return _schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    _patch_schema_request_json(monkeypatch, handler)
 
     all_models = CliRunner().invoke(rest, ["schema", "--models"])
     core = CliRunner().invoke(rest, ["schema", "core"])
@@ -206,12 +228,7 @@ def test_rest_schema_models_matches_each_module_output(monkeypatch):
 
 
 def test_rest_schema_models_rejects_raw(monkeypatch):
-    monkeypatch.setattr(
-        "lamin_cli._rest._query.request_json", lambda *args, **kwargs: {}
-    )
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    _patch_schema_request_json(monkeypatch, lambda *args: {})
 
     result = CliRunner().invoke(rest, ["schema", "--models", "--raw"])
 
@@ -220,13 +237,10 @@ def test_rest_schema_models_rejects_raw(monkeypatch):
 
 
 def test_rest_schema_json_summary_includes_hidden(monkeypatch):
-    def fake_request_json(method, path, *, params=None, body=None):
+    def handler(method, path, params, body):
         return _schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    _patch_schema_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(
         rest,
@@ -287,12 +301,12 @@ def test_rest_schema_uses_cache(monkeypatch, tmp_path):
         calls.append((method, path, params, body))
         return _schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli._rest._schema.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._query._current_instance", lambda: ("inst/1", "")
+        "lamin_cli._rest._schema._current_instance", lambda: ("inst/1", "")
     )
     monkeypatch.setattr(
-        "lamin_cli._rest._query._current_instance_schema_id", lambda: "schema:1"
+        "lamin_cli._rest._schema._current_instance_schema_id", lambda: "schema:1"
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
 
@@ -314,12 +328,12 @@ def test_rest_schema_refresh_bypasses_cache(monkeypatch, tmp_path):
         schema["new"] = {}
         return schema
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli._rest._schema.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._query._current_instance", lambda: ("inst/1", "")
+        "lamin_cli._rest._schema._current_instance", lambda: ("inst/1", "")
     )
     monkeypatch.setattr(
-        "lamin_cli._rest._query._current_instance_schema_id", lambda: "schema:1"
+        "lamin_cli._rest._schema._current_instance_schema_id", lambda: "schema:1"
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
 
@@ -339,13 +353,10 @@ def test_rest_schema_refresh_bypasses_cache(monkeypatch, tmp_path):
 
 
 def test_rest_statistics_constructs_request(monkeypatch):
-    calls = []
-
-    def fake_request_json(method, path, *, params=None, body=None):
-        calls.append((method, path, params, body))
+    def handler(method, path, params, body):
         return {"instance_size": 123, "counts": {"core": {"ULabel": 2}}}
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    calls = _patch_request_json(monkeypatch, "_statistics", handler)
 
     result = CliRunner().invoke(
         rest,
@@ -370,18 +381,12 @@ def test_rest_statistics_constructs_request(monkeypatch):
 
 
 def test_rest_statistics_module_scope_constructs_request(monkeypatch):
-    calls = []
-
-    def fake_request_json(method, path, *, params=None, body=None):
-        calls.append((method, path, params, body))
+    def handler(method, path, params, body):
         if path == "schema":
             return _schema_payload()
         return {"instance_size": 123, "counts": {"core": {"Artifact": 1, "User": 2}}}
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    calls = _patch_statistics_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(rest, ["statistics", "core", "--compact"])
 
@@ -397,18 +402,12 @@ def test_rest_statistics_module_scope_constructs_request(monkeypatch):
 
 
 def test_rest_statistics_model_scope_constructs_request(monkeypatch):
-    calls = []
-
-    def fake_request_json(method, path, *, params=None, body=None):
-        calls.append((method, path, params, body))
+    def handler(method, path, params, body):
         if path == "schema":
             return _schema_payload()
         return {"instance_size": 123, "counts": {"core": {"Artifact": 1}}}
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    calls = _patch_statistics_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(rest, ["statistics", "core", "artifact", "--compact"])
 
@@ -424,18 +423,12 @@ def test_rest_statistics_model_scope_constructs_request(monkeypatch):
 
 
 def test_rest_statistics_object_scope_constructs_relation_counts_request(monkeypatch):
-    calls = []
-
-    def fake_request_json(method, path, *, params=None, body=None):
-        calls.append((method, path, params, body))
+    def handler(method, path, params, body):
         if path == "schema":
             return _schema_payload()
         return {"projects": 1, "ulabels": 2}
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
-    monkeypatch.setattr(
-        "lamin_cli._rest._query._current_schema_cache_path", lambda: None
-    )
+    calls = _patch_statistics_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(
         rest,
@@ -451,9 +444,7 @@ def test_rest_statistics_object_scope_constructs_relation_counts_request(monkeyp
 
 
 def test_rest_statistics_rejects_mixed_model_option_and_scope(monkeypatch):
-    monkeypatch.setattr(
-        "lamin_cli._rest._query.request_json", lambda *args, **kwargs: {}
-    )
+    _patch_statistics_request_json(monkeypatch, lambda *args: {})
 
     result = CliRunner().invoke(rest, ["statistics", "core", "--model", "core.ULabel"])
 
@@ -462,13 +453,12 @@ def test_rest_statistics_rejects_mixed_model_option_and_scope(monkeypatch):
 
 
 def test_rest_relation_counts_constructs_request(monkeypatch):
-    calls = []
-
-    def fake_request_json(method, path, *, params=None, body=None):
-        calls.append((method, path, params, body))
+    def handler(method, path, params, body):
+        if path == "schema":
+            return _schema_payload()
         return {"projects": 1, "ulabels": 2}
 
-    monkeypatch.setattr("lamin_cli._rest._query.request_json", fake_request_json)
+    calls = _patch_statistics_request_json(monkeypatch, handler)
 
     result = CliRunner().invoke(
         rest,
@@ -477,7 +467,10 @@ def test_rest_relation_counts_constructs_request(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {"projects": 1, "ulabels": 2}
-    assert calls == [("get", "modules/core/artifact/123/counts", None, None)]
+    assert calls == [
+        ("get", "schema", None, None),
+        ("get", "modules/core/artifact/123/counts", None, None),
+    ]
 
 
 def test_rest_insert_constructs_request(monkeypatch):

@@ -3,7 +3,9 @@ from __future__ import annotations
 from ._click import rest_group
 from ._client import request_json
 from ._mutations import delete, insert, update, upsert
-from ._query import get_record, list_records, relation_counts, schema, statistics
+from ._query import get_record, list_records
+from ._schema import schema
+from ._statistics import relation_counts, statistics
 
 
 @rest_group
