@@ -1,6 +1,6 @@
 # REST CLI
 
-`lamin rest` exposes thin shell wrappers around the LaminDB REST API for the
+`lamin rest` exposes thin shell wrappers around the LaminHub REST API for the
 currently connected instance.
 
 Use it when you want to inspect an instance, query records, or issue a small
@@ -119,5 +119,5 @@ lamin rest list core artifact --select '["uid","key"]'
 ## Design
 
 The commands are intentionally low-level wrappers. They build the REST path and
-request body, authenticate through the existing LaminDB setup client, and print
+request body, authenticate through the existing `lamindb-setup` client, and print
 JSON. The REST API remains responsible for model semantics and validation.

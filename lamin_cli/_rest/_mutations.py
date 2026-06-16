@@ -21,7 +21,7 @@ from ._client import (
 )
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def insert(module: str, model: str, records: str, compact: bool) -> None:
-    r"""Insert one or more simple LaminDB objects.
+    r"""Insert one or more simple objects.
 
     \b
     Examples:

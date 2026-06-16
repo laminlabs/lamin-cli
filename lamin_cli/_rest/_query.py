@@ -97,7 +97,7 @@ def list_records(
     include_foreign_keys: bool,
     compact: bool,
 ) -> None:
-    r"""Query multiple LaminDB objects.
+    r"""Query multiple objects.
 
     \b
     Examples:
@@ -156,7 +156,7 @@ def get_record(
     include_foreign_keys: bool,
     compact: bool,
 ) -> None:
-    r"""Query one LaminDB object by numeric id or uid.
+    r"""Query one object by numeric id or uid.
 
     \b
     Examples:
@@ -224,7 +224,7 @@ def statistics(models: tuple[str, ...], compact: bool) -> None:
 @click.argument("id", type=int)
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def relation_counts(module: str, model: str, id: int, compact: bool) -> None:
-    r"""Read relation counts for one LaminDB object by numeric database id.
+    r"""Read relation counts for one object by numeric database id.
 
     \b
     Examples:

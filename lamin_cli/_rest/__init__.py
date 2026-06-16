@@ -8,7 +8,7 @@ from ._query import get_record, list_records, relation_counts, schema, statistic
 
 @rest_group
 def rest():
-    """Query the LaminDB REST API."""
+    """Query the LaminHub REST API."""
 
 
 rest.add_command(list_records)
