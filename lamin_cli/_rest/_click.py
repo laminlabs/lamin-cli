@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 REST_COMMAND_GROUP_LIST = [
     {
         "name": "Metadata",
-        "commands": ["schema", "statistics", "relation-counts"],
+        "commands": ["schema", "statistics"],
     },
     {
         "name": "Reads",

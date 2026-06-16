@@ -24,9 +24,9 @@ lamin rest schema core --include-hidden
 lamin rest schema core artifact --raw --refresh
 
 lamin rest statistics
-lamin rest statistics --model core.ULabel --model core.Artifact
-
-lamin rest relation-counts core artifact 123
+lamin rest statistics core
+lamin rest statistics core ulabel
+lamin rest statistics core artifact 123
 ```
 
 ## Reads
