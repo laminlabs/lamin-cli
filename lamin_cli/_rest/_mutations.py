@@ -1,3 +1,4 @@
+# ruff: noqa: D301
 from __future__ import annotations
 
 from ._click import click
@@ -21,7 +22,7 @@ from ._client import (
 )
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def insert(module: str, model: str, records: str, compact: bool) -> None:
-    r"""Insert one or more simple objects.
+    """Insert one or more simple objects.
 
     \b
     Examples:
@@ -60,7 +61,7 @@ def upsert(
     conflict_columns: tuple[str, ...],
     compact: bool,
 ) -> None:
-    r"""Insert or update one or more objects by conflict columns.
+    """Insert or update one or more objects by conflict columns.
 
     \b
     Examples:
@@ -99,7 +100,7 @@ def update(
     index_columns: tuple[str, ...],
     compact: bool,
 ) -> None:
-    r"""Partially update one row or a batch of objects.
+    """Partially update one row or a batch of objects.
 
     \b
     Examples:
@@ -151,7 +152,7 @@ def delete(
     records: str | None,
     compact: bool,
 ) -> None:
-    r"""Delete one row or a batch of objects.
+    """Delete one row or a batch of objects.
 
     \b
     Examples:

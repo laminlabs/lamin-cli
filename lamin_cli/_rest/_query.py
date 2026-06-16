@@ -1,3 +1,4 @@
+# ruff: noqa: D301
 from __future__ import annotations
 
 from typing import Any
@@ -97,7 +98,7 @@ def list_records(
     include_foreign_keys: bool,
     compact: bool,
 ) -> None:
-    r"""Query multiple objects.
+    """Query multiple objects.
 
     \b
     Examples:
@@ -156,7 +157,7 @@ def get_record(
     include_foreign_keys: bool,
     compact: bool,
 ) -> None:
-    r"""Query one object by numeric id or uid.
+    """Query one object by numeric id or uid.
 
     \b
     Examples:
@@ -181,7 +182,7 @@ def get_record(
 @click.argument("model", required=False)
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def schema(module: str | None, model: str | None, compact: bool) -> None:
-    r"""Print raw instance schema JSON, optionally scoped to a module or model.
+    """Print raw instance schema JSON, optionally scoped to a module or model.
 
     \b
     Examples:
@@ -205,7 +206,7 @@ def schema(module: str | None, model: str | None, compact: bool) -> None:
 )
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def statistics(models: tuple[str, ...], compact: bool) -> None:
-    r"""Read instance artifact size and table counts.
+    """Read instance artifact size and table counts.
 
     \b
     Examples:
@@ -224,7 +225,7 @@ def statistics(models: tuple[str, ...], compact: bool) -> None:
 @click.argument("id", type=int)
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def relation_counts(module: str, model: str, id: int, compact: bool) -> None:
-    r"""Read relation counts for one object by numeric database id.
+    """Read relation counts for one object by numeric database id.
 
     \b
     Examples:
