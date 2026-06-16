@@ -77,16 +77,22 @@ lamin rest list core record \
 Mutations write to the currently connected instance.
 
 ```bash
-lamin rest insert core ulabel --records '{"name":"treated"}'
+lamin rest insert core ulabel --objects '{"name":"treated"}'
+
+lamin rest insert core ulabel \
+  --objects '[{"name":"control"},{"name":"treated"}]'
 
 lamin rest upsert core ulabel \
   --conflict-column name \
-  --records '[{"name":"treated"}]'
+  --objects '[{"name":"treated"}]'
 
 lamin rest update core ulabel abc12345 \
   --values '{"description":"updated"}'
 
 lamin rest delete core ulabel abc12345
+
+lamin rest delete core ulabel \
+  --objects '[{"name":"control"},{"name":"treated"}]'
 ```
 
 Batch updates identify rows by one or more index columns.
@@ -94,14 +100,14 @@ Batch updates identify rows by one or more index columns.
 ```bash
 lamin rest update core project \
   --index-column uid \
-  --records '[{"uid":"abc12345","description":"updated"}]'
+  --objects '[{"uid":"abc12345","description":"updated"}]'
 ```
 
 Batch deletes accept a list of identifier objects.
 
 ```bash
 lamin rest delete core recordrecord \
-  --records '[{"record_id":1,"feature_id":2,"value_id":3}]'
+  --objects '[{"record_id":1,"feature_id":2,"value_id":3}]'
 ```
 
 ## JSON input
@@ -109,7 +115,7 @@ lamin rest delete core recordrecord \
 Options that accept JSON also accept `@path` for a file and `-` for stdin.
 
 ```bash
-lamin rest insert core project --records @projects.json
+lamin rest insert core project --objects @projects.json
 cat body.json | lamin rest list core artifact --body -
 ```
 

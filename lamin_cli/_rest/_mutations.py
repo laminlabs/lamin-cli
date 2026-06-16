@@ -7,7 +7,7 @@ from ._utils import (
     _module_model_path,
     _print_json,
     _read_json_object,
-    _read_records,
+    _read_objects,
     request_json,
 )
 
@@ -16,23 +16,24 @@ from ._utils import (
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.option(
-    "--records",
+    "--objects",
     required=True,
-    help="Record object/list as JSON, @path, or -.",
+    help="Object or list of objects as JSON, @path, or -.",
 )
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
-def insert(module: str, model: str, records: str, compact: bool) -> None:
+def insert(module: str, model: str, objects: str, compact: bool) -> None:
     """Insert one or more simple objects.
 
     \b
     Examples:
-      lamin rest insert core ulabel --records '{"name":"treated"}'
-      lamin rest insert core project --records @projects.json
+      lamin rest insert core ulabel --objects '{"name":"treated"}'
+      lamin rest insert core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
+      lamin rest insert core project --objects @projects.json
     """
     data = request_json(
         "put",
         path=_module_model_path(module, model),
-        body=_read_records(records, "--records", allow_object=True),
+        body=_read_objects(objects, "--objects", allow_object=True),
     )
     _print_json(data, compact=compact)
 
@@ -41,9 +42,9 @@ def insert(module: str, model: str, records: str, compact: bool) -> None:
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.option(
-    "--records",
+    "--objects",
     required=True,
-    help="Record object/list as JSON, @path, or -.",
+    help="Object or list of objects as JSON, @path, or -.",
 )
 @click.option(
     "--conflict-column",
@@ -57,7 +58,7 @@ def insert(module: str, model: str, records: str, compact: bool) -> None:
 def upsert(
     module: str,
     model: str,
-    records: str,
+    objects: str,
     conflict_columns: tuple[str, ...],
     compact: bool,
 ) -> None:
@@ -65,14 +66,14 @@ def upsert(
 
     \b
     Examples:
-      lamin rest upsert core ulabel --conflict-column name --records '[{"name":"treated"}]'
-      lamin rest upsert core project --conflict-column uid --records @projects.json
+      lamin rest upsert core ulabel --conflict-column name --objects @ulabels.json
+      lamin rest upsert core project --conflict-column uid --objects @projects.json
     """
     data = request_json(
         "put",
         path=f"{_module_model_path(module, model)}/upsert",
         params={"conflict_columns": _columns(conflict_columns, "--conflict-column")},
-        body=_read_records(records, "--records", allow_object=True),
+        body=_read_objects(objects, "--objects", allow_object=True),
     )
     _print_json(data, compact=compact)
 
@@ -82,7 +83,7 @@ def upsert(
 @click.argument("model", type=str)
 @click.argument("uid", required=False)
 @click.option("--values", help="Single partial update object as JSON, @path, or -.")
-@click.option("--records", help="List of partial update objects as JSON, @path, or -.")
+@click.option("--objects", help="List of partial update objects as JSON, @path, or -.")
 @click.option(
     "--index-column",
     "--index-columns",
@@ -96,7 +97,7 @@ def update(
     model: str,
     uid: str | None,
     values: str | None,
-    records: str | None,
+    objects: str | None,
     index_columns: tuple[str, ...],
     compact: bool,
 ) -> None:
@@ -105,19 +106,19 @@ def update(
     \b
     Examples:
       lamin rest update core ulabel abc12345 --values '{"description":"updated"}'
-      lamin rest update core project --index-column uid --records '[{"uid":"abc12345","description":"updated"}]'
+      lamin rest update core project --index-column uid --objects @projects.json
     """
-    if records is not None:
+    if objects is not None:
         if uid or values is not None:
             raise click.ClickException(
-                "update with --records cannot also pass uid or --values"
+                "update with --objects cannot also pass uid or --values"
             )
         data = request_json(
             "patch",
             path=f"{_module_model_path(module, model)}/batch-update",
             body={
                 "index_columns": _columns(index_columns, "--index-column"),
-                "records": _read_records(records, "--records", allow_object=False),
+                "records": _read_objects(objects, "--objects", allow_object=False),
             },
         )
         _print_json(data, compact=compact)
@@ -125,11 +126,11 @@ def update(
 
     if not uid or values is None:
         raise click.ClickException(
-            "update requires uid and --values, or --records with --index-column"
+            "update requires uid and --values, or --objects with --index-column"
         )
     if index_columns:
         raise click.ClickException(
-            "update without --records cannot pass --index-column"
+            "update without --objects cannot pass --index-column"
         )
     data = request_json(
         "patch",
@@ -143,13 +144,13 @@ def update(
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.argument("uid", required=False)
-@click.option("--records", help="List of identifier objects as JSON, @path, or -.")
+@click.option("--objects", help="List of identifier objects as JSON, @path, or -.")
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def delete(
     module: str,
     model: str,
     uid: str | None,
-    records: str | None,
+    objects: str | None,
     compact: bool,
 ) -> None:
     """Delete one row or a batch of objects.
@@ -157,22 +158,22 @@ def delete(
     \b
     Examples:
       lamin rest delete core ulabel abc12345
-      lamin rest delete core recordrecord --records '[{"record_id":1,"feature_id":2,"value_id":3}]'
+      lamin rest delete core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
     """
-    if records is not None:
+    if objects is not None:
         if uid:
             raise click.ClickException(
-                "delete accepts either uid or --records, not both"
+                "delete accepts either uid or --objects, not both"
             )
         data = request_json(
             "post",
             path=f"{_module_model_path(module, model)}/batch-delete",
-            body={"records": _read_records(records, "--records", allow_object=False)},
+            body={"records": _read_objects(objects, "--objects", allow_object=False)},
         )
         _print_json(data, compact=compact)
         return
 
     if not uid:
-        raise click.ClickException("delete requires uid or --records")
+        raise click.ClickException("delete requires uid or --objects")
     data = request_json("delete", path=_module_model_path(module, model, uid))
     _print_json(data, compact=compact)

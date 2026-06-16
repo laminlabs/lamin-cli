@@ -189,23 +189,23 @@ def _records_body(
     return request_body
 
 
-def _read_records(
+def _read_objects(
     value: str,
     label: str,
     *,
     allow_object: bool,
 ) -> list[dict[str, Any]] | dict[str, Any]:
-    records = _read_json(value, label)
-    if isinstance(records, dict):
+    objects = _read_json(value, label)
+    if isinstance(objects, dict):
         if allow_object:
-            return records
+            return objects
         raise click.ClickException(f"{label} must be a JSON list of objects")
-    if not isinstance(records, list):
+    if not isinstance(objects, list):
         expected = "a JSON object or list of objects" if allow_object else "a JSON list"
         raise click.ClickException(f"{label} must be {expected}")
-    if not all(isinstance(record, dict) for record in records):
+    if not all(isinstance(obj, dict) for obj in objects):
         raise click.ClickException(f"{label} must contain only JSON objects")
-    return records
+    return objects
 
 
 def _columns(values: tuple[str, ...], label: str) -> list[str]:

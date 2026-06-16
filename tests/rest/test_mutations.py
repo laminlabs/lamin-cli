@@ -17,7 +17,7 @@ def test_rest_insert_constructs_request(monkeypatch):
 
     result = CliRunner().invoke(
         rest,
-        ["insert", "core", "ulabel", "--records", '{"name":"treated"}', "--compact"],
+        ["insert", "core", "ulabel", "--objects", '{"name":"treated"}', "--compact"],
     )
 
     assert result.exit_code == 0, result.output
@@ -44,7 +44,7 @@ def test_rest_upsert_constructs_request(monkeypatch):
             "ulabel",
             "--conflict-column",
             "name",
-            "--records",
+            "--objects",
             '[{"name":"treated"}]',
             "--compact",
         ],
@@ -113,7 +113,7 @@ def test_rest_update_batch_constructs_request(monkeypatch):
             "project",
             "--index-column",
             "uid",
-            "--records",
+            "--objects",
             '[{"uid":"abc123","description":"updated"}]',
             "--compact",
         ],
@@ -168,7 +168,7 @@ def test_rest_delete_batch_constructs_request(monkeypatch):
             "delete",
             "core",
             "recordrecord",
-            "--records",
+            "--objects",
             '[{"record_id":1,"feature_id":2,"value_id":3}]',
             "--compact",
         ],
