@@ -11,7 +11,7 @@ from ._client import (
 )
 
 
-@click.command("insert", short_help="Insert rows.")
+@click.command("insert", short_help="Insert objects.")
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.option(
@@ -21,9 +21,9 @@ from ._client import (
 )
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def insert(module: str, model: str, records: str, compact: bool) -> None:
-    """Insert one or more simple LaminDB rows.
+    r"""Insert one or more simple LaminDB objects.
 
-    
+    \b
     Examples:
       lamin rest insert core ulabel --records '{"name":"treated"}'
       lamin rest insert core project --records @projects.json
@@ -36,7 +36,7 @@ def insert(module: str, model: str, records: str, compact: bool) -> None:
     _print_json(data, compact=compact)
 
 
-@click.command("upsert", short_help="Insert or update rows.")
+@click.command("upsert", short_help="Insert or update objects.")
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.option(
@@ -60,9 +60,9 @@ def upsert(
     conflict_columns: tuple[str, ...],
     compact: bool,
 ) -> None:
-    """Insert or update one or more rows by conflict columns.
+    r"""Insert or update one or more objects by conflict columns.
 
-    
+    \b
     Examples:
       lamin rest upsert core ulabel --conflict-column name --records '[{"name":"treated"}]'
       lamin rest upsert core project --conflict-column uid --records @projects.json
@@ -76,7 +76,7 @@ def upsert(
     _print_json(data, compact=compact)
 
 
-@click.command("update", short_help="Update rows.")
+@click.command("update", short_help="Update objects.")
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.argument("uid", required=False)
@@ -99,9 +99,9 @@ def update(
     index_columns: tuple[str, ...],
     compact: bool,
 ) -> None:
-    """Partially update one row or a batch of rows.
+    r"""Partially update one row or a batch of objects.
 
-    
+    \b
     Examples:
       lamin rest update core ulabel abc12345 --values '{"description":"updated"}'
       lamin rest update core project --index-column uid --records '[{"uid":"abc12345","description":"updated"}]'
@@ -138,7 +138,7 @@ def update(
     _print_json(data, compact=compact)
 
 
-@click.command("delete", short_help="Delete rows.")
+@click.command("delete", short_help="Delete objects.")
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.argument("uid", required=False)
@@ -151,9 +151,9 @@ def delete(
     records: str | None,
     compact: bool,
 ) -> None:
-    """Delete one row or a batch of rows.
+    r"""Delete one row or a batch of objects.
 
-    
+    \b
     Examples:
       lamin rest delete core ulabel abc12345
       lamin rest delete core recordrecord --records '[{"record_id":1,"feature_id":2,"value_id":3}]'

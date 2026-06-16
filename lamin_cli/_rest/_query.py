@@ -97,9 +97,9 @@ def list_records(
     include_foreign_keys: bool,
     compact: bool,
 ) -> None:
-    """Query multiple LaminDB objects.
+    r"""Query multiple LaminDB objects.
 
-    
+    \b
     Examples:
       lamin rest list core ulabel --limit 20
       lamin rest list core artifact --select uid --select key --search training --limit 10
@@ -156,9 +156,9 @@ def get_record(
     include_foreign_keys: bool,
     compact: bool,
 ) -> None:
-    """Query one LaminDB object by numeric id or uid.
+    r"""Query one LaminDB object by numeric id or uid.
 
-    
+    \b
     Examples:
       lamin rest get core artifact j2qX8G9a
       lamin rest get core artifact j2qX8G9a --select uid --select key --select description
@@ -176,14 +176,14 @@ def get_record(
     _print_json(data, compact=compact)
 
 
-@click.command("schema", short_help="Read instance schema.")
+@click.command("schema", short_help="Show instance schema.")
 @click.argument("module", required=False)
 @click.argument("model", required=False)
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def schema(module: str | None, model: str | None, compact: bool) -> None:
-    """Print raw instance schema JSON, optionally scoped to a module or model.
+    r"""Print raw instance schema JSON, optionally scoped to a module or model.
 
-    
+    \b
     Examples:
       lamin rest schema
       lamin rest schema core
@@ -193,7 +193,7 @@ def schema(module: str | None, model: str | None, compact: bool) -> None:
     _print_json(data, compact=compact)
 
 
-@click.command("statistics", short_help="Read instance statistics.")
+@click.command("statistics", short_help="Show size and table counts.")
 @click.option(
     "--model",
     "models",
@@ -205,9 +205,9 @@ def schema(module: str | None, model: str | None, compact: bool) -> None:
 )
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def statistics(models: tuple[str, ...], compact: bool) -> None:
-    """Read instance artifact size and table counts.
+    r"""Read instance artifact size and table counts.
 
-    
+    \b
     Examples:
       lamin rest statistics
       lamin rest statistics --model core.ULabel --model core.Artifact
@@ -218,15 +218,15 @@ def statistics(models: tuple[str, ...], compact: bool) -> None:
     _print_json(data, compact=compact)
 
 
-@click.command("relation-counts", short_help="Read relation counts.")
+@click.command("relation-counts", short_help="Count relations for one object.")
 @click.argument("module", type=str)
 @click.argument("model", type=str)
 @click.argument("id", type=int)
 @click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
 def relation_counts(module: str, model: str, id: int, compact: bool) -> None:
-    """Read relation counts for one LaminDB object by numeric database id.
+    r"""Read relation counts for one LaminDB object by numeric database id.
 
-    
+    \b
     Examples:
       lamin rest relation-counts core artifact 123
       lamin rest get core artifact j2qX8G9a --select id --compact
