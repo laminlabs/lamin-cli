@@ -357,3 +357,13 @@ def test_rest_help_groups_commands():
     assert "Metadata" in result.output
     assert "Reads" in result.output
     assert "Mutations" in result.output
+
+
+def test_rest_list_help_includes_nested_filter_example():
+    result = CliRunner().invoke(rest, ["list", "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "--filter" in result.output
+    assert '"and"' in result.output
+    assert '"is_type":{"eq":true}' in result.output
+    assert '"name":{"contains":"dataset"}' in result.output
