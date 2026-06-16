@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ._click import click
-from ._client import (
+from ._utils import (
     _current_instance,
     _current_instance_schema_id,
     _print_json,

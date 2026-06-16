@@ -4,13 +4,13 @@ from __future__ import annotations
 from typing import Any
 
 from ._click import click
-from ._client import _module_model_path, _print_json, request_json
 from ._schema import (
     is_hidden_model,
     load_schema,
     module_schema,
     resolve_model_metadata,
 )
+from ._utils import _module_model_path, _print_json, request_json
 
 
 def _statistics_models_for_scope(

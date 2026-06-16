@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ._click import click
-from ._client import (
+from ._utils import (
     _columns,
     _module_model_path,
     _print_json,
