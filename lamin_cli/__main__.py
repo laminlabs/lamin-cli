@@ -330,7 +330,7 @@ def list_(registry: Literal["branch", "space"]):
 
             print(Branch.to_dataframe())
     else:
-        from lamindb.models import Space
+        from lamindb import Space
 
         print(Space.to_dataframe())
 
