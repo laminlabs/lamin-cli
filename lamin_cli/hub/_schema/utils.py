@@ -106,7 +106,7 @@ def _schema_cache_path(instance_id: str, schema_id: str) -> Path:
     cache_root = os.environ.get("LAMIN_REST_SCHEMA_CACHE_DIR")
     root = Path(cache_root).expanduser() if cache_root else _default_cache_root()
     return (
-        root / "rest" / "schemas" / _safe_cache_part(instance_id) / f"{schema_id}.json"
+        root / "hub" / "schemas" / _safe_cache_part(instance_id) / f"{schema_id}.json"
     )
 
 
@@ -130,12 +130,12 @@ def _read_cached_schema(path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError as error:
         raise click.ClickException(
             f"Schema cache at {path} is not valid JSON. "
-            "Run `lamin rest schema --refresh` to rebuild it."
+            "Run `lamin hub schema --refresh` to rebuild it."
         ) from error
     if not isinstance(data, dict):
         raise click.ClickException(
             f"Schema cache at {path} has invalid content. "
-            "Run `lamin rest schema --refresh` to rebuild it."
+            "Run `lamin hub schema --refresh` to rebuild it."
         )
     return data
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from click.testing import CliRunner
-from lamin_cli.hub import rest
+from lamin_cli.hub import hub
 
 
 def test_rest_insert_constructs_request(monkeypatch):
@@ -16,7 +16,7 @@ def test_rest_insert_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         ["insert", "core", "ulabel", "--objects", '{"name":"treated"}', "--compact"],
     )
 
@@ -37,7 +37,7 @@ def test_rest_upsert_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "upsert",
             "core",
@@ -72,7 +72,7 @@ def test_rest_update_single_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "update",
             "core",
@@ -106,7 +106,7 @@ def test_rest_update_batch_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "update",
             "core",
@@ -144,7 +144,7 @@ def test_rest_delete_single_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         ["delete", "core", "ulabel", "abc123", "--compact"],
     )
 
@@ -163,7 +163,7 @@ def test_rest_delete_batch_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "delete",
             "core",

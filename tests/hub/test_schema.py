@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from click.testing import CliRunner
-from lamin_cli.hub import rest
+from lamin_cli.hub import hub
 
 
 def test_rest_schema_raw_scopes_response(patch_schema_request_json, schema_payload):
@@ -13,7 +13,7 @@ def test_rest_schema_raw_scopes_response(patch_schema_request_json, schema_paylo
     calls = patch_schema_request_json(handler)
 
     result = CliRunner().invoke(
-        rest, ["schema", "core", "artifact", "--raw", "--compact"]
+        hub, ["schema", "core", "artifact", "--raw", "--compact"]
     )
 
     assert result.exit_code == 0, result.output
@@ -27,7 +27,7 @@ def test_rest_schema_markdown_summary(patch_schema_request_json, schema_payload)
 
     patch_schema_request_json(handler)
 
-    result = CliRunner().invoke(rest, ["schema", "core", "artifact"])
+    result = CliRunner().invoke(hub, ["schema", "core", "artifact"])
 
     assert result.exit_code == 0, result.output
     assert "# Schema: core.artifact" in result.output
@@ -48,9 +48,9 @@ def test_rest_schema_models_matches_each_module_output(
 
     patch_schema_request_json(handler)
 
-    all_models = CliRunner().invoke(rest, ["schema", "--models"])
-    core = CliRunner().invoke(rest, ["schema", "core"])
-    bionty = CliRunner().invoke(rest, ["schema", "bionty"])
+    all_models = CliRunner().invoke(hub, ["schema", "--models"])
+    core = CliRunner().invoke(hub, ["schema", "core"])
+    bionty = CliRunner().invoke(hub, ["schema", "bionty"])
 
     assert all_models.exit_code == 0, all_models.output
     assert core.exit_code == 0, core.output
@@ -61,7 +61,7 @@ def test_rest_schema_models_matches_each_module_output(
 def test_rest_schema_models_rejects_raw(patch_schema_request_json):
     patch_schema_request_json(lambda *args: {})
 
-    result = CliRunner().invoke(rest, ["schema", "--models", "--raw"])
+    result = CliRunner().invoke(hub, ["schema", "--models", "--raw"])
 
     assert result.exit_code != 0
     assert "--models cannot be combined with --raw." in result.output
@@ -76,7 +76,7 @@ def test_rest_schema_json_summary_includes_hidden(
     patch_schema_request_json(handler)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "schema",
             "core",
@@ -144,8 +144,8 @@ def test_rest_schema_uses_cache(monkeypatch, tmp_path, schema_payload):
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
 
-    first = CliRunner().invoke(rest, ["schema", "--format", "json", "--compact"])
-    second = CliRunner().invoke(rest, ["schema", "--format", "json", "--compact"])
+    first = CliRunner().invoke(hub, ["schema", "--format", "json", "--compact"])
+    second = CliRunner().invoke(hub, ["schema", "--format", "json", "--compact"])
 
     assert first.exit_code == 0, first.output
     assert second.exit_code == 0, second.output
@@ -172,12 +172,12 @@ def test_rest_schema_refresh_bypasses_cache(monkeypatch, tmp_path, schema_payloa
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
 
-    cached = tmp_path / "rest" / "schemas" / "inst_1" / "schema_1.json"
+    cached = tmp_path / "hub" / "schemas" / "inst_1" / "schema_1.json"
     cached.parent.mkdir(parents=True)
     cached.write_text(json.dumps(schema_payload()))
 
     result = CliRunner().invoke(
-        rest, ["schema", "--refresh", "--format", "json", "--compact"]
+        hub, ["schema", "--refresh", "--format", "json", "--compact"]
     )
 
     assert result.exit_code == 0, result.output

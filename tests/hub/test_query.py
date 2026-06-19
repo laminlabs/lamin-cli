@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from click.testing import CliRunner
-from lamin_cli.hub import rest
+from lamin_cli.hub import hub
 
 
 def test_rest_list_constructs_request(monkeypatch):
@@ -16,7 +16,7 @@ def test_rest_list_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._query.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "list",
             "core",
@@ -72,7 +72,7 @@ def test_rest_get_constructs_request(monkeypatch):
     monkeypatch.setattr("lamin_cli.hub._query.request_json", fake_request_json)
 
     result = CliRunner().invoke(
-        rest,
+        hub,
         [
             "get",
             "core",

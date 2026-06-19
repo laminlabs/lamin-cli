@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from click.testing import CliRunner
-from lamin_cli.hub import rest
+from lamin_cli.hub import hub
 
 
 def test_rest_mutation_help_uses_objects_option():
     for command in ["insert", "upsert", "update", "delete"]:
-        result = CliRunner().invoke(rest, [command, "--help"])
+        result = CliRunner().invoke(hub, [command, "--help"])
 
         assert result.exit_code == 0, result.output
         assert "--objects" in result.output
 
 
 def test_rest_help_groups_commands():
-    result = CliRunner().invoke(rest, ["--help"])
+    result = CliRunner().invoke(hub, ["--help"])
 
     assert result.exit_code == 0, result.output
     assert "Metadata" in result.output
@@ -22,7 +22,7 @@ def test_rest_help_groups_commands():
 
 
 def test_rest_list_help_includes_nested_filter_example():
-    result = CliRunner().invoke(rest, ["list", "--help"])
+    result = CliRunner().invoke(hub, ["list", "--help"])
 
     assert result.exit_code == 0, result.output
     assert "--filter" in result.output
@@ -32,18 +32,18 @@ def test_rest_list_help_includes_nested_filter_example():
 
 
 def test_rest_insert_help_includes_bulk_ulabel_example():
-    result = CliRunner().invoke(rest, ["insert", "--help"])
+    result = CliRunner().invoke(hub, ["insert", "--help"])
 
     assert result.exit_code == 0, result.output
-    assert "lamin rest insert core ulabel" in result.output
+    assert "lamin hub insert core ulabel" in result.output
     assert "--objects" in result.output
     assert '[{"name":"control"},{"name":"treated"}]' in result.output
 
 
 def test_rest_delete_help_includes_bulk_ulabel_example():
-    result = CliRunner().invoke(rest, ["delete", "--help"])
+    result = CliRunner().invoke(hub, ["delete", "--help"])
 
     assert result.exit_code == 0, result.output
-    assert "lamin rest delete core ulabel" in result.output
+    assert "lamin hub delete core ulabel" in result.output
     assert "--objects" in result.output
     assert '[{"name":"control"},{"name":"treated"}]' in result.output

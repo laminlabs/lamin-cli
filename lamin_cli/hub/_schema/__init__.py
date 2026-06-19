@@ -58,13 +58,13 @@ def schema(
 
     \b
     Examples:
-      lamin rest schema
-      lamin rest schema --models
-      lamin rest schema core
-      lamin rest schema core artifact
-      lamin rest schema core artifact --format json --compact
-      lamin rest schema core --include-hidden
-      lamin rest schema core artifact --raw --refresh
+      lamin hub schema
+      lamin hub schema --models
+      lamin hub schema core
+      lamin hub schema core artifact
+      lamin hub schema core artifact --format json --compact
+      lamin hub schema core --include-hidden
+      lamin hub schema core artifact --raw --refresh
     """
     if raw and models:
         raise click.ClickException("--models cannot be combined with --raw.")

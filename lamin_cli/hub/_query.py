@@ -74,11 +74,11 @@ def list_records(
 
     \b
     Examples:
-      lamin rest list core ulabel --limit 20
-      lamin rest list core artifact --select uid --select key --search training --limit 10
-      lamin rest list core artifact --search training --search-in ulabels.name --limit 10
-      lamin rest list core artifact --select uid --select key --select 'run(transform(uid,key))'
-      lamin rest list core record --filter '{"and":[{"is_type":{"eq":true}},{"name":{"contains":"dataset"}}]}' --select uid --select name
+      lamin hub list core ulabel --limit 20
+      lamin hub list core artifact --select uid --select key --search training --limit 10
+      lamin hub list core artifact --search training --search-in ulabels.name --limit 10
+      lamin hub list core artifact --select uid --select key --select 'run(transform(uid,key))'
+      lamin hub list core record --filter '{"and":[{"is_type":{"eq":true}},{"name":{"contains":"dataset"}}]}' --select uid --select name
     """
     data = request_json(
         "post",
@@ -133,9 +133,9 @@ def get_record(
 
     \b
     Examples:
-      lamin rest get core artifact j2qX8G9a
-      lamin rest get core artifact j2qX8G9a --select uid --select key --select description
-      lamin rest get core record abc12345 --select uid --select name --select 'schema(uid,name)'
+      lamin hub get core artifact j2qX8G9a
+      lamin hub get core artifact j2qX8G9a --select uid --select key --select description
+      lamin hub get core record abc12345 --select uid --select name --select 'schema(uid,name)'
     """
     data = request_json(
         "post",

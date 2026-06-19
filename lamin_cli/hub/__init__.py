@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ._click import rest_group
+from ._click import hub_group
 from ._client import instance_url, module_model_path, request_json
 from ._mutations import delete, insert, update, upsert
 from ._query import get_record, list_records
@@ -9,24 +9,27 @@ from ._statistics import relation_counts, statistics
 from .branches import create_branch, list_branches
 
 
-@rest_group
-def rest():
-    """Query the LaminHub REST API."""
+@hub_group
+def hub():
+    """Query the hub API.
+
+    This is an EXPERIMENTAL feature.
+    """
 
 
-rest.add_command(list_records)
-rest.add_command(get_record)
-rest.add_command(schema)
-rest.add_command(statistics)
-rest.add_command(relation_counts)
-rest.add_command(insert)
-rest.add_command(upsert)
-rest.add_command(update)
-rest.add_command(delete)
+hub.add_command(list_records)
+hub.add_command(get_record)
+hub.add_command(schema)
+hub.add_command(statistics)
+hub.add_command(relation_counts)
+hub.add_command(insert)
+hub.add_command(upsert)
+hub.add_command(update)
+hub.add_command(delete)
 
 __all__ = [
     "request_json",
-    "rest",
+    "hub",
     "instance_url",
     "module_model_path",
     "list_branches",

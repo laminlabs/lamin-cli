@@ -30,8 +30,8 @@ else:
     import rich_click as click
 
 
-class PlainRestGroup(click.Group):
-    """Group REST commands by purpose in plain Click help output."""
+class PlainHubGroup(click.Group):
+    """Group Hub commands by purpose in plain Click help output."""
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         ordered: list[str] = []
@@ -76,13 +76,13 @@ class PlainRestGroup(click.Group):
 
 if os.environ.get("NO_RICH"):
 
-    def rest_group(f: Callable[..., Any]) -> click.Group:
-        return click.group(cls=PlainRestGroup)(f)
+    def hub_group(f: Callable[..., Any]) -> click.Group:
+        return click.group(cls=PlainHubGroup)(f)
 
 
 else:
 
-    def rest_group(f: Callable[..., Any]) -> click.Group:
+    def hub_group(f: Callable[..., Any]) -> click.Group:
         @click.rich_config(
             help_config=click.RichHelpConfiguration(
                 command_groups=REST_COMMAND_GROUPS,

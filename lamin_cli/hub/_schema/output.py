@@ -177,7 +177,7 @@ def _format_schema_markdown(data: dict[str, Any]) -> str:
                 f"- {module['module']}: {module['visible_models']} models "
                 f"({hidden} hidden)"
             )
-    lines.extend(["", "Use `lamin rest schema MODULE` to list models."])
+    lines.extend(["", "Use `lamin hub schema MODULE` to list models."])
     if not data["include_hidden"]:
         lines.append("Pass `--include-hidden` for link and generated models.")
     return "\n".join(lines)
@@ -191,7 +191,7 @@ def _format_module_markdown(data: dict[str, Any]) -> str:
         f"{model['hidden_fields']} hidden)"
         for model in data["models"]
     )
-    lines.extend(["", f"Use `lamin rest schema {data['module']} MODEL` for fields."])
+    lines.extend(["", f"Use `lamin hub schema {data['module']} MODEL` for fields."])
     if data["hidden_models"] and not data["include_hidden"]:
         lines.append(
             f"Hidden models omitted: {data['hidden_models']}. "

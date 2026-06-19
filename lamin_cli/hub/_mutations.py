@@ -26,9 +26,9 @@ def insert(module: str, model: str, objects: str, compact: bool) -> None:
 
     \b
     Examples:
-      lamin rest insert core ulabel --objects '{"name":"treated"}'
-      lamin rest insert core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
-      lamin rest insert core project --objects @projects.json
+      lamin hub insert core ulabel --objects '{"name":"treated"}'
+      lamin hub insert core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
+      lamin hub insert core project --objects @projects.json
     """
     data = request_json(
         "put",
@@ -66,8 +66,8 @@ def upsert(
 
     \b
     Examples:
-      lamin rest upsert core ulabel --conflict-column name --objects @ulabels.json
-      lamin rest upsert core project --conflict-column uid --objects @projects.json
+      lamin hub upsert core ulabel --conflict-column name --objects @ulabels.json
+      lamin hub upsert core project --conflict-column uid --objects @projects.json
     """
     data = request_json(
         "put",
@@ -105,8 +105,8 @@ def update(
 
     \b
     Examples:
-      lamin rest update core ulabel abc12345 --values '{"description":"updated"}'
-      lamin rest update core project --index-column uid --objects @projects.json
+      lamin hub update core ulabel abc12345 --values '{"description":"updated"}'
+      lamin hub update core project --index-column uid --objects @projects.json
     """
     if objects is not None:
         if uid or values is not None:
@@ -157,8 +157,8 @@ def delete(
 
     \b
     Examples:
-      lamin rest delete core ulabel abc12345
-      lamin rest delete core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
+      lamin hub delete core ulabel abc12345
+      lamin hub delete core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
     """
     if objects is not None:
         if uid:

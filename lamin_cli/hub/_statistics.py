@@ -147,12 +147,12 @@ def statistics(
 
     \b
     Examples:
-      lamin rest statistics
-      lamin rest statistics core
-      lamin rest statistics core ulabel
-      lamin rest statistics core artifact 123
-      lamin rest statistics core ulabel --format json --compact
-      lamin rest statistics --model core.ULabel --model core.Artifact
+      lamin hub statistics
+      lamin hub statistics core
+      lamin hub statistics core ulabel
+      lamin hub statistics core artifact 123
+      lamin hub statistics core ulabel --format json --compact
+      lamin hub statistics --model core.ULabel --model core.Artifact
     """
     if id is not None:
         if models:
@@ -189,9 +189,9 @@ def relation_counts(module: str, model: str, id: int, compact: bool) -> None:
 
     \b
     Examples:
-      lamin rest relation-counts core artifact 123
-      lamin rest get core artifact j2qX8G9a --select id --compact
-      lamin rest relation-counts core artifact 123 --compact
+      lamin hub relation-counts core artifact 123
+      lamin hub get core artifact j2qX8G9a --select id --compact
+      lamin hub relation-counts core artifact 123 --compact
     """
     data = request_json("get", _relation_counts_path(module, model, id))
     _print_json(data, compact=compact)
