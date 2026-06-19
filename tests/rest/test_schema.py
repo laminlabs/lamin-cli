@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from click.testing import CliRunner
-from lamin_cli._rest import rest
+from lamin_cli.hub import rest
 
 
 def test_rest_schema_raw_scopes_response(patch_schema_request_json, schema_payload):
@@ -134,12 +134,12 @@ def test_rest_schema_uses_cache(monkeypatch, tmp_path, schema_payload):
         calls.append((method, path, params, body))
         return schema_payload()
 
-    monkeypatch.setattr("lamin_cli._rest._schema.utils.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._schema.utils.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._schema.utils._current_instance", lambda: ("inst/1", "")
+        "lamin_cli.hub._schema.utils._current_instance", lambda: ("inst/1", "")
     )
     monkeypatch.setattr(
-        "lamin_cli._rest._schema.utils._current_instance_schema_id",
+        "lamin_cli.hub._schema.utils._current_instance_schema_id",
         lambda: "schema:1",
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))
@@ -162,12 +162,12 @@ def test_rest_schema_refresh_bypasses_cache(monkeypatch, tmp_path, schema_payloa
         schema["new"] = {}
         return schema
 
-    monkeypatch.setattr("lamin_cli._rest._schema.utils.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._schema.utils.request_json", fake_request_json)
     monkeypatch.setattr(
-        "lamin_cli._rest._schema.utils._current_instance", lambda: ("inst/1", "")
+        "lamin_cli.hub._schema.utils._current_instance", lambda: ("inst/1", "")
     )
     monkeypatch.setattr(
-        "lamin_cli._rest._schema.utils._current_instance_schema_id",
+        "lamin_cli.hub._schema.utils._current_instance_schema_id",
         lambda: "schema:1",
     )
     monkeypatch.setenv("LAMIN_REST_SCHEMA_CACHE_DIR", str(tmp_path))

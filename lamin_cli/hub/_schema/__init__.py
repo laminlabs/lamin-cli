@@ -1,8 +1,8 @@
 # ruff: noqa: D301
 from __future__ import annotations
 
-from lamin_cli._rest._click import click
-from lamin_cli._rest._utils import _print_json
+from lamin_cli.hub._click import click
+from lamin_cli.hub._utils import _print_json
 
 from .output import format_schema_markdown, schema_output
 from .utils import load_schema, scope_schema

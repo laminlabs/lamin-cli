@@ -61,7 +61,7 @@ def patch_request_json(monkeypatch):
             calls.append((method, path, params, body))
             return handler(method, path, params, body)
 
-        monkeypatch.setattr(f"lamin_cli._rest.{target}.request_json", fake_request_json)
+        monkeypatch.setattr(f"lamin_cli.hub.{target}.request_json", fake_request_json)
         return calls
 
     return patch
@@ -72,7 +72,7 @@ def patch_schema_request_json(monkeypatch, patch_request_json):
     def patch(handler):
         calls = patch_request_json("_schema.utils", handler)
         monkeypatch.setattr(
-            "lamin_cli._rest._schema.utils._current_schema_cache_path", lambda: None
+            "lamin_cli.hub._schema.utils._current_schema_cache_path", lambda: None
         )
         return calls
 
@@ -89,13 +89,11 @@ def patch_statistics_request_json(monkeypatch):
             return handler(method, path, params, body)
 
         monkeypatch.setattr(
-            "lamin_cli._rest._schema.utils.request_json", fake_request_json
+            "lamin_cli.hub._schema.utils.request_json", fake_request_json
         )
+        monkeypatch.setattr("lamin_cli.hub._statistics.request_json", fake_request_json)
         monkeypatch.setattr(
-            "lamin_cli._rest._statistics.request_json", fake_request_json
-        )
-        monkeypatch.setattr(
-            "lamin_cli._rest._schema.utils._current_schema_cache_path", lambda: None
+            "lamin_cli.hub._schema.utils._current_schema_cache_path", lambda: None
         )
         return calls
 

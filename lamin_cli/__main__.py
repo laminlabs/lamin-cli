@@ -116,8 +116,8 @@ from lamindb_setup._silence_loggers import silence_loggers
 
 from lamin_cli._io import io
 from lamin_cli._migration import migrate
-from lamin_cli._rest import rest
 from lamin_cli._settings import settings
+from lamin_cli.hub import rest
 
 if TYPE_CHECKING:
     from click import Command, Context

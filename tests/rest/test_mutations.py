@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from click.testing import CliRunner
-from lamin_cli._rest import rest
+from lamin_cli.hub import rest
 
 
 def test_rest_insert_constructs_request(monkeypatch):
@@ -13,7 +13,7 @@ def test_rest_insert_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return [{"uid": "abc123", "name": "treated"}]
 
-    monkeypatch.setattr("lamin_cli._rest._mutations.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
         rest,
@@ -34,7 +34,7 @@ def test_rest_upsert_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return [{"uid": "abc123", "name": "treated"}]
 
-    monkeypatch.setattr("lamin_cli._rest._mutations.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
         rest,
@@ -69,7 +69,7 @@ def test_rest_update_single_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return {"uid": "abc123", "description": "updated"}
 
-    monkeypatch.setattr("lamin_cli._rest._mutations.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
         rest,
@@ -103,7 +103,7 @@ def test_rest_update_batch_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return [{"uid": "abc123", "description": "updated"}]
 
-    monkeypatch.setattr("lamin_cli._rest._mutations.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
         rest,
@@ -141,7 +141,7 @@ def test_rest_delete_single_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return {"deleted": 1}
 
-    monkeypatch.setattr("lamin_cli._rest._mutations.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
         rest,
@@ -160,7 +160,7 @@ def test_rest_delete_batch_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return {"deleted": 2}
 
-    monkeypatch.setattr("lamin_cli._rest._mutations.request_json", fake_request_json)
+    monkeypatch.setattr("lamin_cli.hub._mutations.request_json", fake_request_json)
 
     result = CliRunner().invoke(
         rest,

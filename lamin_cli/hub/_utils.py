@@ -5,11 +5,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from lamin_cli.hub import module_model_path as _module_model_path
-from lamin_cli.hub import request_json
-from lamin_cli.hub._client import _current_instance as _hub_current_instance
-
 from ._click import click
+from ._client import _current_instance, request_json
+from ._client import module_model_path as _module_model_path
 
 
 def _read_text_value(value: str | None) -> str | None:
@@ -66,10 +64,6 @@ def _parse_string_list(values: tuple[str, ...], label: str) -> list[str] | None:
 def _print_json(data: Any, *, compact: bool) -> None:
     indent = None if compact else 2
     click.echo(json.dumps(data, indent=indent, default=str))
-
-
-def _current_instance() -> tuple[str, str]:
-    return _hub_current_instance()
 
 
 def _current_instance_schema_id() -> str | None:

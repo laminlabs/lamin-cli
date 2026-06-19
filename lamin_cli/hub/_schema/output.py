@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lamin_cli._rest._click import click
+from lamin_cli.hub._click import click
 
 from .utils import (
     is_hidden_model,

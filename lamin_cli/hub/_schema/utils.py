@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from lamin_cli._rest._click import click
-from lamin_cli._rest._utils import (
+from lamin_cli.hub._click import click
+from lamin_cli.hub._utils import (
     _current_instance,
     _current_instance_schema_id,
     request_json,

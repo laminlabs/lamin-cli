@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from click.testing import CliRunner
-from lamin_cli._rest import rest
+from lamin_cli.hub import rest
 
 
 def test_rest_mutation_help_uses_objects_option():
