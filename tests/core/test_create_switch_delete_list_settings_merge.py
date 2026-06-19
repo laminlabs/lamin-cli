@@ -6,6 +6,8 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
+from click.testing import CliRunner
+from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
@@ -53,6 +55,31 @@ def test_branch():
     exit_status = os.system("lamin delete branch --name testbranch")
     assert exit_status == 0
     exit_status = os.system("lamin switch main")
+
+
+def test_list_branch_managed_uses_hub(monkeypatch):
+    class DummyTable:
+        def __str__(self):
+            return "managed-branch-list"
+
+    calls = []
+
+    def fake_list_branches():
+        calls.append("called")
+        return DummyTable()
+
+    monkeypatch.setattr("lamin_cli.hub.list_branches", fake_list_branches)
+    instance = ln_setup.settings.instance
+    original_api_url = instance._api_url
+    instance._api_url = "https://lamin.ai/api"
+    try:
+        result = CliRunner().invoke(main, ["list", "branch"])
+    finally:
+        instance._api_url = original_api_url
+
+    assert result.exit_code == 0
+    assert calls == ["called"]
+    assert "managed-branch-list" in result.output
 
 
 def test_merge():

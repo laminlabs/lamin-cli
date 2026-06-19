@@ -312,11 +312,20 @@ def list_(registry: Literal["branch", "space"]):
     """
     assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
-    from lamindb.models import Branch, Space
-
     if registry == "branch":
+        import lamindb_setup as ln_setup
+
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import list_branches
+
+            print(list_branches())
+            return
+        from lamindb.models import Branch
+
         print(Branch.to_dataframe())
     else:
+        from lamindb.models import Space
+
         print(Space.to_dataframe())
 
 
