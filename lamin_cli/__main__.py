@@ -290,11 +290,11 @@ def create(
             branch_data = create_branch(name=resolved_name)
             created_name = str(branch_data.get("name", resolved_name))
         else:
-            from lamindb.models import Branch
+            from lamindb import Branch
 
             created_name = Branch(name=resolved_name).save().name
     elif registry == "project":
-        from lamindb.models import Project
+        from lamindb import Project
 
         created_name = Project(name=resolved_name).save().name
     else:
@@ -325,10 +325,10 @@ def list_(registry: Literal["branch", "space"]):
             from lamin_cli.hub import list_branches
 
             print(list_branches())
-            return
-        from lamindb.models import Branch
+        else:
+            from lamindb import Branch
 
-        print(Branch.to_dataframe())
+            print(Branch.to_dataframe())
     else:
         from lamindb.models import Space
 
