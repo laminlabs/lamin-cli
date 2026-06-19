@@ -289,18 +289,17 @@ def create(
 
             branch_data = create_branch(name=resolved_name)
             created_name = str(branch_data.get("name", resolved_name))
-            logger.important(f"created {registry}: {created_name}")
-            return
-        from lamindb.models import Branch
+        else:
+            from lamindb.models import Branch
 
-        record = Branch(name=resolved_name).save()
+            created_name = Branch(name=resolved_name).save().name
     elif registry == "project":
         from lamindb.models import Project
 
-        record = Project(name=resolved_name).save()
+        created_name = Project(name=resolved_name).save().name
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
-    logger.important(f"created {registry}: {record.name}")
+    logger.important(f"created {registry}: {created_name}")
 
 
 # fmt: off
