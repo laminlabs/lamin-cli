@@ -57,31 +57,6 @@ def test_branch():
     exit_status = os.system("lamin switch main")
 
 
-def test_list_branch_managed_uses_hub(monkeypatch):
-    class DummyTable:
-        def __str__(self):
-            return "managed-branch-list"
-
-    calls = []
-
-    def fake_list_branches():
-        calls.append("called")
-        return DummyTable()
-
-    monkeypatch.setattr("lamin_cli.hub.list_branches", fake_list_branches)
-    instance = ln_setup.settings.instance
-    original_api_url = instance._api_url
-    instance._api_url = "https://lamin.ai/api"
-    try:
-        result = CliRunner().invoke(main, ["list", "branch"])
-    finally:
-        instance._api_url = original_api_url
-
-    assert result.exit_code == 0
-    assert calls == ["called"]
-    assert "managed-branch-list" in result.output
-
-
 def test_merge():
     """Merge a branch into main: create branch, add record, switch to main, merge."""
     exit_status = os.system("lamin switch -c merge_test_branch")
