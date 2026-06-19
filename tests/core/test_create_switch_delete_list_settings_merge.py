@@ -6,6 +6,8 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
+from click.testing import CliRunner
+from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
