@@ -283,11 +283,20 @@ def create(
             stacklevel=2,
         )
 
-    from lamindb.models import Branch, Project
-
     if registry == "branch":
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import create_branch
+
+            branch_data = create_branch(name=resolved_name)
+            created_name = str(branch_data.get("name", resolved_name))
+            logger.important(f"created {registry}: {created_name}")
+            return
+        from lamindb.models import Branch
+
         record = Branch(name=resolved_name).save()
     elif registry == "project":
+        from lamindb.models import Project
+
         record = Project(name=resolved_name).save()
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
