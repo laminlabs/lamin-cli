@@ -1,0 +1,179 @@
+# ruff: noqa: D301
+from __future__ import annotations
+
+from ._click import click
+from ._utils import (
+    _columns,
+    _module_model_path,
+    _print_json,
+    _read_json_object,
+    _read_objects,
+    request_json,
+)
+
+
+@click.command("insert", short_help="Insert objects.")
+@click.argument("module", type=str)
+@click.argument("model", type=str)
+@click.option(
+    "--objects",
+    required=True,
+    help="Object or list of objects as JSON, @path, or -.",
+)
+@click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
+def insert(module: str, model: str, objects: str, compact: bool) -> None:
+    """Insert one or more simple objects.
+
+    \b
+    Examples:
+      lamin hub insert core ulabel --objects '{"name":"treated"}'
+      lamin hub insert core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
+      lamin hub insert core project --objects @projects.json
+    """
+    data = request_json(
+        "put",
+        path=_module_model_path(module, model),
+        body=_read_objects(objects, "--objects", allow_object=True),
+    )
+    _print_json(data, compact=compact)
+
+
+@click.command("upsert", short_help="Insert or update objects.")
+@click.argument("module", type=str)
+@click.argument("model", type=str)
+@click.option(
+    "--objects",
+    required=True,
+    help="Object or list of objects as JSON, @path, or -.",
+)
+@click.option(
+    "--conflict-column",
+    "--conflict-columns",
+    "conflict_columns",
+    multiple=True,
+    required=True,
+    help="Conflict column name. Repeat for multiple columns or pass a JSON list.",
+)
+@click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
+def upsert(
+    module: str,
+    model: str,
+    objects: str,
+    conflict_columns: tuple[str, ...],
+    compact: bool,
+) -> None:
+    """Insert or update one or more objects by conflict columns.
+
+    \b
+    Examples:
+      lamin hub upsert core ulabel --conflict-column name --objects @ulabels.json
+      lamin hub upsert core project --conflict-column uid --objects @projects.json
+    """
+    data = request_json(
+        "put",
+        path=f"{_module_model_path(module, model)}/upsert",
+        params={"conflict_columns": _columns(conflict_columns, "--conflict-column")},
+        body=_read_objects(objects, "--objects", allow_object=True),
+    )
+    _print_json(data, compact=compact)
+
+
+@click.command("update", short_help="Update objects.")
+@click.argument("module", type=str)
+@click.argument("model", type=str)
+@click.argument("uid", required=False)
+@click.option("--values", help="Single partial update object as JSON, @path, or -.")
+@click.option("--objects", help="List of partial update objects as JSON, @path, or -.")
+@click.option(
+    "--index-column",
+    "--index-columns",
+    "index_columns",
+    multiple=True,
+    help="Identifier column name. Repeat for multiple columns or pass a JSON list.",
+)
+@click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
+def update(
+    module: str,
+    model: str,
+    uid: str | None,
+    values: str | None,
+    objects: str | None,
+    index_columns: tuple[str, ...],
+    compact: bool,
+) -> None:
+    """Partially update one row or a batch of objects.
+
+    \b
+    Examples:
+      lamin hub update core ulabel abc12345 --values '{"description":"updated"}'
+      lamin hub update core project --index-column uid --objects @projects.json
+    """
+    if objects is not None:
+        if uid or values is not None:
+            raise click.ClickException(
+                "update with --objects cannot also pass uid or --values"
+            )
+        data = request_json(
+            "patch",
+            path=f"{_module_model_path(module, model)}/batch-update",
+            body={
+                "index_columns": _columns(index_columns, "--index-column"),
+                "records": _read_objects(objects, "--objects", allow_object=False),
+            },
+        )
+        _print_json(data, compact=compact)
+        return
+
+    if not uid or values is None:
+        raise click.ClickException(
+            "update requires uid and --values, or --objects with --index-column"
+        )
+    if index_columns:
+        raise click.ClickException(
+            "update without --objects cannot pass --index-column"
+        )
+    data = request_json(
+        "patch",
+        path=_module_model_path(module, model, uid),
+        body=_read_json_object(values, "--values"),
+    )
+    _print_json(data, compact=compact)
+
+
+@click.command("delete", short_help="Delete objects.")
+@click.argument("module", type=str)
+@click.argument("model", type=str)
+@click.argument("uid", required=False)
+@click.option("--objects", help="List of identifier objects as JSON, @path, or -.")
+@click.option("--compact", is_flag=True, default=False, help="Print one-line JSON.")
+def delete(
+    module: str,
+    model: str,
+    uid: str | None,
+    objects: str | None,
+    compact: bool,
+) -> None:
+    """Delete one row or a batch of objects.
+
+    \b
+    Examples:
+      lamin hub delete core ulabel abc12345
+      lamin hub delete core ulabel --objects '[{"name":"control"},{"name":"treated"}]'
+    """
+    if objects is not None:
+        if uid:
+            raise click.ClickException(
+                "delete accepts either uid or --objects, not both"
+            )
+        data = request_json(
+            "post",
+            path=f"{_module_model_path(module, model)}/batch-delete",
+            body={"records": _read_objects(objects, "--objects", allow_object=False)},
+        )
+        _print_json(data, compact=compact)
+        return
+
+    if not uid:
+        raise click.ClickException("delete requires uid or --objects")
+    data = request_json("delete", path=_module_model_path(module, model, uid))
+    _print_json(data, compact=compact)

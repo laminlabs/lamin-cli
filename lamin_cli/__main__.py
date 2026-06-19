@@ -55,8 +55,8 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Manage settings and migrations",
-            "commands": ["settings", "migrate"],
+            "name": "Manage settings and schema & data migrations",
+            "commands": ["settings", "migrate", "io"],
         },
         {
             "name": "Auth",
@@ -64,6 +64,10 @@ COMMAND_GROUPS = {
                 "login",
                 "logout",
             ],
+        },
+        {
+            "name": "Experimental",
+            "commands": ["run", "hub"],
         },
     ]
 }
@@ -113,6 +117,7 @@ from lamindb_setup._silence_loggers import silence_loggers
 from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
+from lamin_cli.hub import hub
 
 if TYPE_CHECKING:
     from click import Command, Context
@@ -278,15 +283,23 @@ def create(
             stacklevel=2,
         )
 
-    from lamindb.models import Branch, Project
-
     if registry == "branch":
-        record = Branch(name=resolved_name).save()
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import create_branch
+
+            branch_data = create_branch(name=resolved_name)
+            created_name = str(branch_data.get("name", resolved_name))
+        else:
+            from lamindb import Branch
+
+            created_name = Branch(name=resolved_name).save().name
     elif registry == "project":
-        record = Project(name=resolved_name).save()
+        from lamindb import Project
+
+        created_name = Project(name=resolved_name).save().name
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
-    logger.important(f"created {registry}: {record.name}")
+    logger.important(f"created {registry}: {created_name}")
 
 
 # fmt: off
@@ -307,11 +320,18 @@ def list_(registry: Literal["branch", "space"]):
     """
     assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
-    from lamindb.models import Branch, Space
-
     if registry == "branch":
-        print(Branch.to_dataframe())
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import list_branches
+
+            print(list_branches())
+        else:
+            from lamindb import Branch
+
+            print(Branch.to_dataframe())
     else:
+        from lamindb import Space
+
         print(Space.to_dataframe())
 
 
@@ -1206,14 +1226,16 @@ def _deprecated_cache_clear_cmd() -> None:
 def _deprecated_cache_get_cmd() -> None:
     _deprecated_cache_get()
 
+main.add_command(hub)
+
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
-def _generate_help():
+def _generate_help() -> dict[str, dict[str, str | None]]:
     out: dict[str, dict[str, str | None]] = {}
 
     def recursive_help(
         cmd: Command, parent: Context | None = None, name: tuple[str, ...] = ()
-    ):
+    ) -> None:
         if getattr(cmd, "hidden", False):
             return
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)

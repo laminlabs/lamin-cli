@@ -21,7 +21,7 @@ else:
 
 @click.group()
 def io():
-    """Import and export instances."""
+    """Import and export databases."""
 
 
 # fmt: off
