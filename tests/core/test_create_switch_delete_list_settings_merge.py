@@ -6,12 +6,14 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
+import pytest
 from click.testing import CliRunner
 from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
 )
+from lamindb_setup.errors import NoWriteAccess
 
 
 def test_create_project():
@@ -27,6 +29,53 @@ def test_create_backward_compat():
     assert exit_status == 0
     exit_status = os.system("lamin delete branch --name backcompatbranch")
     assert exit_status == 0
+
+
+def _setup_create_no_write_access(monkeypatch, message: str) -> list[str]:
+    class DummyProject:
+        def __init__(self, name):
+            self.name = name
+
+        def save(self):
+            raise NoWriteAccess(message)
+
+    monkeypatch.setattr("lamindb.Project", DummyProject)
+    return ["create", "project", "blocked_project"]
+
+
+def _setup_switch_no_write_access(monkeypatch, message: str) -> list[str]:
+    def raise_no_write_access(target, **kwargs):
+        raise NoWriteAccess(message)
+
+    monkeypatch.setattr("lamindb.setup.switch", raise_no_write_access)
+    return ["switch", "-c", "blocked_branch"]
+
+
+def _setup_save_no_write_access(monkeypatch, message: str) -> list[str]:
+    def raise_no_write_access(**kwargs):
+        raise NoWriteAccess(message)
+
+    monkeypatch.setattr("lamin_cli.__main__.save_", raise_no_write_access)
+    return ["save", "blocked_file.txt"]
+
+
+@pytest.mark.parametrize(
+    "setup_case",
+    [
+        _setup_create_no_write_access,
+        _setup_switch_no_write_access,
+        _setup_save_no_write_access,
+    ],
+)
+def test_write_commands_map_no_write_access_to_click_exception(monkeypatch, setup_case):
+    message = "You're not allowed to write to the space 'all'."
+    command = setup_case(monkeypatch, message)
+    result = CliRunner().invoke(main, command)
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_branch():

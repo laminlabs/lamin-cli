@@ -283,22 +283,28 @@ def create(
             stacklevel=2,
         )
 
-    if registry == "branch":
-        if ln_setup.settings.instance.is_managed_by_hub:
-            from lamin_cli.hub import create_branch
+    from lamindb_setup.errors import NoWriteAccess
 
-            branch_data = create_branch(name=resolved_name)
-            created_name = str(branch_data.get("name", resolved_name))
+    try:
+        if registry == "branch":
+            if ln_setup.settings.instance.is_managed_by_hub:
+                from lamin_cli.hub import create_branch
+
+                branch_data = create_branch(name=resolved_name)
+                created_name = str(branch_data.get("name", resolved_name))
+            else:
+                from lamindb import Branch
+
+                created_name = Branch(name=resolved_name).save().name
+        elif registry == "project":
+            from lamindb import Project
+
+            created_name = Project(name=resolved_name).save().name
         else:
-            from lamindb import Branch
+            raise NotImplementedError(f"Creating {registry} object is not implemented.")
+    except NoWriteAccess as e:
+        raise click.ClickException(str(e)) from None
 
-            created_name = Branch(name=resolved_name).save().name
-    elif registry == "project":
-        from lamindb import Project
-
-        created_name = Project(name=resolved_name).save().name
-    else:
-        raise NotImplementedError(f"Creating {registry} object is not implemented.")
     logger.important(f"created {registry}: {created_name}")
 
 
@@ -386,6 +392,7 @@ def switch(
     """
     from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
     from lamindb.setup import switch as switch_
+    from lamindb_setup.errors import NoWriteAccess
 
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
@@ -395,7 +402,7 @@ def switch(
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
         try:
             switch_(name, space=(kind == "space"), create=create)
-        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
+        except (ObjectDoesNotExist, BranchAlreadyExists, NoWriteAccess) as e:
             raise click.ClickException(str(e)) from e
         return
 
@@ -405,7 +412,7 @@ def switch(
     target_str = target[0] if len(target) == 1 else None
     try:
         switch_(target_str, space=space, create=create)
-    except (ObjectDoesNotExist, BranchAlreadyExists) as e:
+    except (ObjectDoesNotExist, BranchAlreadyExists, NoWriteAccess) as e:
         raise click.ClickException(str(e)) from e
 
 
@@ -926,8 +933,23 @@ def save(
 
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
-    if save_(path=path, key=key, description=description, kind=kind, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
-        sys.exit(1)
+    from lamindb_setup.errors import NoWriteAccess
+
+    try:
+        if save_(
+            path=path,
+            key=key,
+            description=description,
+            kind=kind,
+            stem_uid=stem_uid,
+            project=project,
+            space=space,
+            branch=branch,
+            registry=registry,
+        ) is not None:
+            sys.exit(1)
+    except NoWriteAccess as e:
+        raise click.ClickException(str(e)) from e
 
 @main.command()
 def track():
