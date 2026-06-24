@@ -135,6 +135,15 @@ def main_unhandled():
     silence_loggers()
 
 
+def _run_write_with_access_check(fn, *args, **kwargs):
+    from lamindb_setup.errors import NoWriteAccess
+
+    try:
+        return fn(*args, **kwargs)
+    except NoWriteAccess as e:
+        raise click.ClickException(str(e)) from None
+
+
 @main_unhandled.command()
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
@@ -292,11 +301,15 @@ def create(
         else:
             from lamindb import Branch
 
-            created_name = Branch(name=resolved_name).save().name
+            created_name = _run_write_with_access_check(
+                Branch(name=resolved_name).save
+            ).name
     elif registry == "project":
         from lamindb import Project
 
-        created_name = Project(name=resolved_name).save().name
+        created_name = _run_write_with_access_check(
+            Project(name=resolved_name).save
+        ).name
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
     logger.important(f"created {registry}: {created_name}")
@@ -394,7 +407,9 @@ def switch(
             f"'lamin switch {kind} <name>' is deprecated and will be removed in a future version. "
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
         try:
-            switch_(name, space=(kind == "space"), create=create)
+            _run_write_with_access_check(
+                switch_, name, space=(kind == "space"), create=create
+            )
         except (ObjectDoesNotExist, BranchAlreadyExists) as e:
             raise click.ClickException(str(e)) from e
         return
@@ -404,7 +419,7 @@ def switch(
         raise click.ClickException("Too many arguments. Use 'lamin switch <target>' or 'lamin switch --space <space>'.")
     target_str = target[0] if len(target) == 1 else None
     try:
-        switch_(target_str, space=space, create=create)
+        _run_write_with_access_check(switch_, target_str, space=space, create=create)
     except (ObjectDoesNotExist, BranchAlreadyExists) as e:
         raise click.ClickException(str(e)) from e
 
@@ -926,7 +941,18 @@ def save(
 
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
-    if save_(path=path, key=key, description=description, kind=kind, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
+    if _run_write_with_access_check(
+        save_,
+        path=path,
+        key=key,
+        description=description,
+        kind=kind,
+        stem_uid=stem_uid,
+        project=project,
+        space=space,
+        branch=branch,
+        registry=registry,
+    ) is not None:
         sys.exit(1)
 
 @main_unhandled.command()
@@ -1261,17 +1287,8 @@ def _generate_help() -> dict[str, dict[str, str | None]]:
 
 
 def main() -> None:
-    """CLI entrypoint with centralized NoWriteAccess error mapping."""
-    from lamindb_setup.errors import NoWriteAccess
-
-    try:
-        try:
-            main_unhandled(standalone_mode=False)
-        except NoWriteAccess as e:
-            raise click.ClickException(str(e)) from e
-    except click.ClickException as e:
-        e.show()
-        raise SystemExit(e.exit_code) from None
+    """CLI entrypoint."""
+    main_unhandled()
 
 
 if __name__ == "__main__":

@@ -6,9 +6,8 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
-import pytest
 from click.testing import CliRunner
-from lamin_cli.__main__ import main, main_unhandled
+from lamin_cli.__main__ import main_unhandled
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
@@ -31,22 +30,58 @@ def test_create_backward_compat():
     assert exit_status == 0
 
 
-def test_cli_maps_no_write_access_to_click_exception(monkeypatch, capsys):
+def test_create_maps_no_write_access_to_click_exception(monkeypatch):
+    message = "You're not allowed to write to the space 'all'."
+
+    class DummyProject:
+        def __init__(self, name):
+            self.name = name
+
+        def save(self):
+            raise NoWriteAccess(message)
+
+    monkeypatch.setattr("lamindb.Project", DummyProject)
+
+    result = CliRunner().invoke(
+        main_unhandled, ["create", "project", "blocked_project"]
+    )
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_switch_maps_no_write_access_to_click_exception(monkeypatch):
+    message = "You're not allowed to write to the space 'all'."
+
+    def raise_no_write_access(target, **kwargs):
+        raise NoWriteAccess(message)
+
+    monkeypatch.setattr("lamindb.setup.switch", raise_no_write_access)
+
+    result = CliRunner().invoke(main_unhandled, ["switch", "-c", "blocked_branch"])
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_save_maps_no_write_access_to_click_exception(monkeypatch):
     message = "You're not allowed to write to the space 'all'."
 
     def raise_no_write_access(**kwargs):
         raise NoWriteAccess(message)
 
-    monkeypatch.setattr("lamin_cli.__main__.main_unhandled", raise_no_write_access)
+    monkeypatch.setattr("lamin_cli.__main__.save_", raise_no_write_access)
 
-    with pytest.raises(SystemExit) as excinfo:
-        main()
+    result = CliRunner().invoke(main_unhandled, ["save", "blocked_file.txt"])
 
-    assert excinfo.value.code == 1
-    captured = capsys.readouterr()
-    combined = captured.err + captured.out
-    assert f"Error: {message}" in combined
-    assert "Traceback" not in combined
+    assert result.exit_code == 1
+    assert message in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_branch():
