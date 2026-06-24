@@ -6,12 +6,14 @@ from pathlib import Path
 
 import lamindb as ln
 import lamindb_setup as ln_setup
+import pytest
 from click.testing import CliRunner
-from lamin_cli.__main__ import main
+from lamin_cli.__main__ import main, main_unhandled
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
 )
+from lamindb_setup.errors import NoWriteAccess
 
 
 def test_create_project():
@@ -27,6 +29,24 @@ def test_create_backward_compat():
     assert exit_status == 0
     exit_status = os.system("lamin delete branch --name backcompatbranch")
     assert exit_status == 0
+
+
+def test_cli_maps_no_write_access_to_click_exception(monkeypatch, capsys):
+    message = "You're not allowed to write to the space 'all'."
+
+    def raise_no_write_access(**kwargs):
+        raise NoWriteAccess(message)
+
+    monkeypatch.setattr("lamin_cli.__main__.main_unhandled", raise_no_write_access)
+
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    combined = captured.err + captured.out
+    assert f"Error: {message}" in combined
+    assert "Traceback" not in combined
 
 
 def test_branch():
@@ -69,7 +89,9 @@ def test_create_branch_managed_uses_hub(monkeypatch):
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
     try:
-        result = CliRunner().invoke(main, ["create", "branch", "managedcreate"])
+        result = CliRunner().invoke(
+            main_unhandled, ["create", "branch", "managedcreate"]
+        )
     finally:
         instance._api_url = original_api_url
 
@@ -93,7 +115,7 @@ def test_list_branch_managed_uses_hub(monkeypatch):
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
     try:
-        result = CliRunner().invoke(main, ["list", "branch"])
+        result = CliRunner().invoke(main_unhandled, ["list", "branch"])
     finally:
         instance._api_url = original_api_url
 

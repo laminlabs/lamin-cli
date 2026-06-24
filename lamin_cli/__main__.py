@@ -130,12 +130,12 @@ except PackageNotFoundError:
 
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb-core")
-def main():
+def main_unhandled():
     """Manage data with LaminDB instances."""
     silence_loggers()
 
 
-@main.command()
+@main_unhandled.command()
 @click.argument("user", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
@@ -153,7 +153,7 @@ def login(user: str, key: str | None):
     return login_(user, key=key)
 
 
-@main.command()
+@main_unhandled.command()
 def logout():
     """Log out of LaminHub."""
     return logout_()
@@ -171,7 +171,7 @@ def schema_to_modules_callback(ctx, param, value):
 
 
 # fmt: off
-@main.command()
+@main_unhandled.command()
 @click.option("--storage", type=str, default = ".", help=DOC_STORAGE_ARG)
 @click.option("--name", type=str, default=None, help=DOC_INSTANCE_NAME)
 @click.option("--db", type=str, default=None, help=DOC_DB)
@@ -201,7 +201,7 @@ def init(
 
 
 # fmt: off
-@main.command()
+@main_unhandled.command()
 @click.argument("instance", type=str)
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
@@ -227,7 +227,7 @@ def connect(instance: str, here: bool):
     return connect_(instance, here=here)
 
 
-@main.command()
+@main_unhandled.command()
 @click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
 def disconnect(here: bool):
     """Unset the default database instance for this environment or directory.
@@ -249,7 +249,7 @@ def disconnect(here: bool):
 
 
 # fmt: off
-@main.command()
+@main_unhandled.command()
 @click.argument("registry", type=click.Choice(["branch", "project"]))
 @click.argument("name", type=str, required=False)
 # below is deprecated, for backward compatibility
@@ -303,7 +303,7 @@ def create(
 
 
 # fmt: off
-@main.command(name="list")
+@main_unhandled.command(name="list")
 @click.argument("registry", type=str)
 # fmt: on
 def list_(registry: Literal["branch", "space"]):
@@ -336,7 +336,7 @@ def list_(registry: Literal["branch", "space"]):
 
 
 # fmt: off
-@main.command()
+@main_unhandled.command()
 @click.argument("target", type=str, nargs=-1, required=False)  # TODO: remove nargs=-1 once deprecated form is removed
 @click.option("--space", is_flag=True, default=False, help="Switch space instead of branch.")
 @click.option("--branch", is_flag=True, default=False, hidden=True)  # backward compat, no effect
@@ -410,7 +410,7 @@ def switch(
 
 
 # fmt: off
-@main.command()
+@main_unhandled.command()
 @click.argument("branch", type=str, required=True)
 # fmt: on
 def merge(branch: str):
@@ -439,7 +439,7 @@ def merge(branch: str):
         raise click.ClickException(str(e)) from e
 
 
-@main.command()
+@main_unhandled.command()
 @click.option("--schema", is_flag=True, help="View database schema via Django plugin.")
 def info(schema: bool):
     """Show info about the instance, development & cache directories, branch, space, and user.
@@ -460,7 +460,7 @@ def info(schema: bool):
 
 
 # fmt: off
-@main.command()
+@main_unhandled.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
@@ -495,7 +495,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     return delete_(entity=entity, name=name, uid=uid, key=key, permanent=permanent, force=force)
 
 
-@main.command()
+@main_unhandled.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, required=False)
 @click.option("--uid", help="The uid for the entity.")
@@ -648,7 +648,7 @@ def _describe(
     record.describe(include=include if include == "comments" else None)
 
 
-@main.command()
+@main_unhandled.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
@@ -694,7 +694,7 @@ def describe(
     _describe(entity=entity, uid=uid, key=key, name=name, include=include)
 
 
-@main.command()
+@main_unhandled.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default="artifact")
 @click.option("--uid", help="The uid for the entity.")
@@ -776,7 +776,7 @@ def get(
     _describe(entity=entity or "artifact", uid=uid, key=key, name=name, include=include)
 
 
-@main.command()
+@main_unhandled.command()
 @click.argument(
     "entity", type=click.Choice(["artifact", "transform", "collection", "project", "branch"])
 )
@@ -840,7 +840,7 @@ def update(
     logger.important(f"updated {entity}: description")
 
 
-@main.command()
+@main_unhandled.command()
 @click.argument("path", type=str)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
@@ -929,7 +929,7 @@ def save(
     if save_(path=path, key=key, description=description, kind=kind, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
         sys.exit(1)
 
-@main.command()
+@main_unhandled.command()
 def track():
     """Start tracking a run of a shell script.
 
@@ -957,7 +957,7 @@ def track():
     return track_()
 
 
-@main.command()
+@main_unhandled.command()
 def finish():
     """Finish a currently tracked run of a shell script.
 
@@ -967,7 +967,7 @@ def finish():
     return finish_()
 
 
-@main.command()
+@main_unhandled.command()
 # entity can be a registry or an object in the registry
 @click.argument("entity", type=str, default=None, required=False)
 @click.option("--key", type=str, default=None, help="The key of an artifact, transform, or collection.")
@@ -1131,7 +1131,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     logger.important(f"annotated {registry}: {obj_rep}")
 
 
-@main.command()
+@main_unhandled.command()
 @click.argument("filepath", type=str)
 @click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
 @click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
@@ -1177,9 +1177,9 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     runner.run(filepath_in_mount_dir)
 
 
-main.add_command(settings)
-main.add_command(migrate)
-main.add_command(io)
+main_unhandled.add_command(settings)
+main_unhandled.add_command(migrate)
+main_unhandled.add_command(io)
 
 
 def _deprecated_cache_set(cache_dir: str) -> None:
@@ -1203,7 +1203,7 @@ def _deprecated_cache_get() -> None:
     click.echo(f"The cache directory is {get_cache_dir()}")
 
 
-@main.group("cache", hidden=True)
+@main_unhandled.group("cache", hidden=True)
 def deprecated_cache():
     """Deprecated. Use 'lamin settings cache-dir' instead."""
 
@@ -1226,7 +1226,7 @@ def _deprecated_cache_clear_cmd() -> None:
 def _deprecated_cache_get_cmd() -> None:
     _deprecated_cache_get()
 
-main.add_command(hub)
+main_unhandled.add_command(hub)
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
@@ -1256,8 +1256,22 @@ def _generate_help() -> dict[str, dict[str, str | None]]:
                 continue
             recursive_help(sub, ctx, name=name)
 
-    recursive_help(main)
+    recursive_help(main_unhandled)
     return out
+
+
+def main() -> None:
+    """CLI entrypoint with centralized NoWriteAccess error mapping."""
+    from lamindb_setup.errors import NoWriteAccess
+
+    try:
+        try:
+            main_unhandled(standalone_mode=False)
+        except NoWriteAccess as e:
+            raise click.ClickException(str(e)) from e
+    except click.ClickException as e:
+        e.show()
+        raise SystemExit(e.exit_code) from None
 
 
 if __name__ == "__main__":
