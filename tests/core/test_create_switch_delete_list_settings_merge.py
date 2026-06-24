@@ -7,7 +7,7 @@ from pathlib import Path
 import lamindb as ln
 import lamindb_setup as ln_setup
 from click.testing import CliRunner
-from lamin_cli.__main__ import main_unhandled
+from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
@@ -42,9 +42,7 @@ def test_create_maps_no_write_access_to_click_exception(monkeypatch):
 
     monkeypatch.setattr("lamindb.Project", DummyProject)
 
-    result = CliRunner().invoke(
-        main_unhandled, ["create", "project", "blocked_project"]
-    )
+    result = CliRunner().invoke(main, ["create", "project", "blocked_project"])
 
     assert result.exit_code == 1
     assert message in result.output
@@ -60,7 +58,7 @@ def test_switch_maps_no_write_access_to_click_exception(monkeypatch):
 
     monkeypatch.setattr("lamindb.setup.switch", raise_no_write_access)
 
-    result = CliRunner().invoke(main_unhandled, ["switch", "-c", "blocked_branch"])
+    result = CliRunner().invoke(main, ["switch", "-c", "blocked_branch"])
 
     assert result.exit_code == 1
     assert message in result.output
@@ -76,7 +74,7 @@ def test_save_maps_no_write_access_to_click_exception(monkeypatch):
 
     monkeypatch.setattr("lamin_cli.__main__.save_", raise_no_write_access)
 
-    result = CliRunner().invoke(main_unhandled, ["save", "blocked_file.txt"])
+    result = CliRunner().invoke(main, ["save", "blocked_file.txt"])
 
     assert result.exit_code == 1
     assert message in result.output
@@ -124,9 +122,7 @@ def test_create_branch_managed_uses_hub(monkeypatch):
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
     try:
-        result = CliRunner().invoke(
-            main_unhandled, ["create", "branch", "managedcreate"]
-        )
+        result = CliRunner().invoke(main, ["create", "branch", "managedcreate"])
     finally:
         instance._api_url = original_api_url
 
@@ -150,7 +146,7 @@ def test_list_branch_managed_uses_hub(monkeypatch):
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
     try:
-        result = CliRunner().invoke(main_unhandled, ["list", "branch"])
+        result = CliRunner().invoke(main, ["list", "branch"])
     finally:
         instance._api_url = original_api_url
 
