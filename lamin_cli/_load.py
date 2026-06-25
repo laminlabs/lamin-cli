@@ -32,6 +32,21 @@ def load(
     """
     import lamindb_setup as ln_setup
 
+    def _note_type_chain_from_record(note_record) -> list[str]:
+        chain: list[str] = []
+        parent = note_record.type
+        visited: set[str] = set()
+        while parent is not None:
+            parent_uid = getattr(parent, "uid", None)
+            if parent_uid is not None:
+                if parent_uid in visited:
+                    break
+                visited.add(parent_uid)
+            if parent.name is not None:
+                chain.append(parent.name)
+            parent = parent.type
+        return list(reversed(chain))
+
     note_target: tuple[list[str], str] | None = None
     if entity is not None and uid is None and key is None:
         note_target = parse_note_target(entity)
@@ -114,23 +129,33 @@ def load(
 
     match entity:
         case "record":
-            if note_target is None:
+            if note_target is not None:
+                type_chain, note_name = note_target
+                note_record = resolve_note_record(
+                    ln=ln,
+                    type_chain=type_chain,
+                    note_name=note_name,
+                    create_if_missing=False,
+                )
+                if note_record is None:
+                    note_path = (
+                        "/".join([*type_chain, note_name]) if type_chain else note_name
+                    )
+                    raise click.ClickException(
+                        f"Record note '{note_path}' does not exist. Save it first with `lamin save`."
+                    )
+            elif uid is not None:
+                records = ln.Record.objects.filter(uid__startswith=uid)
+                if (n_records := len(records)) == 0:
+                    raise click.ClickException(f"Record with uid={uid} does not exist.")
+                if n_records > 1:
+                    records = records.order_by("-created_at")
+                note_record = records.first()
+                type_chain = _note_type_chain_from_record(note_record)
+                note_name = note_record.name
+            else:
                 raise click.ClickException(
                     "For record note loads, pass a note target like <topic>/<note> or <topic>/<note>.md."
-                )
-            type_chain, note_name = note_target
-            note_record = resolve_note_record(
-                ln=ln,
-                type_chain=type_chain,
-                note_name=note_name,
-                create_if_missing=False,
-            )
-            if note_record is None:
-                note_path = (
-                    "/".join([*type_chain, note_name]) if type_chain else note_name
-                )
-                raise click.ClickException(
-                    f"Record note '{note_path}' does not exist. Save it first with `lamin save`."
                 )
             readme_block = (
                 note_record.ablocks.filter(kind="readme")
