@@ -76,9 +76,9 @@ COMMAND_GROUPS = {
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
     import click as click
-    from lamindb_setup.errors import CurrentInstanceNotConfigured
+    from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
 
-    class OrderedGroup(click.Group):
+    class OrderedExceptionHandlingGroup(click.Group):
         """Overwrites list_commands to return commands in order of definition."""
 
         def __init__(
@@ -93,23 +93,23 @@ if os.environ.get("NO_RICH"):
         def invoke(self, ctx: click.Context):
             try:
                 return super().invoke(ctx)
-            except CurrentInstanceNotConfigured as e:
+            except (CurrentInstanceNotConfigured, NoWriteAccess) as e:
                 raise click.ClickException(str(e)) from None
 
         def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
             return self.commands
 
-    lamin_group_decorator = click.group(cls=OrderedGroup)
+    lamin_group_decorator = click.group(cls=OrderedExceptionHandlingGroup)
 
 else:
     import rich_click as click
-    from lamindb_setup.errors import CurrentInstanceNotConfigured
+    from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
 
-    class OrderedRichGroup(click.RichGroup):
+    class OrderedRichExceptionHandlingGroup(click.RichGroup):
         def invoke(self, ctx: click.Context):
             try:
                 return super().invoke(ctx)
-            except CurrentInstanceNotConfigured as e:
+            except (CurrentInstanceNotConfigured, NoWriteAccess) as e:
                 raise click.ClickException(str(e)) from None
 
     def lamin_group_decorator(f):
@@ -119,7 +119,7 @@ else:
                 style_commands_table_column_width_ratio=(1, 10),
             )
         )
-        @click.group(cls=OrderedRichGroup)
+        @click.group(cls=OrderedRichExceptionHandlingGroup)
         @wraps(f)
         def wrapper(*args, **kwargs):
             return f(*args, **kwargs)
@@ -298,27 +298,22 @@ def create(
             stacklevel=2,
         )
 
-    from lamindb_setup.errors import NoWriteAccess
+    if registry == "branch":
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import create_branch
 
-    try:
-        if registry == "branch":
-            if ln_setup.settings.instance.is_managed_by_hub:
-                from lamin_cli.hub import create_branch
-
-                branch_data = create_branch(name=resolved_name)
-                created_name = str(branch_data.get("name", resolved_name))
-            else:
-                from lamindb import Branch
-
-                created_name = Branch(name=resolved_name).save().name
-        elif registry == "project":
-            from lamindb import Project
-
-            created_name = Project(name=resolved_name).save().name
+            branch_data = create_branch(name=resolved_name)
+            created_name = str(branch_data.get("name", resolved_name))
         else:
-            raise NotImplementedError(f"Creating {registry} object is not implemented.")
-    except NoWriteAccess as e:
-        raise click.ClickException(str(e)) from None
+            from lamindb import Branch
+
+            created_name = Branch(name=resolved_name).save().name
+    elif registry == "project":
+        from lamindb import Project
+
+        created_name = Project(name=resolved_name).save().name
+    else:
+        raise NotImplementedError(f"Creating {registry} object is not implemented.")
 
     logger.important(f"created {registry}: {created_name}")
 
@@ -407,8 +402,6 @@ def switch(
     """
     from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
     from lamindb.setup import switch as switch_
-    from lamindb_setup.errors import NoWriteAccess
-
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
         kind, name = target[0], target[1]
@@ -417,7 +410,7 @@ def switch(
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
         try:
             switch_(name, space=(kind == "space"), create=create)
-        except (ObjectDoesNotExist, BranchAlreadyExists, NoWriteAccess) as e:
+        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
             raise click.ClickException(str(e)) from e
         return
 
@@ -427,7 +420,7 @@ def switch(
     target_str = target[0] if len(target) == 1 else None
     try:
         switch_(target_str, space=space, create=create)
-    except (ObjectDoesNotExist, BranchAlreadyExists, NoWriteAccess) as e:
+    except (ObjectDoesNotExist, BranchAlreadyExists) as e:
         raise click.ClickException(str(e)) from e
 
 
@@ -948,23 +941,18 @@ def save(
 
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
-    from lamindb_setup.errors import NoWriteAccess
-
-    try:
-        if save_(
-            path=path,
-            key=key,
-            description=description,
-            kind=kind,
-            stem_uid=stem_uid,
-            project=project,
-            space=space,
-            branch=branch,
-            registry=registry,
-        ) is not None:
-            sys.exit(1)
-    except NoWriteAccess as e:
-        raise click.ClickException(str(e)) from e
+    if save_(
+        path=path,
+        key=key,
+        description=description,
+        kind=kind,
+        stem_uid=stem_uid,
+        project=project,
+        space=space,
+        branch=branch,
+        registry=registry,
+    ) is not None:
+        sys.exit(1)
 
 @main.command()
 def track():
