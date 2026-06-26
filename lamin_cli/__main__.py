@@ -76,6 +76,7 @@ COMMAND_GROUPS = {
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
     import click as click
+    from lamindb_setup.errors import CurrentInstanceNotConfigured
 
     class OrderedGroup(click.Group):
         """Overwrites list_commands to return commands in order of definition."""
@@ -89,6 +90,12 @@ if os.environ.get("NO_RICH"):
             super().__init__(name, commands, **kwargs)
             self.commands = commands or OrderedDict()
 
+        def invoke(self, ctx: click.Context):
+            try:
+                return super().invoke(ctx)
+            except CurrentInstanceNotConfigured as e:
+                raise click.ClickException(str(e)) from None
+
         def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
             return self.commands
 
@@ -96,6 +103,14 @@ if os.environ.get("NO_RICH"):
 
 else:
     import rich_click as click
+    from lamindb_setup.errors import CurrentInstanceNotConfigured
+
+    class OrderedRichGroup(click.RichGroup):
+        def invoke(self, ctx: click.Context):
+            try:
+                return super().invoke(ctx)
+            except CurrentInstanceNotConfigured as e:
+                raise click.ClickException(str(e)) from None
 
     def lamin_group_decorator(f):
         @click.rich_config(
@@ -104,7 +119,7 @@ else:
                 style_commands_table_column_width_ratio=(1, 10),
             )
         )
-        @click.group()
+        @click.group(cls=OrderedRichGroup)
         @wraps(f)
         def wrapper(*args, **kwargs):
             return f(*args, **kwargs)
