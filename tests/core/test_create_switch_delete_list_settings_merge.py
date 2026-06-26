@@ -13,7 +13,7 @@ from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
 )
-from lamindb_setup.errors import NoWriteAccess
+from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
 
 
 def test_create_project():
@@ -74,6 +74,19 @@ def test_write_commands_map_no_write_access_to_click_exception(monkeypatch, setu
 
     assert result.exit_code == 1
     assert message in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_list_space_maps_no_instance_to_click_exception(monkeypatch):
+    monkeypatch.setattr(
+        "lamindb.Space.to_dataframe",
+        lambda: (_ for _ in ()).throw(CurrentInstanceNotConfigured()),
+    )
+    result = CliRunner().invoke(main, ["list", "space"])
+
+    assert result.exit_code == 1
+    assert "No instance is connected" in result.output
     assert "Error" in result.output
     assert "Traceback" not in result.output
 
