@@ -48,13 +48,13 @@ def test_list_branches_constructs_request(monkeypatch):
     ]
     assert header_calls == [
         (
-            ["name", "created_at", "change_request", "created_by"],
+            ["name", "change_request", "created_by", "created_at"],
             {
                 "column_widths": {
-                    "name": 28,
-                    "created_at": 19,
+                    "name": 26,
                     "change_request": 14,
                     "created_by": 12,
+                    "created_at": 19,
                 }
             },
         )
@@ -64,17 +64,17 @@ def test_list_branches_constructs_request(monkeypatch):
             [
                 {
                     "name": "main",
-                    "created_at": "2026-06-19 08:00:00",
                     "change_request": "draft",
                     "created_by": "falexwolf",
+                    "created_at": "2026-06-19 08:00:00",
                 }
             ],
             False,
             {
-                "name": 28,
-                "created_at": 19,
+                "name": 26,
                 "change_request": 14,
                 "created_by": 12,
+                "created_at": 19,
             },
         )
     ]

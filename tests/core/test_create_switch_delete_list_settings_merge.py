@@ -81,7 +81,7 @@ def test_write_commands_map_no_write_access_to_click_exception(monkeypatch, setu
 def test_list_space_maps_no_instance_to_click_exception(monkeypatch):
     monkeypatch.setattr(
         "lamindb.Space.to_dataframe",
-        lambda: (_ for _ in ()).throw(CurrentInstanceNotConfigured()),
+        lambda *args, **kwargs: (_ for _ in ()).throw(CurrentInstanceNotConfigured()),
     )
     result = CliRunner().invoke(main, ["list", "space"])
 
