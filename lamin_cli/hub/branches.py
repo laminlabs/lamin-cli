@@ -9,12 +9,12 @@ from ._click import click
 from ._client import module_model_path, request_json
 
 BRANCH_SELECT = ["name", "created_at", "_status_code", "created_by(handle)"]
-BRANCH_COLUMNS = ["name", "created_at", "change_request", "created_by"]
+BRANCH_COLUMNS = ["name", "change_request", "created_by", "created_at"]
 BRANCH_COLUMN_WIDTHS = {
-    "name": 28,
-    "created_at": 19,
+    "name": 26,
     "change_request": 14,
     "created_by": 12,
+    "created_at": 19,
 }
 BRANCH_CODE_TO_STATUS: dict[int, str] = {
     -2: "closed",
@@ -41,6 +41,8 @@ def _format_created_at(value: Any) -> str:
 
 
 def list_branches(limit: int = 20) -> None:
+    # print header immediately before making the request so that the user
+    # sees the columns right away
     _pretty_print_json_list_header(BRANCH_COLUMNS, column_widths=BRANCH_COLUMN_WIDTHS)
     data = request_json(
         "post",
@@ -69,7 +71,6 @@ def list_branches(limit: int = 20) -> None:
         records.append(
             {
                 "name": record.get("name"),
-                "created_at": _format_created_at(record.get("created_at")),
                 "change_request": (
                     "" if normalized_status == "standalone" else normalized_status
                 ),
@@ -78,8 +79,10 @@ def list_branches(limit: int = 20) -> None:
                     if isinstance(created_by, dict)
                     else created_by
                 ),
+                "created_at": _format_created_at(record.get("created_at")),
             }
         )
+    # now print the data
     _pretty_print_json_list(
         records, show_header=False, column_widths=BRANCH_COLUMN_WIDTHS
     )
