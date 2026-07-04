@@ -46,13 +46,7 @@ def test_create_branch_constructs_request(monkeypatch):
 
     def fake_request_json(method, path, *, params=None, body=None):
         calls.append((method, path, params, body))
-        return {
-            "statusCode": 200,
-            "body": {
-                "message": "Branch created successfully",
-                "branch": {"name": "new"},
-            },
-        }
+        return [{"id": 1, "uid": "abc123", "name": "new", "description": None}]
 
     monkeypatch.setattr("lamin_cli.hub.branches.request_json", fake_request_json)
 
@@ -60,10 +54,10 @@ def test_create_branch_constructs_request(monkeypatch):
 
     assert calls == [
         (
-            "post",
-            "branches",
+            "put",
+            "modules/core/branch",
             None,
-            {"branch_name": "new", "description": None},
+            {"name": "new", "description": None},
         )
     ]
-    assert result == {"name": "new"}
+    assert result == {"id": 1, "uid": "abc123", "name": "new", "description": None}
