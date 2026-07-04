@@ -31,7 +31,7 @@ def _format_created_at(value: Any) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def list_branches(limit: int = 100) -> list[dict[str, Any]]:
+def list_branches(limit: int = 20) -> list[dict[str, Any]]:
     data = request_json(
         "post",
         path=module_model_path("core", "branch"),
