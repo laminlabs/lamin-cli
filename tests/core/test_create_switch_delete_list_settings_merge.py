@@ -140,28 +140,13 @@ def test_create_branch_managed_uses_hub(monkeypatch):
 
 
 def test_list_branch_managed_uses_hub(monkeypatch):
-    calls = {"list": [], "pretty": []}
+    calls = {"list": []}
 
     def fake_list_branches(limit=100):
         calls["list"].append(limit)
-        return [
-            {
-                "name": "managed-branch-list",
-                "created_at": "2026-06-19 08:00:00",
-                "change_request": "review",
-                "created_by": "falexwolf",
-            }
-        ]
-
-    def fake_pretty_print_json_list(data):
-        calls["pretty"].append(data)
         print("managed-branch-list")
 
     monkeypatch.setattr("lamin_cli.hub.list_branches", fake_list_branches)
-    monkeypatch.setattr(
-        "lamin_cli.hub._utils._pretty_print_json_list",
-        fake_pretty_print_json_list,
-    )
     instance = ln_setup.settings.instance
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
@@ -172,16 +157,6 @@ def test_list_branch_managed_uses_hub(monkeypatch):
 
     assert result.exit_code == 0
     assert calls["list"] == [5]
-    assert calls["pretty"] == [
-        [
-            {
-                "name": "managed-branch-list",
-                "created_at": "2026-06-19 08:00:00",
-                "change_request": "review",
-                "created_by": "falexwolf",
-            }
-        ]
-    ]
     assert "managed-branch-list" in result.output
 
 

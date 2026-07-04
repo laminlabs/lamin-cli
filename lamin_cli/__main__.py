@@ -346,9 +346,8 @@ def list_(registry: Literal["branch", "space"], limit: int):
     if registry == "branch":
         if ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import list_branches
-            from lamin_cli.hub._utils import _pretty_print_json_list
 
-            _pretty_print_json_list(list_branches(limit=limit))
+            list_branches(limit=limit)
         else:
             from lamindb import Branch
 

@@ -5,6 +5,8 @@ from lamin_cli.hub.branches import create_branch, list_branches
 
 def test_list_branches_constructs_request(monkeypatch):
     calls = []
+    header_calls = []
+    print_calls = []
 
     def fake_request_json(method, path, *, params=None, body=None):
         calls.append((method, path, params, body))
@@ -18,27 +20,63 @@ def test_list_branches_constructs_request(monkeypatch):
         ]
 
     monkeypatch.setattr("lamin_cli.hub.branches.request_json", fake_request_json)
+    monkeypatch.setattr(
+        "lamin_cli.hub.branches._pretty_print_json_list_header",
+        lambda columns, **kwargs: header_calls.append((columns, kwargs)),
+    )
 
-    records = list_branches()
+    def fake_pretty_print_json_list(rows, *, show_header=True, column_widths=None):
+        print_calls.append((rows, show_header, column_widths))
+
+    monkeypatch.setattr(
+        "lamin_cli.hub.branches._pretty_print_json_list",
+        fake_pretty_print_json_list,
+    )
+
+    list_branches()
 
     assert calls == [
         (
             "post",
             "modules/core/branch",
-            {"limit_to_many": 10, "limit": 100, "offset": 0},
+            {"limit_to_many": 10, "limit": 20, "offset": 0},
             {
                 "select": ["name", "created_at", "_status_code", "created_by(handle)"],
                 "order_by": [{"field": "id", "descending": True}],
             },
         )
     ]
-    assert records == [
-        {
-            "name": "main",
-            "created_at": "2026-06-19 08:00:00",
-            "change_request": "draft",
-            "created_by": "falexwolf",
-        }
+    assert header_calls == [
+        (
+            ["name", "created_at", "change_request", "created_by"],
+            {
+                "column_widths": {
+                    "name": 28,
+                    "created_at": 19,
+                    "change_request": 14,
+                    "created_by": 12,
+                }
+            },
+        )
+    ]
+    assert print_calls == [
+        (
+            [
+                {
+                    "name": "main",
+                    "created_at": "2026-06-19 08:00:00",
+                    "change_request": "draft",
+                    "created_by": "falexwolf",
+                }
+            ],
+            False,
+            {
+                "name": 28,
+                "created_at": 19,
+                "change_request": 14,
+                "created_by": 12,
+            },
+        )
     ]
 
 

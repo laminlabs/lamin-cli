@@ -3,10 +3,19 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from lamin_cli.hub._utils import _pretty_print_json_list, _pretty_print_json_list_header
+
+from ._click import click
 from ._client import module_model_path, request_json
 
 BRANCH_SELECT = ["name", "created_at", "_status_code", "created_by(handle)"]
 BRANCH_COLUMNS = ["name", "created_at", "change_request", "created_by"]
+BRANCH_COLUMN_WIDTHS = {
+    "name": 28,
+    "created_at": 19,
+    "change_request": 14,
+    "created_by": 12,
+}
 BRANCH_CODE_TO_STATUS: dict[int, str] = {
     -2: "closed",
     -1: "merged",
@@ -31,7 +40,8 @@ def _format_created_at(value: Any) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def list_branches(limit: int = 20) -> list[dict[str, Any]]:
+def list_branches(limit: int = 20) -> None:
+    _pretty_print_json_list_header(BRANCH_COLUMNS, column_widths=BRANCH_COLUMN_WIDTHS)
     data = request_json(
         "post",
         path=module_model_path("core", "branch"),
@@ -41,8 +51,14 @@ def list_branches(limit: int = 20) -> list[dict[str, Any]]:
             "order_by": [{"field": "id", "descending": True}],
         },
     )
+    if not isinstance(data, list):
+        raise click.ClickException(
+            "Unexpected response for branch list: expected a JSON list."
+        )
     records: list[dict[str, Any]] = []
     for record in data:
+        if not isinstance(record, dict):
+            continue
         status_code = record.get("_status_code")
         normalized_status = (
             BRANCH_CODE_TO_STATUS.get(status_code, "standalone")
@@ -64,7 +80,9 @@ def list_branches(limit: int = 20) -> list[dict[str, Any]]:
                 ),
             }
         )
-    return records
+    _pretty_print_json_list(
+        records, show_header=False, column_widths=BRANCH_COLUMN_WIDTHS
+    )
 
 
 def create_branch(name: str, description: str | None = None) -> dict[str, Any]:

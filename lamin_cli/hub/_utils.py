@@ -68,22 +68,60 @@ def _print_json(data: Any, *, compact: bool) -> None:
 
 def _pretty_print_json_list(
     rows: list[dict[str, Any]],
+    *,
+    show_header: bool = True,
+    column_widths: dict[str, int] | None = None,
 ) -> None:
     if not rows:
-        click.echo("[]")
+        if show_header:
+            click.echo("[]")
         return
     display_columns = _list_columns(rows)
-    from rich.console import Console  # pyright: ignore[reportMissingImports]
-    from rich.table import Table  # pyright: ignore[reportMissingImports]
-
-    table = Table(show_header=True, header_style="dim", box=None, pad_edge=False)
-    for index, column in enumerate(display_columns):
-        table.add_column(column, style="cyan3" if index == 0 else "", no_wrap=True)
+    table = _make_json_list_table(
+        display_columns, show_header=show_header, column_widths=column_widths
+    )
     for row in rows:
         table.add_row(
             *[_format_table_value(row.get(column)) for column in display_columns]
         )
-    Console().print(table)
+    _rich_console().print(table)
+
+
+def _pretty_print_json_list_header(
+    columns: list[str], *, column_widths: dict[str, int] | None = None
+) -> None:
+    table = _make_json_list_table(
+        columns, show_header=True, column_widths=column_widths
+    )
+    _rich_console().print(table)
+
+
+def _rich_console():
+    from rich.console import Console  # pyright: ignore[reportMissingImports]
+
+    return Console()
+
+
+def _make_json_list_table(
+    columns: list[str],
+    *,
+    show_header: bool,
+    column_widths: dict[str, int] | None = None,
+):
+    from rich.table import Table  # pyright: ignore[reportMissingImports]
+
+    table = Table(show_header=show_header, header_style="dim", box=None, pad_edge=False)
+    for index, column in enumerate(columns):
+        width = None if column_widths is None else column_widths.get(column)
+        table.add_column(
+            column,
+            style="cyan3" if index == 0 else "",
+            no_wrap=True,
+            min_width=width,
+            max_width=width,
+            overflow="crop",
+        )
+    return table
 
 
 def _list_columns(rows: list[dict[str, Any]]) -> list[str]:
