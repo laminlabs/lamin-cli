@@ -25,12 +25,8 @@ def list_branches(limit: int = 100) -> list[dict[str, Any]]:
             "order_by": [{"field": "id", "descending": True}],
         },
     )
-    if not isinstance(data, list):
-        return []
     records: list[dict[str, Any]] = []
     for record in data:
-        if not isinstance(record, dict):
-            continue
         status_code = record.get("_status_code")
         normalized_status = (
             BRANCH_CODE_TO_STATUS.get(status_code, "standalone")
