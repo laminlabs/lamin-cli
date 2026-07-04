@@ -10,16 +10,16 @@ def test_list_branches_constructs_request(monkeypatch):
         calls.append((method, path, params, body))
         return [
             {
-                "uid": "abc123",
                 "name": "main",
-                "description": "Main branch",
                 "created_at": "2026-06-19T08:00:00",
+                "_status_code": 1,
+                "created_by": {"handle": "falexwolf"},
             }
         ]
 
     monkeypatch.setattr("lamin_cli.hub.branches.request_json", fake_request_json)
 
-    df = list_branches()
+    records = list_branches()
 
     assert calls == [
         (
@@ -27,18 +27,19 @@ def test_list_branches_constructs_request(monkeypatch):
             "modules/core/branch",
             {"limit_to_many": 10, "limit": 100, "offset": 0},
             {
-                "select": ["uid", "name", "description", "created_at"],
+                "select": ["name", "created_at", "_status_code", "created_by(handle)"],
                 "order_by": [{"field": "id", "descending": True}],
             },
         )
     ]
-    assert list(df.columns) == ["uid", "name", "description", "created_at"]
-    assert df.iloc[0].to_dict() == {
-        "uid": "abc123",
-        "name": "main",
-        "description": "Main branch",
-        "created_at": "2026-06-19T08:00:00",
-    }
+    assert records == [
+        {
+            "name": "main",
+            "created_at": "2026-06-19T08:00:00",
+            "change request": "draft",
+            "created_by": "falexwolf",
+        }
+    ]
 
 
 def test_create_branch_constructs_request(monkeypatch):

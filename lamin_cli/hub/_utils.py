@@ -66,6 +66,54 @@ def _print_json(data: Any, *, compact: bool) -> None:
     click.echo(json.dumps(data, indent=indent, default=str))
 
 
+def _pretty_print_json_list(
+    rows: list[dict[str, Any]],
+    *,
+    columns: list[str] | None = None,
+) -> None:
+    if not rows:
+        click.echo("[]")
+        return
+    display_columns = columns or _list_columns(rows)
+    if len(display_columns) == 1:
+        key = display_columns[0]
+        for row in rows:
+            click.echo(_format_table_value(row.get(key)))
+        return
+    matrix: list[list[str]] = [
+        [_format_table_value(row.get(column)) for column in display_columns]
+        for row in rows
+    ]
+    widths = [len(column) for column in display_columns]
+    for values in matrix:
+        for index, value in enumerate(values):
+            widths[index] = max(widths[index], len(value))
+    row_format = " | ".join(f"{{:{width}}}" for width in widths)
+    click.echo(row_format.format(*display_columns))
+    click.echo("-+-".join("-" * width for width in widths))
+    for values in matrix:
+        click.echo(row_format.format(*values))
+
+
+def _list_columns(rows: list[dict[str, Any]]) -> list[str]:
+    columns: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        for key in row:
+            if key not in seen:
+                seen.add(key)
+                columns.append(key)
+    return columns
+
+
+def _format_table_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str)
+    return str(value)
+
+
 def _current_instance_schema_id() -> str | None:
     import lamindb_setup as ln_setup
 
