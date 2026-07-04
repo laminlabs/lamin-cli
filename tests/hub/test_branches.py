@@ -35,8 +35,8 @@ def test_list_branches_constructs_request(monkeypatch):
     assert records == [
         {
             "name": "main",
-            "created_at": "2026-06-19T08:00:00",
-            "change request": "draft",
+            "created_at": "2026-06-19 08:00:00",
+            "change_request": "draft",
             "created_by": "falexwolf",
         }
     ]

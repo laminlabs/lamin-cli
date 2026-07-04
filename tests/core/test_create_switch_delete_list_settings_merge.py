@@ -142,13 +142,13 @@ def test_create_branch_managed_uses_hub(monkeypatch):
 def test_list_branch_managed_uses_hub(monkeypatch):
     calls = {"list": [], "pretty": []}
 
-    def fake_list_branches():
-        calls["list"].append("called")
+    def fake_list_branches(limit=100):
+        calls["list"].append(limit)
         return [
             {
                 "name": "managed-branch-list",
-                "created_at": "2026-06-19T08:00:00",
-                "change request": "review",
+                "created_at": "2026-06-19 08:00:00",
+                "change_request": "review",
                 "created_by": "falexwolf",
             }
         ]
@@ -166,18 +166,18 @@ def test_list_branch_managed_uses_hub(monkeypatch):
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
     try:
-        result = CliRunner().invoke(main, ["list", "branch"])
+        result = CliRunner().invoke(main, ["list", "branch", "--limit", "5"])
     finally:
         instance._api_url = original_api_url
 
     assert result.exit_code == 0
-    assert calls["list"] == ["called"]
+    assert calls["list"] == [5]
     assert calls["pretty"] == [
         [
             {
                 "name": "managed-branch-list",
-                "created_at": "2026-06-19T08:00:00",
-                "change request": "review",
+                "created_at": "2026-06-19 08:00:00",
+                "change_request": "review",
                 "created_by": "falexwolf",
             }
         ]

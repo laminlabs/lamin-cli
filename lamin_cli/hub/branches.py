@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from ._client import module_model_path, request_json
 
 BRANCH_SELECT = ["name", "created_at", "_status_code", "created_by(handle)"]
-BRANCH_COLUMNS = ["name", "created_at", "change request", "created_by"]
+BRANCH_COLUMNS = ["name", "created_at", "change_request", "created_by"]
 BRANCH_CODE_TO_STATUS: dict[int, str] = {
     -2: "closed",
     -1: "merged",
@@ -13,6 +14,21 @@ BRANCH_CODE_TO_STATUS: dict[int, str] = {
     1: "draft",
     2: "review",
 }
+
+
+def _format_created_at(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if not isinstance(value, str):
+        return str(value)
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return value
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def list_branches(limit: int = 100) -> list[dict[str, Any]]:
@@ -37,8 +53,8 @@ def list_branches(limit: int = 100) -> list[dict[str, Any]]:
         records.append(
             {
                 "name": record.get("name"),
-                "created_at": record.get("created_at"),
-                "change request": (
+                "created_at": _format_created_at(record.get("created_at")),
+                "change_request": (
                     "" if normalized_status == "standalone" else normalized_status
                 ),
                 "created_by": (

@@ -73,24 +73,17 @@ def _pretty_print_json_list(
         click.echo("[]")
         return
     display_columns = _list_columns(rows)
-    if len(display_columns) == 1:
-        key = display_columns[0]
-        for row in rows:
-            click.echo(_format_table_value(row.get(key)))
-        return
-    matrix: list[list[str]] = [
-        [_format_table_value(row.get(column)) for column in display_columns]
-        for row in rows
-    ]
-    widths = [len(column) for column in display_columns]
-    for values in matrix:
-        for index, value in enumerate(values):
-            widths[index] = max(widths[index], len(value))
-    row_format = " | ".join(f"{{:{width}}}" for width in widths)
-    click.echo(row_format.format(*display_columns))
-    click.echo("-+-".join("-" * width for width in widths))
-    for values in matrix:
-        click.echo(row_format.format(*values))
+    from rich.console import Console  # pyright: ignore[reportMissingImports]
+    from rich.table import Table  # pyright: ignore[reportMissingImports]
+
+    table = Table(show_header=True, header_style="dim", box=None, pad_edge=False)
+    for index, column in enumerate(display_columns):
+        table.add_column(column, style="cyan3" if index == 0 else "", no_wrap=True)
+    for row in rows:
+        table.add_row(
+            *[_format_table_value(row.get(column)) for column in display_columns]
+        )
+    Console().print(table)
 
 
 def _list_columns(rows: list[dict[str, Any]]) -> list[str]:
