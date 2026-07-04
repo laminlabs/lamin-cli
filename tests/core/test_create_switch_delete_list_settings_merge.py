@@ -81,7 +81,7 @@ def test_write_commands_map_no_write_access_to_click_exception(monkeypatch, setu
 def test_list_space_maps_no_instance_to_click_exception(monkeypatch):
     monkeypatch.setattr(
         "lamindb.Space.to_dataframe",
-        lambda: (_ for _ in ()).throw(CurrentInstanceNotConfigured()),
+        lambda *args, **kwargs: (_ for _ in ()).throw(CurrentInstanceNotConfigured()),
     )
     result = CliRunner().invoke(main, ["list", "space"])
 
@@ -140,27 +140,23 @@ def test_create_branch_managed_uses_hub(monkeypatch):
 
 
 def test_list_branch_managed_uses_hub(monkeypatch):
-    class DummyTable:
-        def __str__(self):
-            return "managed-branch-list"
+    calls = {"list": []}
 
-    calls = []
-
-    def fake_list_branches():
-        calls.append("called")
-        return DummyTable()
+    def fake_list_branches(limit=100):
+        calls["list"].append(limit)
+        print("managed-branch-list")
 
     monkeypatch.setattr("lamin_cli.hub.list_branches", fake_list_branches)
     instance = ln_setup.settings.instance
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
     try:
-        result = CliRunner().invoke(main, ["list", "branch"])
+        result = CliRunner().invoke(main, ["list", "branch", "--limit", "5"])
     finally:
         instance._api_url = original_api_url
 
     assert result.exit_code == 0
-    assert calls == ["called"]
+    assert calls["list"] == [5]
     assert "managed-branch-list" in result.output
 
 

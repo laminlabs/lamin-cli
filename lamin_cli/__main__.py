@@ -321,8 +321,15 @@ def create(
 # fmt: off
 @main.command(name="list")
 @click.argument("registry", type=str)
+@click.option(
+    "--limit",
+    type=click.IntRange(1),
+    default=20,
+    show_default=True,
+    help="Maximum number of rows to display.",
+)
 # fmt: on
-def list_(registry: Literal["branch", "space"]):
+def list_(registry: Literal["branch", "space"], limit: int):
     """List objects.
 
     For example:
@@ -340,15 +347,15 @@ def list_(registry: Literal["branch", "space"]):
         if ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import list_branches
 
-            print(list_branches())
+            list_branches(limit=limit)
         else:
             from lamindb import Branch
 
-            print(Branch.to_dataframe())
+            print(Branch.to_dataframe(limit=limit))
     else:
         from lamindb import Space
 
-        print(Space.to_dataframe())
+        print(Space.to_dataframe(limit=limit))
 
 
 # fmt: off
