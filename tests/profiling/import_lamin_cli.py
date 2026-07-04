@@ -1,1 +1,1 @@
-import lamindb_cli
+import lamin_cli
