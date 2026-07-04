@@ -5,7 +5,7 @@ from typing import Any
 from ._client import module_model_path, request_json
 
 BRANCH_SELECT = ["name", "created_at", "_status_code", "created_by(handle)"]
-BRANCH_COLUMNS = ["name", "created_at", "change_request", "created_by"]
+BRANCH_COLUMNS = ["name", "created_at", "change request", "created_by"]
 BRANCH_CODE_TO_STATUS: dict[int, str] = {
     -2: "closed",
     -1: "merged",
@@ -42,7 +42,7 @@ def list_branches(limit: int = 100) -> list[dict[str, Any]]:
             {
                 "name": record.get("name"),
                 "created_at": record.get("created_at"),
-                "change_request": (
+                "change request": (
                     "" if normalized_status == "standalone" else normalized_status
                 ),
                 "created_by": (

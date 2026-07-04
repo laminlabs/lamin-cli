@@ -68,13 +68,11 @@ def _print_json(data: Any, *, compact: bool) -> None:
 
 def _pretty_print_json_list(
     rows: list[dict[str, Any]],
-    *,
-    columns: list[str] | None = None,
 ) -> None:
     if not rows:
         click.echo("[]")
         return
-    display_columns = columns or _list_columns(rows)
+    display_columns = _list_columns(rows)
     if len(display_columns) == 1:
         key = display_columns[0]
         for row in rows:
