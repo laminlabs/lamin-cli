@@ -6,7 +6,7 @@ The interface is defined in `__main__.py`.
 The root API here is used by LaminR to replicate the CLI functionality.
 """
 
-__version__ = "1.18.1"
+__version__ = "1.18.2"
 
 from lamindb_setup import logout
 from lamindb_setup._init_instance import init
