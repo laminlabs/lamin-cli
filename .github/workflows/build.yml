@@ -90,8 +90,8 @@ jobs:
         with:
           python-version: ${{ github.ref == 'refs/heads/release' && '3.11' || '3.14' }}
       - run: pip install git+https://github.com/laminlabs/laminci
-      - run: nox -s setup
       - run: uv pip install --system git+https://github.com/laminlabs/laminprofiler
+      - run: nox -s setup
       - run: lamin login
       - run: lamin connect laminlabs/lamindata
       - run: laminprofiler check tests/profiling/import_lamin_cli.py --threshold 0.28
