@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import click
 import lamindb_setup as ln_setup
@@ -193,13 +194,14 @@ def _save_readme_block(
     import lamindb as ln
 
     content = ppath.read_text(encoding="utf-8")
-    ln.models.Block(
+    block = ln.models.Block(
         key="README.md",
         content=content,
         kind="readme",
-        branch=branch,
-        space=space,
-    ).save()
+    )
+    block.branch = branch
+    block.space = space
+    block.save()
     logger.important("saved README block")
 
 
@@ -505,11 +507,11 @@ def save(
                 description = parse_title_r_notebook(content)
             else:
                 description = None
-            transform = ln.Transform(
+            transform = cast(Any, ln.Transform)(
                 uid=uid,
                 description=description,
                 key=key,
-                type="script" if ppath.suffix in {".R", ".py", ".sh"} else "notebook",
+                kind="script" if ppath.suffix in {".R", ".py", ".sh"} else "notebook",
                 revises=revises,
                 reference=reference,
                 reference_type=reference_type,

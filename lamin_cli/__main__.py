@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import inspect
 import os
+import shlex
 import shutil
+import subprocess
 import sys
 import warnings
 from collections import OrderedDict
+from datetime import datetime, timezone
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -37,6 +40,10 @@ COMMAND_GROUPS = {
         {
             "name": "Configure your environment",
             "commands": ["connect", "info", "init", "disconnect"],
+        },
+        {
+            "name": "Execute programs",
+            "commands": ["exec"],
         },
         {
             "name": "Save, load, create & delete",
@@ -141,6 +148,230 @@ try:
     lamindb_version = version("lamindb-core")
 except PackageNotFoundError:
     lamindb_version = "lamindb-core installation not found"
+
+
+def classify_exec_target(target: str) -> Literal["script", "executable"]:
+    """Classify an exec target as a local script or an opaque executable."""
+    return (
+        "script"
+        if Path(target).suffix
+        in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"}
+        else "executable"
+    )
+
+
+def _probe_exec_version(executable: str) -> str | None:
+    try:
+        result = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=5,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    version_output = (result.stdout or result.stderr).strip()
+    if not version_output:
+        return None
+    return version_output.splitlines()[0]
+
+
+def _prepare_exec_transform(target: str, target_kind: Literal["script", "executable"]):
+    import lamindb as ln
+
+    target_path = Path(target)
+    key = target_path.name
+    if target_kind == "script":
+        transform = ln.Transform(
+            key=key,
+            source_code=target_path.read_text(),
+            kind="script",
+        )
+        transform.branch = ln_setup.settings.branch
+        transform.space = ln_setup.settings.space
+        return transform.save()
+
+    description = key
+    version_output = _probe_exec_version(target)
+    if version_output is not None:
+        description = f"{key} ({version_output})"
+    transform = ln.Transform(
+        key=key,
+        kind="pipeline",
+        description=description,
+    )
+    transform.branch = ln_setup.settings.branch
+    transform.space = ln_setup.settings.space
+    return transform.save()
+
+
+def parse_lamin_exec_uri(uri: str) -> tuple[str, str, Path | None]:
+    if not uri.startswith("lamin://"):
+        raise click.BadParameter("Expected a lamin:// URI.")
+
+    parts = uri.removeprefix("lamin://").split("/")
+    if len(parts) < 4:
+        raise click.BadParameter(
+            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
+        )
+
+    owner, instance, entity, uid, *subpath_parts = parts
+    if not owner or not instance or entity != "artifact":
+        raise click.BadParameter(
+            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
+        )
+
+    if len(uid) not in {16, 20}:
+        raise click.BadParameter(
+            f"Artifact uid must be 16 or 20 characters, got {len(uid)}."
+        )
+
+    if not uid.isalnum():
+        raise click.BadParameter("Artifact uid must be alphanumeric.")
+
+    if any(part == "" for part in subpath_parts):
+        raise click.BadParameter(
+            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
+        )
+
+    subpath = Path(*subpath_parts) if subpath_parts else None
+    return f"{owner}/{instance}", uid, subpath
+
+
+def _load_exec_artifact(instance_slug: str, uid: str):
+    ln_setup.connect(instance_slug)
+    import lamindb as ln
+
+    return ln.Artifact.get(uid)
+
+
+def parse_mount_storage_mappings(
+    mappings: tuple[str, ...],
+) -> tuple[tuple[str, Path], ...]:
+    from lamindb_setup.core.upath import UPath
+
+    parsed_mappings: list[tuple[str, Path]] = []
+    seen_storage_roots: set[str] = set()
+    for mapping in mappings:
+        storage_root, separator, mount_root = mapping.partition("=")
+        if not separator or not storage_root or not mount_root:
+            raise click.BadParameter(
+                "Expected --mount-storage <storage-root>=<mount-root>."
+            )
+        normalized_storage_root = str(UPath(storage_root).resolve())
+        if normalized_storage_root in seen_storage_roots:
+            raise click.BadParameter(
+                "Duplicate --mount-storage storage root after normalization."
+            )
+        seen_storage_roots.add(normalized_storage_root)
+        parsed_mappings.append((normalized_storage_root, Path(mount_root)))
+    return tuple(parsed_mappings)
+
+
+def _resolve_mounted_exec_path(
+    artifact,
+    subpath: Path | None,
+    mount_storage_mappings: tuple[tuple[str, Path], ...],
+) -> Path | None:
+    if not mount_storage_mappings:
+        return None
+
+    from lamindb.core.storage.paths import check_path_is_child_of_root
+    from lamindb_setup.core.upath import UPath
+
+    artifact_storage = getattr(artifact, "storage", None)
+    artifact_raw_path = getattr(artifact, "path", None)
+    if artifact_raw_path is None or artifact_storage is None:
+        return None
+
+    artifact_path = UPath(str(artifact_raw_path))
+
+    for candidate_storage_root, mount_root in sorted(
+        mount_storage_mappings,
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
+        if not check_path_is_child_of_root(artifact_path, candidate_storage_root):
+            continue
+
+        resolved_artifact_path = str(artifact_path.resolve())
+        resolved_storage_root = str(UPath(candidate_storage_root).resolve())
+        relative_path = resolved_artifact_path.removeprefix(
+            resolved_storage_root
+        ).lstrip("/")
+
+        mounted_path = mount_root / Path(relative_path)
+        if subpath is not None:
+            mounted_path = mounted_path / subpath
+        if mounted_path.exists():
+            return mounted_path
+
+    return None
+
+
+def resolve_lamin_exec_arg(
+    arg: str, mount_storage_mappings: tuple[tuple[str, Path], ...] = ()
+) -> str:
+    if not arg.startswith("lamin://"):
+        return arg
+
+    instance_slug, uid, subpath = parse_lamin_exec_uri(arg)
+    artifact = _load_exec_artifact(instance_slug, uid)
+    mounted_path = _resolve_mounted_exec_path(artifact, subpath, mount_storage_mappings)
+    if mounted_path is not None:
+        return str(mounted_path)
+
+    cache_path = artifact.cache()
+    if subpath is not None:
+        cache_path = cache_path / subpath
+    return str(cache_path)
+
+
+def rewrite_exec_argv(
+    argv: list[str], mount_storage_mappings: tuple[tuple[str, Path], ...] = ()
+) -> list[str]:
+    return [resolve_lamin_exec_arg(arg, mount_storage_mappings) for arg in argv]
+
+
+def _collect_exec_output_paths(
+    argv: list[str], register_outputs: tuple[str, ...]
+) -> list[Path]:
+    output_paths = [Path(output) for output in register_outputs]
+    passthrough_argv = argv[1:]
+    i = 0
+    while i < len(passthrough_argv):
+        arg = passthrough_argv[i]
+        if arg in {"--out", "--output"}:
+            if i + 1 < len(passthrough_argv):
+                value = passthrough_argv[i + 1]
+                if not value.startswith("-"):
+                    output_paths.append(Path(value))
+                    i += 2
+                    continue
+        elif arg.startswith("--out="):
+            output_paths.append(Path(arg.partition("=")[2]))
+        elif arg.startswith("--output="):
+            output_paths.append(Path(arg.partition("=")[2]))
+        i += 1
+    return output_paths
+
+
+def _register_exec_outputs(run, output_paths: list[Path]) -> None:
+    import lamindb as ln
+
+    seen_paths: set[Path] = set()
+    for output_path in output_paths:
+        if output_path in seen_paths or not output_path.exists():
+            continue
+        seen_paths.add(output_path)
+        ln.Artifact(output_path, key=output_path.name, run=run).save()
 
 
 @lamin_group_decorator
@@ -261,6 +492,85 @@ def disconnect(here: bool):
     → Python/R alternative: {func}`~lamindb.setup.disconnect`
     """
     return disconnect_(here=here)
+
+
+@main.command("exec", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@click.argument("target", type=str)
+@click.option(
+    "--register-output",
+    "register_outputs",
+    multiple=True,
+    type=str,
+    help="Register an output artifact path after execution.",
+)
+@click.option(
+    "--mount-storage",
+    "mount_storage",
+    multiple=True,
+    type=str,
+    help="Map a storage root to a mounted local root for exec artifact resolution.",
+)
+@click.pass_context
+def exec_(
+    ctx: click.Context,
+    target: str,
+    register_outputs: tuple[str, ...],
+    mount_storage: tuple[str, ...],
+):
+    """Execute a local script or opaque executable.
+
+    The target is launched directly and all remaining argv tokens are passed to the
+    child process unchanged.
+    """
+    import lamindb as ln
+    from lamindb._finish import save_run_logs
+
+    from lamin_cli._settings import read_mount_storage_config
+
+    configured_mount_storage = read_mount_storage_config() if not mount_storage else ()
+    try:
+        mount_storage_mappings = parse_mount_storage_mappings(
+            mount_storage or configured_mount_storage
+        )
+    except click.BadParameter as error:
+        if configured_mount_storage:
+            raise click.BadParameter(
+                "Invalid machine-local mount-storage mapping. Fix it with `lamin settings mount-storage set ...` or `lamin settings mount-storage unset`."
+            ) from error
+        raise
+    resolved_target = resolve_lamin_exec_arg(target, mount_storage_mappings)
+    target_kind = classify_exec_target(resolved_target)
+    transform = _prepare_exec_transform(resolved_target, target_kind)
+    run = ln.Run(transform=transform)
+    run.started_at = datetime.now(timezone.utc)
+    run._status_code = -1
+    run.save()
+
+    previous_run = ln.context.run
+    ln.context._run = run
+    ln.context._stream_tracker.start(run)
+    returncode = 1
+    try:
+        child_argv = rewrite_exec_argv(
+            [resolved_target, *ctx.args], mount_storage_mappings
+        )
+        run.cli_args = shlex.join(child_argv)
+        run.save()
+        result = subprocess.run(child_argv, check=False)
+        returncode = result.returncode
+        _register_exec_outputs(
+            run, _collect_exec_output_paths(child_argv, register_outputs)
+        )
+    except FileNotFoundError:
+        returncode = 127
+    finally:
+        run._status_code = returncode
+        run.finished_at = datetime.now(timezone.utc)
+        run.save()
+        ln.context._stream_tracker.finish()
+        ln.context._run = previous_run
+        save_run_logs(run, save_run=True)
+    raise SystemExit(returncode)
 
 
 # fmt: off
