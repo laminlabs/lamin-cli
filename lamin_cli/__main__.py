@@ -510,7 +510,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
     ```
 
-    → Python/R alternative: {meth}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
+    → Python/R alternative: {meth}`~lamindb.models.SQLRecord.delete` and {func}`~lamindb.setup.delete`
     """
     from lamin_cli._delete import delete as delete_
 
