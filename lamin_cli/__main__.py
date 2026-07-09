@@ -407,8 +407,11 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
+    import lamindb_setup as ln_setup
     from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
     from lamindb.setup import switch as switch_
+
+    from lamin_cli.hub import switch_and_create_fast_path
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
         kind, name = target[0], target[1]
@@ -416,7 +419,13 @@ def switch(
             f"'lamin switch {kind} <name>' is deprecated and will be removed in a future version. "
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
         try:
-            switch_(name, space=(kind == "space"), create=create)
+            should_fast_path = (
+                create and kind != "space" and ln_setup.settings.instance.is_managed_by_hub
+            )
+            if should_fast_path:
+                switch_and_create_fast_path(name)
+            else:
+                switch_(name, space=(kind == "space"), create=create)
         except (ObjectDoesNotExist, BranchAlreadyExists) as e:
             raise click.ClickException(str(e)) from e
         return
@@ -426,7 +435,17 @@ def switch(
         raise click.ClickException("Too many arguments. Use 'lamin switch <target>' or 'lamin switch --space <space>'.")
     target_str = target[0] if len(target) == 1 else None
     try:
-        switch_(target_str, space=space, create=create)
+        should_fast_path = (
+            create
+            and not space
+            and target_str is not None
+            and ln_setup.settings.instance.is_managed_by_hub
+        )
+        if should_fast_path:
+            assert target_str is not None
+            switch_and_create_fast_path(target_str)
+        else:
+            switch_(target_str, space=space, create=create)
     except (ObjectDoesNotExist, BranchAlreadyExists) as e:
         raise click.ClickException(str(e)) from e
 

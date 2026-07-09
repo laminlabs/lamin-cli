@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from lamindb.setup import switch as switch
+
 from lamin_cli.hub._utils import _pretty_print_json_list, _pretty_print_json_list_header
 
 from ._click import click
@@ -99,3 +101,8 @@ def create_branch(name: str, description: str | None = None) -> dict[str, Any]:
     if isinstance(data, dict):
         return data
     return {"name": name}
+
+
+def switch_and_create_fast_path(target_name: str) -> None:
+    create_branch(name=target_name)
+    switch(target_name, space=False, create=False)

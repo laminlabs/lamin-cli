@@ -4,6 +4,7 @@ import subprocess
 import warnings
 from pathlib import Path
 
+import click
 import lamindb as ln
 import lamindb_setup as ln_setup
 import pytest
@@ -126,7 +127,7 @@ def test_create_branch_managed_uses_hub(monkeypatch):
         calls.append((name, description))
         return {"name": name}
 
-    monkeypatch.setattr("lamin_cli.hub.create_branch", fake_create_branch)
+    monkeypatch.setattr("lamin_cli.hub.branches.create_branch", fake_create_branch)
     instance = ln_setup.settings.instance
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"
@@ -137,6 +138,82 @@ def test_create_branch_managed_uses_hub(monkeypatch):
 
     assert result.exit_code == 0
     assert calls == [("managedcreate", None)]
+
+
+def test_switch_create_branch_managed_uses_hub(monkeypatch):
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_create_branch(name, description=None):
+        calls.append((name, description))
+        return {"name": name}
+
+    switch_calls: list[tuple[str | None, bool, bool]] = []
+
+    def fake_switch(target, *, space=False, create=False):
+        switch_calls.append((target, space, create))
+
+    monkeypatch.setattr(
+        type(ln_setup.settings.instance),
+        "is_managed_by_hub",
+        property(lambda self: True),
+    )
+    monkeypatch.setattr("lamin_cli.hub.branches.create_branch", fake_create_branch)
+    monkeypatch.setattr("lamindb.setup.switch", fake_switch)
+    result = CliRunner().invoke(main, ["switch", "-c", "managedswitch"])
+
+    assert result.exit_code == 0
+    assert calls == [("managedswitch", None)]
+    assert switch_calls == [("managedswitch", False, False)]
+
+
+def test_switch_create_branch_managed_duplicate_maps_to_existing_error(monkeypatch):
+    def fake_create_branch(name, description=None):
+        raise click.ClickException("PUT ... failed: 409 branch already exists")
+
+    switch_calls: list[tuple[str | None, bool, bool]] = []
+
+    def fake_switch(target, *, space=False, create=False):
+        switch_calls.append((target, space, create))
+
+    monkeypatch.setattr(
+        type(ln_setup.settings.instance),
+        "is_managed_by_hub",
+        property(lambda self: True),
+    )
+    monkeypatch.setattr("lamin_cli.hub.branches.create_branch", fake_create_branch)
+    monkeypatch.setattr("lamindb.setup.switch", fake_switch)
+    result = CliRunner().invoke(main, ["switch", "-c", "main"])
+
+    assert result.exit_code == 1
+    assert (
+        "Branch 'main' already exists. Omit -c/--create to switch to it."
+        in result.output
+    )
+    assert switch_calls == []
+
+
+def test_switch_create_branch_non_managed_keeps_orm_path(monkeypatch):
+    switch_calls: list[tuple[str | None, bool, bool]] = []
+
+    def fake_switch(target, *, space=False, create=False):
+        switch_calls.append((target, space, create))
+
+    def fail_create_branch(*args, **kwargs):
+        raise AssertionError(
+            "create_branch must not be called for non-managed instances"
+        )
+
+    monkeypatch.setattr(
+        type(ln_setup.settings.instance),
+        "is_managed_by_hub",
+        property(lambda self: False),
+    )
+    monkeypatch.setattr("lamindb.setup.switch", fake_switch)
+    monkeypatch.setattr("lamin_cli.hub.branches.create_branch", fail_create_branch)
+    result = CliRunner().invoke(main, ["switch", "-c", "localbranch"])
+
+    assert result.exit_code == 0
+    assert switch_calls == [("localbranch", False, True)]
 
 
 def test_list_branch_managed_uses_hub(monkeypatch):

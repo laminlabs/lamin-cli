@@ -1,7 +1,12 @@
 def main():
-    from lamindb.setup import switch
+    import lamindb_setup as ln_setup
+    from lamin_cli.hub import switch_and_create_fast_path
+    from lamindb.setup import switch as switch_
 
-    switch("test-branch-profiling", create=True)
+    if ln_setup.settings.instance.is_managed_by_hub:
+        switch_and_create_fast_path("test-branch-profiling")
+    else:
+        switch_("test-branch-profiling", create=True)
 
 
 def cleanup():

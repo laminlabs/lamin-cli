@@ -6,7 +6,7 @@ from ._mutations import delete, insert, update, upsert
 from ._query import get_record, list_records
 from ._schema import schema
 from ._statistics import relation_counts, statistics
-from .branches import create_branch, list_branches
+from .branches import create_branch, list_branches, switch_and_create_fast_path
 
 
 @hub_group
@@ -34,4 +34,5 @@ __all__ = [
     "module_model_path",
     "list_branches",
     "create_branch",
+    "switch_and_create_fast_path",
 ]
