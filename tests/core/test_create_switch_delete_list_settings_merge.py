@@ -12,6 +12,7 @@ from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
     local_current_instance_file,
+    settings_dir,
 )
 from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
 
@@ -158,6 +159,86 @@ def test_list_branch_managed_uses_hub(monkeypatch):
     assert result.exit_code == 0
     assert calls["list"] == [5]
     assert "managed-branch-list" in result.output
+
+
+def test_switch_branch_managed_uses_hub(monkeypatch):
+    calls = []
+
+    def fake_switch_branch(target, create=False):
+        calls.append((target, create))
+
+    def should_not_be_called(*args, **kwargs):
+        raise AssertionError(
+            "lamindb.setup.switch should not be called for managed branch switch"
+        )
+
+    monkeypatch.setattr("lamin_cli.hub.switch_branch", fake_switch_branch)
+    monkeypatch.setattr("lamindb.setup.switch", should_not_be_called)
+    instance = ln_setup.settings.instance
+    original_api_url = instance._api_url
+    instance._api_url = "https://lamin.ai/api"
+    try:
+        result = CliRunner().invoke(main, ["switch", "managedbranch"])
+    finally:
+        instance._api_url = original_api_url
+
+    assert result.exit_code == 0
+    assert calls == [("managedbranch", False)]
+
+
+def test_hub_switch_branch_writes_branch_file(monkeypatch):
+    from lamin_cli.hub.switch import switch_branch
+
+    instance = ln_setup.settings.instance
+    branch_file = (
+        settings_dir / f"current-branch--{instance.owner}--{instance.name}.txt"
+    )
+    original_contents = branch_file.read_text() if branch_file.exists() else None
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        return {"uid": "z9x8c7v6b5n4m3k2", "name": "managedbranch"}
+
+    monkeypatch.setattr("lamin_cli.hub.switch.request_json", fake_request_json)
+    try:
+        switch_branch("managedbranch")
+        assert branch_file.read_text() == "z9x8c7v6b5n4m3k2\nmanagedbranch"
+    finally:
+        if original_contents is None:
+            branch_file.unlink(missing_ok=True)
+        else:
+            branch_file.write_text(original_contents)
+
+
+def test_hub_switch_branch_create_existing_raises(monkeypatch):
+    from lamin_cli.hub._click import click as hub_click
+    from lamin_cli.hub.switch import switch_branch
+
+    def fake_create_branch(name, description=None):
+        raise hub_click.ClickException(
+            f"Branch '{name}' already exists. Omit -c/--create to switch to it."
+        )
+
+    monkeypatch.setattr("lamin_cli.hub.switch.create_branch", fake_create_branch)
+
+    with pytest.raises(hub_click.ClickException, match="already exists"):
+        switch_branch("existingbranch", create=True)
+
+
+def test_hub_switch_branch_missing_branch_raises(monkeypatch):
+    from lamin_cli.hub._click import click as hub_click
+    from lamin_cli.hub.switch import switch_branch
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        if path.endswith("/missingbranch"):
+            return None
+        if path.endswith("/branch"):
+            return []
+        return None
+
+    monkeypatch.setattr("lamin_cli.hub.switch.request_json", fake_request_json)
+
+    with pytest.raises(hub_click.ClickException, match="please check on the hub UI"):
+        switch_branch("missingbranch")
 
 
 def test_merge():

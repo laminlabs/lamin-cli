@@ -1,7 +1,7 @@
 def main():
-    from lamindb.setup import switch
+    from lamin_cli.hub import switch_branch
 
-    switch("test-branch-profiling", create=True)
+    switch_branch("test-branch-profiling", create=True)
 
 
 def cleanup():

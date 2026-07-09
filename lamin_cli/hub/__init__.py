@@ -7,6 +7,7 @@ from ._query import get_record, list_records
 from ._schema import schema
 from ._statistics import relation_counts, statistics
 from .branches import create_branch, list_branches
+from .switch import switch_branch
 
 
 @hub_group
@@ -34,4 +35,5 @@ __all__ = [
     "module_model_path",
     "list_branches",
     "create_branch",
+    "switch_branch",
 ]
