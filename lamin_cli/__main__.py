@@ -407,28 +407,35 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
-    from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
-    from lamindb.setup import switch as switch_
+    def _switch_target(target_name: str | None, *, switch_space: bool) -> None:
+        if not switch_space and ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import switch_branch
+
+            switch_branch(target_name, create=create)
+            return
+
+        from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
+        from lamindb.setup import switch as switch_
+
+        try:
+            switch_(target_name, space=switch_space, create=create)
+        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
+            raise click.ClickException(str(e)) from e
+
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
         kind, name = target[0], target[1]
         logger.warn(
             f"'lamin switch {kind} <name>' is deprecated and will be removed in a future version. "
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
-        try:
-            switch_(name, space=(kind == "space"), create=create)
-        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
-            raise click.ClickException(str(e)) from e
+        _switch_target(name, switch_space=(kind == "space"))
         return
 
     # Normal usage: single target (or none)
     if len(target) > 1:
         raise click.ClickException("Too many arguments. Use 'lamin switch <target>' or 'lamin switch --space <space>'.")
     target_str = target[0] if len(target) == 1 else None
-    try:
-        switch_(target_str, space=space, create=create)
-    except (ObjectDoesNotExist, BranchAlreadyExists) as e:
-        raise click.ClickException(str(e)) from e
+    _switch_target(target_str, switch_space=space)
 
 
 # fmt: off
