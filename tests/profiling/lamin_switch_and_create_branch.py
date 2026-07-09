@@ -1,8 +1,7 @@
 def main():
     from lamindb.setup import switch
 
-    branch_data = switch(name="test-branch-profiling", create=True)
-    print(branch_data)
+    switch("test-branch-profiling", create=True)
 
 
 def cleanup():
