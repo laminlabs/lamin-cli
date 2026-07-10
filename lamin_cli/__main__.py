@@ -55,6 +55,10 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
+            "name": "Track Claude Code sessions",
+            "commands": ["track-claudecode", "finish-claudecode"],
+        },
+        {
             "name": "Manage settings and schema & data migrations",
             "commands": ["settings", "migrate", "io"],
         },
@@ -1004,6 +1008,36 @@ def finish():
     """
     from lamin_cli._context import finish as finish_
     return finish_()
+
+
+@main.command("track-claudecode")
+@click.option(
+    "--description",
+    type=str,
+    default=None,
+    help="One-sentence description of what this session will accomplish.",
+)
+def track_claudecode_command(description: str | None) -> None:
+    """Start tracking a Claude Code session in LaminDB.
+
+    Creates (or reuses) a shared Transform for all Claude Code sessions in this
+    project and opens a new Run. Writes the run UID and transcript path to
+    `.claude/` so that `lamin finish-claudecode` can close it.
+    """
+    from lamin_cli._claudecode import track_claudecode_session
+    return track_claudecode_session(description=description)
+
+
+@main.command("finish-claudecode")
+def finish_claudecode_command() -> None:
+    """Finish a tracked Claude Code session.
+
+    Reads the session transcript, renders it as HTML, saves it as a LaminDB
+    artifact linked to the run, closes the run, and cleans up the `.claude/`
+    state files written by `lamin track-claudecode`.
+    """
+    from lamin_cli._claudecode import finish_claudecode_session
+    return finish_claudecode_session()
 
 
 @main.command()
