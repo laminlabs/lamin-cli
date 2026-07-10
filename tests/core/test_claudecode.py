@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import lamindb as ln
@@ -38,24 +39,38 @@ def _write_transcript(tmp_path: Path) -> Path:
 
 
 def test_full_track_finish_flow(tmp_path):
-    # Step 1: track opens a run and writes state files
+    # track opens a run and writes state files
     track_claudecode_session(description="integration test")
 
     assert _RUN_UID_FILE.exists()
     uid = _RUN_UID_FILE.read_text().strip()
-    run = ln.Run.get(uid=uid)
-    assert run.finished_at is None
+    session_run = ln.Run.get(uid=uid)
+    assert session_run.finished_at is None
 
-    # Step 2: finish closes the run and saves a report artifact
+    # simulate a script that ran with LAMIN_INITIATED_BY_RUN_UID set
+    child_transform = ln.Transform(key="analysis.py", kind="script").save()
+    child_run = ln.Run(child_transform, initiated_by_run=session_run)
+    child_run.finished_at = datetime.now(timezone.utc)
+    child_run.save()
+
+    # finish closes the run, saves report, and stamps child transform
     transcript = _write_transcript(tmp_path)
     _TRANSCRIPT_PATH_FILE.write_text(str(transcript))
-
     finish_claudecode_session()
 
     assert not _RUN_UID_FILE.exists()
-    run = ln.Run.get(uid=uid)
-    assert run.finished_at is not None
-    assert run.report is not None
+    session_run = ln.Run.get(uid=uid)
+    assert session_run.finished_at is not None
+    assert session_run.report is not None
+
+    # child Transform.run must point to session run (shows up as session output)
+    child_transform = ln.Transform.get(key="analysis.py")
+    assert child_transform.run is not None
+    assert child_transform.run.uid == uid
+
+    # Cleanup
+    child_run.delete(permanent=True)
+    child_transform.delete(permanent=True)
 
 
 def test_track_reuses_transform_across_sessions():
