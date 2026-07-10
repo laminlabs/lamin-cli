@@ -21,9 +21,13 @@ def isolated(tmp_path, monkeypatch):
     t = ln.Transform.filter(key=_TRANSFORM_KEY).first()
     if t is not None:
         for run in t.runs.all():
-            if run.report is not None:
-                run.report.delete(permanent=True)
+            report = run.report
+            if report is not None:
+                run.report = None
+                run.save()
             run.delete(permanent=True)
+            if report is not None:
+                report.delete(permanent=True)
         t.delete(permanent=True)
 
 
