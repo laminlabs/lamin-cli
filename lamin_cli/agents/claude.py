@@ -107,9 +107,8 @@ def track_claudecode_session(name: str | None = None) -> None:
             transform = ln.Transform(
                 key=_TRANSFORM_KEY,
                 kind="function",
-                description="Claude Code runs.",
-            )
-            transform.save()
+                description="A Claude Code session.",
+            ).save()
 
         run = ln.Run(transform, status="started", name=name).save()
 
