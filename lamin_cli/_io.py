@@ -32,7 +32,7 @@ def io():
 def snapshot(upload: bool, track: bool) -> None:
     """Create a SQLite snapshot of the connected instance."""
     from lamindb_setup.io import export_db
-    if not ln_setup.settings._instance_exists:
+    if not ln_setup.settings.is_configured:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
@@ -111,7 +111,7 @@ def snapshot(upload: bool, track: bool) -> None:
 def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size: int):
     """Export registry tables to parquet files."""
     from lamindb_setup.io import export_db
-    if not ln_setup.settings._instance_exists:
+    if not ln_setup.settings.is_configured:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
@@ -134,7 +134,7 @@ def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size:
 def importdb(modules: str | None, input_dir: str, if_exists: str):
     """Import registry tables from parquet files."""
     from lamindb_setup.io import import_db
-    if not ln_setup.settings._instance_exists:
+    if not ln_setup.settings.is_configured:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
