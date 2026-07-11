@@ -971,13 +971,12 @@ def save(
 @main.group(invoke_without_command=True)
 @click.pass_context
 def track(ctx: click.Context):
-    """Track runs and interactive agent sessions.
+    """Track shell script runs and agent sessions.
 
-    This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
+    To track a **shell script**, add `lamin track` at the beginning of the script:
 
     ```
     # my_script.sh
-    set -e         # exit on error
     lamin track    # initiate a tracked shell script run
     lamin load --key raw/file1.txt
     # do something
@@ -985,10 +984,18 @@ def track(ctx: click.Context):
     lamin finish   # mark the shell script run as finished
     ```
 
-    If you run that script, it will track the run of the script, and save the input and output artifacts:
+    If you run the script, input and output artifacts will be linked:
 
     ```
     sh my_script.sh
+    ```
+
+    Track a **Claude Code** session:
+
+    ```
+    lamin track claude
+    # do work in Claude Code
+    lamin track finish
     ```
 
     → Python/R alternative: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
