@@ -43,7 +43,7 @@ def _write_transcript(tmp_path: Path) -> Path:
 
 def test_full_track_finish_flow(tmp_path):
     # track opens a run and writes state files
-    track_claudecode_session(description="integration test")
+    track_claudecode_session(name="integration test")
 
     assert _RUN_UID_FILE.exists()
     uid = _RUN_UID_FILE.read_text().strip()
@@ -77,8 +77,8 @@ def test_full_track_finish_flow(tmp_path):
 
 
 def test_track_reuses_transform_across_sessions():
-    track_claudecode_session(description="session 1")
-    track_claudecode_session(description="session 2")
+    track_claudecode_session(name="session 1")
+    track_claudecode_session(name="session 2")
 
     assert ln.Transform.filter(key=_TRANSFORM_KEY).count() == 1
 

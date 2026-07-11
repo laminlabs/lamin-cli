@@ -79,7 +79,7 @@ def _instance_connected(ln: object) -> bool:
 # --- session start ---
 
 
-def track_claudecode_session(name: str | None) -> None:
+def track_claudecode_session(name: str | None = None) -> None:
     try:
         import lamindb as ln
     except Exception as e:
