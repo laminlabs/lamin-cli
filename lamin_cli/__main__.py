@@ -1013,7 +1013,7 @@ def track_claude_command(description: str | None) -> None:
     project and opens a new Run. Writes the run UID and transcript path to
     `.claude/` so that `lamin track finish` can close it.
     """
-    from lamin_cli._claudecode import track_claudecode_session
+    from lamin_cli.agents.claude import track_claudecode_session
     return track_claudecode_session(description=description)
 
 
@@ -1026,7 +1026,7 @@ def track_finish_command() -> None:
     """
     claude_run_uid_file = Path(".claude/.lamindb_run_uid")
     if claude_run_uid_file.exists():
-        from lamin_cli._claudecode import finish_claudecode_session
+        from lamin_cli.agents.claude import finish_claudecode_session
         return finish_claudecode_session()
     from lamin_cli._context import finish as finish_
     return finish_()

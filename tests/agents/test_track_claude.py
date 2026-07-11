@@ -4,11 +4,10 @@ from pathlib import Path
 
 import lamindb as ln
 import pytest
-
-from lamin_cli._claudecode import (
-    _TRANSFORM_KEY,
+from lamin_cli.agents.claude import (
     _RUN_UID_FILE,
     _TRANSCRIPT_PATH_FILE,
+    _TRANSFORM_KEY,
     finish_claudecode_session,
     track_claudecode_session,
 )
