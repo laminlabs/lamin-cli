@@ -339,6 +339,7 @@ def finish_claudecode_session() -> None:
                 f"transcript file not found: {transcript_path} — "
                 "closing run without report (is CLAUDE_CODE_SESSION_ID set?)"
             )
+            run._status_code = 0  # completed
             run.finished_at = datetime.now(timezone.utc)
             run.save()
             _RUN_UID_FILE.unlink()
@@ -364,6 +365,7 @@ def finish_claudecode_session() -> None:
         run.report = artifact
         _stamp_transforms(run, entries, ln)
 
+        run._status_code = 0  # completed
         run.finished_at = datetime.now(timezone.utc)
         run.save()
 
