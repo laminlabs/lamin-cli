@@ -1009,8 +1009,7 @@ def track(ctx: click.Context):
 def track_claude_command(description: str | None) -> None:
     """Start tracking a Claude Code session in LaminDB.
 
-    Creates (or reuses) a shared Transform for all Claude Code sessions in this
-    project and opens a new Run. Writes the run UID and transcript path to
+    Creates a new Claude Code run. Writes the run UID and trace path to
     `.claude/` so that `lamin track finish` can close it.
     """
     from lamin_cli.agents.claude import track_claudecode_session
@@ -1019,10 +1018,9 @@ def track_claude_command(description: str | None) -> None:
 
 @track.command("finish")
 def track_finish_command() -> None:
-    """Finish a tracked Claude Code session, or shell run if none exists.
+    """Finish a tracked session.
 
-    Prefer this command after `lamin track claude`.
-    For shell scripts, `lamin finish` remains supported.
+    This can be a shell script run or a Claude Code session.
     """
     claude_run_uid_file = Path(".claude/.lamindb_run_uid")
     if claude_run_uid_file.exists():
