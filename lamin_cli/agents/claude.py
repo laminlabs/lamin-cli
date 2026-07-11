@@ -16,6 +16,7 @@ _CLAUDE_DIR = Path(".claude")
 _RUN_UID_FILE = _CLAUDE_DIR / ".lamindb_run_uid"
 _TRANSCRIPT_PATH_FILE = _CLAUDE_DIR / ".lamindb_transcript_path"
 _TRANSFORM_KEY = "__claudecode__"
+_TRANSFORM_UID = "SnfuhjObaAKR0000"
 _SKILL_MARKER = "Base directory for this skill:"
 _BLOCK_TRUNCATE = 4000
 
@@ -102,13 +103,16 @@ def track_claudecode_session(name: str | None = None) -> None:
             _warn("no lamindb instance connected, skipping session tracking")
             return
 
-        transform = ln.Transform.filter(key=_TRANSFORM_KEY).first()
+        transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
         if transform is None:
-            transform = ln.Transform(
-                key=_TRANSFORM_KEY,
-                kind="function",
-                description="A Claude Code session.",
-            ).save()
+            transform, _ = ln.Transform.objects.get_or_create(
+                uid=_TRANSFORM_UID,
+                defaults={
+                    "key": _TRANSFORM_KEY,
+                    "kind": "function",
+                    "description": "A Claude Code session.",
+                },
+            )
 
         run = ln.Run(transform, status="started", name=name).save()
 
