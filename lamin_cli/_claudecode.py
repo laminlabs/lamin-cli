@@ -54,6 +54,7 @@ h1 {{ font-size: 1.3rem; }}
 
 # --- output helpers ---
 
+
 def _info(msg: str) -> None:
     click.echo(f"✓ {msg}")
 
@@ -64,9 +65,10 @@ def _warn(msg: str) -> None:
 
 # --- lamindb helpers ---
 
+
 def _get_transcript_path() -> Path:
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
-    project_key = os.getcwd().replace("/", "-")
+    project_key = str(Path.cwd()).replace("/", "-")
     return Path.home() / ".claude" / "projects" / project_key / f"{session_id}.jsonl"
 
 
@@ -75,6 +77,7 @@ def _instance_connected(ln: object) -> bool:
 
 
 # --- session start ---
+
 
 def track_claudecode_session(description: str | None) -> None:
     try:
@@ -116,19 +119,22 @@ def track_claudecode_session(description: str | None) -> None:
 
 # --- transcript parsing ---
 
+
 def _content_has_marker(content: object, marker: str) -> bool:
     if isinstance(content, str):
         return marker in content
     if isinstance(content, list):
         return any(
-            isinstance(b, dict) and b.get("type") == "text" and marker in b.get("text", "")
+            isinstance(b, dict)
+            and b.get("type") == "text"
+            and marker in b.get("text", "")
             for b in content
         )
     return False
 
 
 def _is_bookkeeping_bash_cmd(cmd: str) -> bool:
-    if "lamin-track-claudecode" in cmd or "lamin-finish-claudecode" in cmd:
+    if "lamin track claude" in cmd or "lamin track finish" in cmd:
         return True
     # legacy: inline python -c form
     return ("ln.Transform(" in cmd and "ln.Run(transform)" in cmd) or (
@@ -155,6 +161,7 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
 
 # --- HTML rendering ---
 
+
 def _render_block(role: str, btype: str, block: dict) -> str | None:
     if btype == "text":
         text = html.escape(block.get("text", ""))[:_BLOCK_TRUNCATE]
@@ -171,7 +178,7 @@ def _render_block(role: str, btype: str, block: dict) -> str | None:
             return None
         return (
             f'<details class="block thinking">'
-            f'<summary>thinking ({role})</summary>'
+            f"<summary>thinking ({role})</summary>"
             f'<div class="content">{html.escape(thinking)[:_BLOCK_TRUNCATE]}</div></details>'
         )
     if btype == "tool_use":
@@ -203,7 +210,8 @@ def _render_block(role: str, btype: str, block: dict) -> str | None:
 
 def _render_transcript_html(entries: list[dict]) -> str:
     filtered = [
-        msg for msg in entries
+        msg
+        for msg in entries
         if not _content_has_marker(msg.get("content"), _SKILL_MARKER)
     ]
 
@@ -240,6 +248,7 @@ def _render_transcript_html(entries: list[dict]) -> str:
 
 # --- transform stamping ---
 
+
 def _extract_written_script_paths(entries: list[dict]) -> list[Path]:
     paths: list[Path] = []
     seen: set[str] = set()
@@ -248,10 +257,15 @@ def _extract_written_script_paths(entries: list[dict]) -> list[Path]:
         if not isinstance(content, list):
             continue
         for block in content:
-            if block.get("type") != "tool_use" or block.get("name") not in _SCRIPT_TOOL_NAMES:
+            if (
+                block.get("type") != "tool_use"
+                or block.get("name") not in _SCRIPT_TOOL_NAMES
+            ):
                 continue
             inp = block.get("input", {})
-            file_path = next((inp.get(k) for k in _SCRIPT_PATH_KEYS if inp.get(k)), None)
+            file_path = next(
+                (inp.get(k) for k in _SCRIPT_PATH_KEYS if inp.get(k)), None
+            )
             if not isinstance(file_path, str):
                 continue
             p = Path(file_path)
@@ -289,6 +303,7 @@ def _stamp_transforms(run: object, entries: list[dict], ln: object) -> None:
 
 
 # --- session finish ---
+
 
 def finish_claudecode_session() -> None:
     try:
@@ -349,22 +364,3 @@ def finish_claudecode_session() -> None:
     except Exception as e:
         _warn(f"lamindb session finish failed, continuing: {e}")
         _warn(traceback.format_exc())
-
-
-
-@click.command("lamin-track-claudecode")
-@click.option(
-    "--description",
-    type=str,
-    default=None,
-    help="One-sentence description of what this session will accomplish.",
-)
-def _track_main(description: str | None) -> None:
-    """Start tracking a Claude Code session in LaminDB."""
-    track_claudecode_session(description=description)
-
-
-@click.command("lamin-finish-claudecode")
-def _finish_main() -> None:
-    """Finish a tracked Claude Code session and save the transcript report."""
-    finish_claudecode_session()

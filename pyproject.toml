@@ -16,8 +16,6 @@ Home = "https://github.com/laminlabs/lamin-cli"
 
 [project.scripts]
 lamin = "lamin_cli.__main__:main"
-lamin-track-claudecode = "lamin_cli._claudecode:_track_main"
-lamin-finish-claudecode = "lamin_cli._claudecode:_finish_main"
 
 [tool.ruff]
 src = ["src"]
