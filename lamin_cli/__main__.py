@@ -51,7 +51,7 @@ COMMAND_GROUPS = {
             "commands": ["switch", "merge"],
         },
         {
-            "name": "Track within shell scripts",
+            "name": "Track agents & shell scripts",
             "commands": ["track", "finish"],
         },
         {
