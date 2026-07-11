@@ -1120,7 +1120,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
             )
         ln_setup.connect(instance)
     else:
-        if not ln_setup.settings._instance_exists:
+        if not ln_setup.settings.is_configured:
             raise click.ClickException(
                 "Not connected to an instance. Please run: lamin connect account/name"
             )
