@@ -51,7 +51,7 @@ COMMAND_GROUPS = {
             "commands": ["switch", "merge"],
         },
         {
-            "name": "Track within shell scripts",
+            "name": "Track agents & shell scripts",
             "commands": ["track", "finish"],
         },
         {
@@ -968,15 +968,15 @@ def save(
     ) is not None:
         sys.exit(1)
 
-@main.command()
-def track():
-    """Start tracking a run of a shell script.
+@main.group(invoke_without_command=True)
+@click.pass_context
+def track(ctx: click.Context):
+    """Track shell script runs and agent sessions.
 
-    This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
+    To track a **shell script**, add `lamin track` at the beginning of the script:
 
     ```
     # my_script.sh
-    set -e         # exit on error
     lamin track    # initiate a tracked shell script run
     lamin load --key raw/file1.txt
     # do something
@@ -984,16 +984,57 @@ def track():
     lamin finish   # mark the shell script run as finished
     ```
 
-    If you run that script, it will track the run of the script, and save the input and output artifacts:
+    If you run the script, input and output artifacts will be linked:
 
     ```
     sh my_script.sh
     ```
 
+    Track a **Claude Code** session:
+
+    ```
+    lamin track claude
+    # do work in Claude Code
+    lamin track finish
+    ```
+
     → Python/R alternative: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
+    if ctx.invoked_subcommand is not None:
+        return None
     from lamin_cli._context import track as track_
     return track_()
+
+
+@track.command("claude")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_claude_command(name: str | None) -> None:
+    """Start tracking a Claude Code session in LaminDB.
+
+    Creates a new Claude Code run. Writes the run UID and trace path to
+    `.claude/` so that `lamin track finish` can close it.
+    """
+    from lamin_cli.agents.claude import track_claudecode_session
+    return track_claudecode_session(name=name)
+
+
+@track.command("finish")
+def track_finish_command() -> None:
+    """Finish a tracked session.
+
+    This can be a shell script run or a Claude Code session.
+    """
+    claude_run_uid_file = Path(".claude/.lamindb_run_uid")
+    if claude_run_uid_file.exists():
+        from lamin_cli.agents.claude import finish_claudecode_session
+        return finish_claudecode_session()
+    from lamin_cli._context import finish as finish_
+    return finish_()
 
 
 @main.command()
