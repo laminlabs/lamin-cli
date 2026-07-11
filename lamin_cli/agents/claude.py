@@ -79,7 +79,7 @@ def _instance_connected(ln: object) -> bool:
 # --- session start ---
 
 
-def track_claudecode_session(description: str | None) -> None:
+def track_claudecode_session(name: str | None) -> None:
     try:
         import lamindb as ln
     except Exception as e:
@@ -100,11 +100,7 @@ def track_claudecode_session(description: str | None) -> None:
             )
             transform.save()
 
-        run = ln.Run(transform)
-        run.started_at = datetime.now(timezone.utc)
-        if description:
-            run.description = description
-        run.save()
+        run = ln.Run(transform, status="started", name=name).save()
 
         _CLAUDE_DIR.mkdir(exist_ok=True)
         _RUN_UID_FILE.write_text(run.uid)

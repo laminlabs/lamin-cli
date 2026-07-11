@@ -1001,19 +1001,19 @@ def track(ctx: click.Context):
 
 @track.command("claude")
 @click.option(
-    "--description",
+    "--name",
     type=str,
     default=None,
-    help="One-sentence description of what this session will accomplish.",
+    help="One-sentence name for this agent session.",
 )
-def track_claude_command(description: str | None) -> None:
+def track_claude_command(name: str | None) -> None:
     """Start tracking a Claude Code session in LaminDB.
 
     Creates a new Claude Code run. Writes the run UID and trace path to
     `.claude/` so that `lamin track finish` can close it.
     """
     from lamin_cli.agents.claude import track_claudecode_session
-    return track_claudecode_session(description=description)
+    return track_claudecode_session(name=name)
 
 
 @track.command("finish")
