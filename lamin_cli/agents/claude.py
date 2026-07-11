@@ -95,13 +95,10 @@ def track_claudecode_session(description: str | None) -> None:
         if transform is None:
             transform = ln.Transform(
                 key=_TRANSFORM_KEY,
-                kind="pipeline",
-                description="All Claude Code sessions in this project",
+                kind="function",
+                description="Claude Code runs.",
             )
             transform.save()
-            _info(f"created transform: {transform.uid}")
-        else:
-            _info(f"using existing transform: {transform.uid}")
 
         run = ln.Run(transform)
         run.started_at = datetime.now(timezone.utc)
