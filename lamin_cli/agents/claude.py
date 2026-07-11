@@ -68,8 +68,19 @@ def _warn(msg: str) -> None:
 
 def _get_transcript_path() -> Path:
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    projects_dir = Path.home() / ".claude" / "projects"
+    # Fast path: Claude Code slugifies the launch directory into the project key.
+    # This usually matches cwd, so try it first.
     project_key = str(Path.cwd()).replace("/", "-")
-    return Path.home() / ".claude" / "projects" / project_key / f"{session_id}.jsonl"
+    candidate = projects_dir / project_key / f"{session_id}.jsonl"
+    if candidate.exists() or not session_id:
+        return candidate
+    # Robust fallback: the user may `cd` into a subdirectory, so the subprocess
+    # cwd differs from the directory Claude Code was launched in (which defines
+    # the project key). The session_id filename is globally unique, so locate
+    # the transcript by globbing across all project dirs.
+    matches = sorted(projects_dir.glob(f"*/{session_id}.jsonl"))
+    return matches[0] if matches else candidate
 
 
 def _instance_connected(ln: object) -> bool:
@@ -317,6 +328,11 @@ def finish_claudecode_session() -> None:
         uid = _RUN_UID_FILE.read_text().strip()
         run = ln.Run.get(uid=uid)
         transcript_path = Path(_TRANSCRIPT_PATH_FILE.read_text().strip())
+
+        # The path stored at session start can be stale if it was derived from a
+        # cwd that differs from Claude Code's launch dir; re-resolve as a fallback.
+        if not transcript_path.exists():
+            transcript_path = _get_transcript_path()
 
         if not transcript_path.exists():
             _warn(
