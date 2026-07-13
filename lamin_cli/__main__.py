@@ -990,11 +990,11 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    Track a **Claude Code** session:
+    Ask **Claude Code** to track its session based on the `lamindb` skill, see [here](https://github.com/laminlabs/lamin-skills/blob/main/skills/lamindb/references/track_claude.md). It will call:
 
     ```
     lamin track claude
-    # do work in Claude Code
+    # work with Claude Code
     lamin track finish
     ```
 
