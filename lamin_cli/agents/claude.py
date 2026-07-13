@@ -13,8 +13,6 @@ import click
 # --- constants ---
 
 _CLAUDE_DIR = Path(".claude")
-_RUN_UID_FILE = _CLAUDE_DIR / ".lamindb_run_uid"
-_TRANSCRIPT_PATH_FILE = _CLAUDE_DIR / ".lamindb_transcript_path"
 _TRANSFORM_KEY = "__claudecode__"
 _TRANSFORM_UID = "SnfuhjObaAKR0000"
 _SKILL_MARKER = "Base directory for this skill:"
@@ -67,6 +65,18 @@ def _warn(msg: str) -> None:
 # --- lamindb helpers ---
 
 
+def _session_id() -> str:
+    return os.environ.get("CLAUDE_CODE_SESSION_ID", "default")
+
+
+def _run_uid_file() -> Path:
+    return _CLAUDE_DIR / f".lamindb_run_uid_{_session_id()}"
+
+
+def _transcript_path_file() -> Path:
+    return _CLAUDE_DIR / f".lamindb_transcript_path_{_session_id()}"
+
+
 def _get_transcript_path() -> Path:
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
     projects_dir = Path.home() / ".claude" / "projects"
@@ -117,8 +127,8 @@ def track_claudecode_session(name: str | None = None) -> None:
         run = ln.Run(transform, status="started", name=name).save()
 
         _CLAUDE_DIR.mkdir(exist_ok=True)
-        _RUN_UID_FILE.write_text(run.uid)
-        _TRANSCRIPT_PATH_FILE.write_text(str(_get_transcript_path()))
+        _run_uid_file().write_text(run.uid)
+        _transcript_path_file().write_text(str(_get_transcript_path()))
         _info(f"started tracking Claude Code session: {run.uid}")
     except Exception as e:
         _warn(f"lamindb session tracking failed, continuing without tracking: {e}")
@@ -324,13 +334,14 @@ def finish_claudecode_session() -> None:
             _warn("no lamindb instance connected, skipping session finish")
             return
 
-        if not _RUN_UID_FILE.exists():
+        run_uid_file = _run_uid_file()
+        if not run_uid_file.exists():
             _warn("no active Claude Code session found, skipping session finish")
             return
 
-        uid = _RUN_UID_FILE.read_text().strip()
+        uid = run_uid_file.read_text().strip()
         run = ln.Run.get(uid=uid)
-        transcript_path = Path(_TRANSCRIPT_PATH_FILE.read_text().strip())
+        transcript_path = Path(_transcript_path_file().read_text().strip())
 
         # The path stored at session start can be stale if it was derived from a
         # cwd that differs from Claude Code's launch dir; re-resolve as a fallback.
@@ -345,8 +356,8 @@ def finish_claudecode_session() -> None:
             run._status_code = 0  # completed
             run.finished_at = datetime.now(timezone.utc)
             run.save()
-            _RUN_UID_FILE.unlink()
-            _TRANSCRIPT_PATH_FILE.unlink()
+            run_uid_file.unlink()
+            _transcript_path_file().unlink()
             return
 
         entries = _parse_transcript(transcript_path)
@@ -372,8 +383,8 @@ def finish_claudecode_session() -> None:
         run.finished_at = datetime.now(timezone.utc)
         run.save()
 
-        _RUN_UID_FILE.unlink()
-        _TRANSCRIPT_PATH_FILE.unlink()
+        run_uid_file.unlink()
+        _transcript_path_file().unlink()
         _info(f"finished tracking Claude Code session: {run.uid}")
     except Exception as e:
         _warn(f"lamindb session finish failed, continuing: {e}")
