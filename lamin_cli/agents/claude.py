@@ -95,7 +95,10 @@ def _get_transcript_path() -> Path:
 
 
 def _instance_connected(ln: object) -> bool:
-    return bool(ln.setup.settings.is_configured)  # type: ignore[attr-defined]
+    s = ln.setup.settings  # type: ignore[attr-defined]
+    if hasattr(s, "is_configured"):
+        return bool(s.is_configured)
+    return bool(s._instance_exists)
 
 
 # --- session start ---
