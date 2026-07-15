@@ -990,7 +990,7 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    Ask **Claude Code** to track its session based on the `lamindb` skill, see [here](https://github.com/laminlabs/lamin-skills/blob/main/skills/lamindb/references/track_claude.md). It will call:
+    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills/tree/main/skills/lamindb) ships with the `lamindb` package at `.agents/skills/lamindb/`. Copy it to `.claude/skills/` to have Claude Code automatically track its sessions. It will call:
 
     ```
     lamin track claude
