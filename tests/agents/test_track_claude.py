@@ -5,9 +5,9 @@ from pathlib import Path
 import lamindb as ln
 import pytest
 from lamin_cli.agents.claude import (
-    _RUN_UID_FILE,
-    _TRANSCRIPT_PATH_FILE,
     _TRANSFORM_KEY,
+    _run_uid_file,
+    _transcript_path_file,
     finish_claudecode_session,
     track_claudecode_session,
 )
@@ -16,6 +16,7 @@ from lamin_cli.agents.claude import (
 @pytest.fixture(autouse=True)
 def isolated(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "test-session")
     yield
     t = ln.Transform.filter(key=_TRANSFORM_KEY).first()
     if t is not None:
@@ -45,8 +46,8 @@ def test_full_track_finish_flow(tmp_path):
     # track opens a run and writes state files
     track_claudecode_session(name="integration test")
 
-    assert _RUN_UID_FILE.exists()
-    uid = _RUN_UID_FILE.read_text().strip()
+    assert _run_uid_file().exists()
+    uid = _run_uid_file().read_text().strip()
     session_run = ln.Run.get(uid=uid)
     assert session_run.finished_at is None
 
@@ -58,10 +59,10 @@ def test_full_track_finish_flow(tmp_path):
 
     # finish closes the run, saves report, and stamps child transform
     transcript = _write_transcript(tmp_path)
-    _TRANSCRIPT_PATH_FILE.write_text(str(transcript))
+    _transcript_path_file().write_text(str(transcript))
     finish_claudecode_session()
 
-    assert not _RUN_UID_FILE.exists()
+    assert not _run_uid_file().exists()
     session_run = ln.Run.get(uid=uid)
     assert session_run.finished_at is not None
     assert session_run.report is not None
@@ -74,6 +75,20 @@ def test_full_track_finish_flow(tmp_path):
     # Cleanup
     child_run.delete(permanent=True)
     child_transform.delete(permanent=True)
+
+
+def test_parallel_sessions_use_separate_state_files(monkeypatch):
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "session-a")
+    track_claudecode_session(name="session a")
+    uid_a = _run_uid_file().read_text().strip()
+
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "session-b")
+    track_claudecode_session(name="session b")
+    uid_b = _run_uid_file().read_text().strip()
+
+    assert uid_a != uid_b
+    assert Path(".claude/.lamindb_run_uid_session-a").exists()
+    assert Path(".claude/.lamindb_run_uid_session-b").exists()
 
 
 def test_track_reuses_transform_across_sessions():

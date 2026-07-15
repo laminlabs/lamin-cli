@@ -1029,8 +1029,8 @@ def track_finish_command() -> None:
 
     This can be a shell script run or a Claude Code session.
     """
-    claude_run_uid_file = Path(".claude/.lamindb_run_uid")
-    if claude_run_uid_file.exists():
+    from lamin_cli.agents.claude import _run_uid_file
+    if _run_uid_file().exists():
         from lamin_cli.agents.claude import finish_claudecode_session
         return finish_claudecode_session()
     from lamin_cli._context import finish as finish_
