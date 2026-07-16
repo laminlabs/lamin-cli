@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 import tempfile
 import traceback
 from datetime import datetime, timezone
@@ -31,24 +32,90 @@ _SCRIPT_PATH_KEYS = ("file_path", "path", "notebook_path")
 
 _HTML_TEMPLATE = """\
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Claude Code Session Transcript</title>
+<html><head><meta charset="utf-8"><title>Session Transcript</title>
 <style>
-body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #fff; color: #111; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }}
-.block {{ margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; }}
-.user-text {{ background: #eef4ff; border-left: 4px solid #3b6fd6; }}
-.assistant-text {{ background: #f5f5f5; border-left: 4px solid #555; }}
-.tool-use {{ background: #fff8e1; border-left: 4px solid #d6a93b; }}
-.tool-result {{ background: #f0fff4; border-left: 4px solid #3bd66f; }}
-.thinking {{ background: #f9f0ff; border-left: 4px solid #a63bd6; }}
-.role-label {{ font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #666; margin-bottom: 0.4rem; }}
-.content {{ white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; }}
-pre.content {{ font-family: ui-monospace, monospace; }}
-h1 {{ font-size: 1.3rem; }}
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:800px;margin:0 auto;padding:1.5rem;font-size:14px;line-height:1.5}}
+ul{{list-style:none}}
+li.step{{display:flex;align-items:flex-start;gap:10px;padding:3px 0}}
+.dot{{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px}}
+.dg{{background:#23d18b}}.dy{{background:#bbb}}
+.bd{{flex:1;min-width:0}}
+.tt{{font-weight:600;color:#111}}
+.lb{{font-weight:400;color:#888;font-size:.85em;margin-left:6px}}
+.tx{{white-space:pre-wrap;word-wrap:break-word;color:#333;margin-top:2px}}
+.io{{margin-top:6px;border-radius:4px;border:1px solid #e5e5e5;overflow:hidden;font-family:ui-monospace,monospace;font-size:.82rem}}
+.iotag{{padding:2px 8px;background:#f5f5f5;color:#888;font-size:.72rem;font-weight:700;letter-spacing:.08em}}
+.iopre{{padding:6px 10px;background:#fafafa;white-space:pre-wrap;word-wrap:break-word;color:#333}}
+details summary{{cursor:pointer;color:#888;font-size:.85rem;list-style:none}}
+details summary::-webkit-details-marker{{display:none}}
+details summary::before{{content:'▶ ';font-size:.7em}}
+details[open] summary::before{{content:'▼ '}}
+.thk{{margin-top:4px;color:#666;font-size:.85rem;white-space:pre-wrap;word-wrap:break-word;padding-left:8px;border-left:2px solid #e5e5e5}}
+.todos{{margin-top:4px}}
+.todo{{display:flex;gap:6px;color:#333;font-size:.88rem;padding:1px 0}}
+.done{{color:#aaa;text-decoration:line-through}}
 </style></head>
-<body>
-<h1>Claude Code Session Transcript</h1>
-{blocks}
-</body></html>"""
+<body><ul>
+{steps}
+</ul></body></html>"""
+
+_ANSI_SGR = re.compile(r"\x1b\[([0-9;]*)m")
+_ANSI_BASE_COLORS = ["#000","#cd3131","#0dbc79","#e5e510","#2472c8","#bc3fbc","#11a8cd","#e5e5e5"]
+_ANSI_BRIGHT_COLORS = ["#666","#f14c4c","#23d18b","#f5f543","#3b8eea","#d670d6","#29b8db","#fff"]
+
+
+def _ansi_to_html(text: str) -> str:
+    """Convert ANSI SGR color codes to HTML spans; HTML-escape all other text."""
+    result: list[str] = []
+    style: dict[str, str] = {}
+    span_open = False
+    cursor = 0
+
+    def css(s: dict[str, str]) -> str:
+        parts = []
+        if "fg" in s:
+            parts.append(f"color:{s['fg']}")
+        if "bg" in s:
+            parts.append(f"background:{s['bg']}")
+        if s.get("bold"):
+            parts.append("font-weight:700")
+        return ";".join(parts)
+
+    for m in _ANSI_SGR.finditer(text):
+        result.append(html.escape(text[cursor:m.start()]))
+        cursor = m.end()
+        codes = [int(c) for c in m.group(1).split(";") if c] if m.group(1) else [0]
+        i = 0
+        while i < len(codes):
+            c = codes[i]
+            if c == 0:
+                style = {}
+            elif c == 1:
+                style["bold"] = "1"
+            elif 30 <= c <= 37:
+                style["fg"] = _ANSI_BASE_COLORS[c - 30]
+            elif 90 <= c <= 97:
+                style["fg"] = _ANSI_BRIGHT_COLORS[c - 90]
+            elif 40 <= c <= 47:
+                style["bg"] = _ANSI_BASE_COLORS[c - 40]
+            elif c == 39:
+                style.pop("fg", None)
+            elif c == 49:
+                style.pop("bg", None)
+            i += 1
+        new_css = css(style)
+        if span_open:
+            result.append("</span>")
+            span_open = False
+        if new_css:
+            result.append(f'<span style="{new_css}">')
+            span_open = True
+
+    result.append(html.escape(text[cursor:]))
+    if span_open:
+        result.append("</span>")
+    return "".join(result)
 
 
 # --- output helpers ---
@@ -182,50 +249,75 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
 # --- HTML rendering ---
 
 
-def _render_block(role: str, btype: str, block: dict) -> str | None:
-    if btype == "text":
-        text = html.escape(block.get("text", ""))[:_BLOCK_TRUNCATE]
-        if not text.strip():
-            return None
+def _render_thinking(thinking: str) -> str:
+    return (
+        '<li class="step"><div class="dot dy"></div><div class="bd">'
+        f'<details><summary>Thinking</summary>'
+        f'<div class="thk">{html.escape(thinking[:_BLOCK_TRUNCATE])}</div>'
+        "</details></div></li>"
+    )
+
+
+def _render_text(text: str) -> str:
+    return (
+        '<li class="step"><div class="dot dg"></div>'
+        f'<div class="bd"><div class="tx">{_ansi_to_html(text[:_BLOCK_TRUNCATE])}</div></div></li>'
+    )
+
+
+def _render_tool(tool_use: dict, tool_result: dict | None) -> str:
+    name = tool_use.get("name", "tool")
+    inp = tool_use.get("input", {})
+
+    if name == "Bash":
+        cmd = inp.get("command", "")
+        label = (cmd.split("\n")[0] if cmd else "")[:80]
+        out_html = ""
+        if tool_result is not None:
+            c = tool_result.get("content", "")
+            out = (
+                "\n".join(b.get("text", "") for b in c if isinstance(b, dict))
+                if isinstance(c, list)
+                else str(c)
+            )
+            out_html = (
+                '<div class="iotag">OUT</div>'
+                f'<div class="iopre">{_ansi_to_html(out[:_BLOCK_TRUNCATE])}</div>'
+            )
         return (
-            f'<div class="block {role}-text">'
-            f'<div class="role-label">{role}</div>'
-            f'<div class="content">{text}</div></div>'
+            '<li class="step"><div class="dot dg"></div><div class="bd">'
+            f'<div class="tt">Bash<span class="lb">{html.escape(label)}</span></div>'
+            '<div class="io">'
+            '<div class="iotag">IN</div>'
+            f'<div class="iopre">{html.escape(cmd[:_BLOCK_TRUNCATE])}</div>'
+            f"{out_html}"
+            "</div></div></li>"
         )
-    if btype == "thinking":
-        thinking = block.get("thinking", "")
-        if not thinking.strip():
-            return None
+
+    if name == "TodoWrite":
+        todos = inp.get("todos", [])
+        items = []
+        for todo in todos[:30]:
+            done = todo.get("status") == "completed"
+            check = "☑" if done else "☐"
+            cls = "todo done" if done else "todo"
+            items.append(
+                f'<div class="{cls}"><span>{check}</span>{html.escape(todo.get("content", ""))}</div>'
+            )
         return (
-            f'<details class="block thinking">'
-            f"<summary>thinking ({role})</summary>"
-            f'<div class="content">{html.escape(thinking)[:_BLOCK_TRUNCATE]}</div></details>'
+            '<li class="step"><div class="dot dg"></div><div class="bd">'
+            '<div class="tt">Update Todos</div>'
+            f'<div class="todos">{"".join(items)}</div>'
+            "</div></li>"
         )
-    if btype == "tool_use":
-        name = block.get("name", "tool")
-        inp = (
-            block.get("input", {}).get("command", "")
-            if name == "Bash"
-            else json.dumps(block.get("input", {}), indent=2)
-        )
-        return (
-            f'<div class="block tool-use">'
-            f'<div class="role-label">tool_use: {html.escape(name)}</div>'
-            f'<pre class="content">{html.escape(inp)[:_BLOCK_TRUNCATE]}</pre></div>'
-        )
-    if btype == "tool_result":
-        c = block.get("content", "")
-        text = (
-            "\n".join(b.get("text", "") for b in c if isinstance(b, dict))
-            if isinstance(c, list)
-            else str(c)
-        )
-        return (
-            f'<div class="block tool-result">'
-            f'<div class="role-label">tool_result</div>'
-            f'<pre class="content">{html.escape(text)[:_BLOCK_TRUNCATE]}</pre></div>'
-        )
-    return None
+
+    label = inp.get("skill", inp.get("name", "")) if name == "Skill" else ""
+    return (
+        '<li class="step"><div class="dot dg"></div><div class="bd">'
+        f'<div class="tt">{html.escape(name)}'
+        + (f'<span class="lb">{html.escape(str(label))}</span>' if label else "")
+        + "</div></div></li>"
+    )
 
 
 def _render_transcript_html(entries: list[dict]) -> str:
@@ -245,7 +337,16 @@ def _render_transcript_html(entries: list[dict]) -> str:
         and _is_bookkeeping_bash_cmd(block.get("input", {}).get("command", ""))
     }
 
-    blocks_html: list[str] = []
+    tool_use_map: dict[str, dict] = {
+        block.get("id", ""): block
+        for msg in filtered
+        for block in (msg.get("content") or [])
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("id")
+    }
+
+    paired_ids: set[str] = set()
+    steps: list[str] = []
+
     for msg in filtered:
         role = msg.get("role", "")
         content = msg.get("content")
@@ -255,15 +356,30 @@ def _render_transcript_html(entries: list[dict]) -> str:
             continue
         for block in content:
             btype = block.get("type")
-            if btype == "tool_use" and block.get("id") in bookkeeping_ids:
-                continue
-            if btype == "tool_result" and block.get("tool_use_id") in bookkeeping_ids:
-                continue
-            rendered = _render_block(role, btype, block)
-            if rendered is not None:
-                blocks_html.append(rendered)
+            if btype == "tool_use":
+                continue  # rendered when paired tool_result is seen
+            if btype == "tool_result":
+                use_id = block.get("tool_use_id", "")
+                if use_id in bookkeeping_ids:
+                    continue
+                tool_use = tool_use_map.get(use_id, {})
+                paired_ids.add(use_id)
+                steps.append(_render_tool(tool_use, block))
+            elif btype == "thinking" and role == "assistant":
+                thinking = block.get("thinking", "").strip()
+                if thinking:
+                    steps.append(_render_thinking(thinking))
+            elif btype == "text" and role == "assistant":
+                text = block.get("text", "").strip()
+                if text:
+                    steps.append(_render_text(text))
 
-    return _HTML_TEMPLATE.format(blocks="\n".join(blocks_html))
+    # render any tool_use blocks that never got a result (session interrupted)
+    for uid, tool_use in tool_use_map.items():
+        if uid not in paired_ids and uid not in bookkeeping_ids:
+            steps.append(_render_tool(tool_use, None))
+
+    return _HTML_TEMPLATE.format(steps="\n".join(steps))
 
 
 # --- transform stamping ---
