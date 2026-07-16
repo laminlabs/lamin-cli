@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 import tempfile
 import traceback
 from datetime import datetime, timezone
@@ -43,12 +44,67 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: 
 .role-label {{ font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #666; margin-bottom: 0.4rem; }}
 .content {{ white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; }}
 pre.content {{ font-family: ui-monospace, monospace; }}
-h1 {{ font-size: 1.3rem; }}
 </style></head>
 <body>
-<h1>Claude Code Session Transcript</h1>
 {blocks}
 </body></html>"""
+
+_ANSI_SGR = re.compile(r"\x1b\[([0-9;]*)m")
+_ANSI_BASE_COLORS = ["#000","#cd3131","#0dbc79","#e5e510","#2472c8","#bc3fbc","#11a8cd","#e5e5e5"]
+_ANSI_BRIGHT_COLORS = ["#666","#f14c4c","#23d18b","#f5f543","#3b8eea","#d670d6","#29b8db","#fff"]
+
+
+def _ansi_to_html(text: str) -> str:
+    """Convert ANSI SGR color codes to HTML spans; HTML-escape all other text."""
+    result: list[str] = []
+    style: dict[str, str] = {}
+    span_open = False
+    cursor = 0
+
+    def css(s: dict[str, str]) -> str:
+        parts = []
+        if "fg" in s:
+            parts.append(f"color:{s['fg']}")
+        if "bg" in s:
+            parts.append(f"background:{s['bg']}")
+        if s.get("bold"):
+            parts.append("font-weight:700")
+        return ";".join(parts)
+
+    for m in _ANSI_SGR.finditer(text):
+        result.append(html.escape(text[cursor:m.start()]))
+        cursor = m.end()
+        codes = [int(c) for c in m.group(1).split(";") if c] if m.group(1) else [0]
+        i = 0
+        while i < len(codes):
+            c = codes[i]
+            if c == 0:
+                style = {}
+            elif c == 1:
+                style["bold"] = "1"
+            elif 30 <= c <= 37:
+                style["fg"] = _ANSI_BASE_COLORS[c - 30]
+            elif 90 <= c <= 97:
+                style["fg"] = _ANSI_BRIGHT_COLORS[c - 90]
+            elif 40 <= c <= 47:
+                style["bg"] = _ANSI_BASE_COLORS[c - 40]
+            elif c == 39:
+                style.pop("fg", None)
+            elif c == 49:
+                style.pop("bg", None)
+            i += 1
+        new_css = css(style)
+        if span_open:
+            result.append("</span>")
+            span_open = False
+        if new_css:
+            result.append(f'<span style="{new_css}">')
+            span_open = True
+
+    result.append(html.escape(text[cursor:]))
+    if span_open:
+        result.append("</span>")
+    return "".join(result)
 
 
 # --- output helpers ---
@@ -184,7 +240,7 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
 
 def _render_block(role: str, btype: str, block: dict) -> str | None:
     if btype == "text":
-        text = html.escape(block.get("text", ""))[:_BLOCK_TRUNCATE]
+        text = _ansi_to_html(block.get("text", "")[:_BLOCK_TRUNCATE])
         if not text.strip():
             return None
         return (
@@ -223,7 +279,7 @@ def _render_block(role: str, btype: str, block: dict) -> str | None:
         return (
             f'<div class="block tool-result">'
             f'<div class="role-label">tool_result</div>'
-            f'<pre class="content">{html.escape(text)[:_BLOCK_TRUNCATE]}</pre></div>'
+            f'<pre class="content">{_ansi_to_html(text[:_BLOCK_TRUNCATE])}</pre></div>'
         )
     return None
 
