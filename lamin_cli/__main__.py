@@ -990,7 +990,7 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills/tree/main/skills/lamindb) ships with the `lamindb` package at `.agents/skills/lamindb/`. When working with Claude Code, ask it to copy the skill to `.claude/skills/` so that it automatically tracks transcripts. It will call:
+    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills/tree/main/skills/lamindb) ships with the `lamindb` package at `.agents/skills/`. When working with Claude Code, ask it to copy the skill to `.claude/skills/` so that it automatically tracks transcripts. It will call:
 
     ```
     lamin track claude
