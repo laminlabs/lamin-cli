@@ -990,11 +990,11 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the `lamindb` package at `.agents/skills/`. When working with Claude Code, ask it to copy the skill to `.claude/skills/` so that it automatically tracks agent sessions. It will call:
+    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the `lamindb` package at `.agents/skills/`. When working with Claude Code or GitHub Copilot, ask it to copy the skill to `.claude/skills/` so that it automatically tracks agent sessions. It will call:
 
     ```
-    lamin track claude
-    # work with Claude Code
+    lamin track claude   # or: lamin track copilot
+    # work with the agent
     lamin track finish
     ```
 
@@ -1023,16 +1023,39 @@ def track_claude_command(name: str | None) -> None:
     return track_claudecode_session(name=name)
 
 
+@track.command("copilot")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_copilot_command(name: str | None) -> None:
+    """Start tracking a GitHub Copilot session in LaminDB.
+
+    Creates a new Copilot run. Writes the run UID to `.claude/` so that
+    `lamin track finish` can close it.
+    """
+    from lamin_cli.agents.copilot import track_copilot_session
+    return track_copilot_session(name=name)
+
+
 @track.command("finish")
 def track_finish_command() -> None:
     """Finish a tracked session.
 
-    This can be a shell script run or a Claude Code session.
+    This can be a shell script run, a Claude Code session, or a Copilot session.
     """
-    from lamin_cli.agents.claude import _run_uid_file
-    if _run_uid_file().exists():
+    from lamin_cli.agents.claude import _run_uid_file as _claude_run_uid_file
+    if _claude_run_uid_file().exists():
         from lamin_cli.agents.claude import finish_claudecode_session
         return finish_claudecode_session()
+
+    from lamin_cli.agents.copilot import _STATE_DIR as _copilot_state_dir
+    if list(_copilot_state_dir.glob(".lamindb_run_uid_copilot_*")):
+        from lamin_cli.agents.copilot import finish_copilot_session
+        return finish_copilot_session()
+
     from lamin_cli._context import finish as finish_
     return finish_()
 
