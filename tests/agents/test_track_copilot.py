@@ -1,5 +1,6 @@
+import itertools
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import lamindb as ln
@@ -13,11 +14,26 @@ from lamin_cli.agents.copilot import (
     track_copilot_session,
 )
 
+# Real Copilot events have millisecond timestamps, which is what
+# `_resolve_session_via_self_invocation` relies on to break ties between
+# sessions whose logged commands both match the same generic search text.
+# A plain `datetime.now()` truncated to whole seconds (as opposed to real
+# sub-second precision) can make two fixture-written events land on the
+# identical string, which makes resolution order depend on filesystem
+# iteration order instead of recency. Use a monotonically increasing fake
+# clock instead so ordering between fixture calls is always deterministic.
+_fake_clock = itertools.count()
+
+
+def _next_timestamp() -> str:
+    dt = datetime.now(timezone.utc) + timedelta(milliseconds=10 * next(_fake_clock))
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+
 
 def _write_fake_session(state_dir: Path, session_id: str, cwd: str, command_texts: list[str]) -> None:
     session_dir = state_dir / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    now = _next_timestamp()
     (session_dir / "workspace.yaml").write_text(
         f"id: {session_id}\ncwd: {cwd}\nclient_name: vscode\nname: test\ncreated_at: {now}\nupdated_at: {now}\n"
     )
@@ -31,7 +47,7 @@ def _write_fake_session(state_dir: Path, session_id: str, cwd: str, command_text
                     "type": "tool.execution_start",
                     "data": {"toolCallId": f"call{i}", "toolName": "bash", "arguments": {"command": cmd}},
                     "id": f"e{i + 1}",
-                    "timestamp": now,
+                    "timestamp": _next_timestamp(),
                     "parentId": "e0",
                 }
             )
@@ -42,7 +58,7 @@ def _write_fake_session(state_dir: Path, session_id: str, cwd: str, command_text
 def _append_event(state_dir: Path, session_id: str, command_text: str) -> None:
     """Add another tool.execution_start to an existing fake session, e.g. for finish."""
     session_dir = state_dir / session_id
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    now = _next_timestamp()
     with (session_dir / "events.jsonl").open("a") as f:
         f.write(
             json.dumps(
@@ -61,7 +77,7 @@ def _append_event(state_dir: Path, session_id: str, command_text: str) -> None:
 def _write_full_transcript(state_dir: Path, session_id: str) -> None:
     """Give a session a realistic user/assistant exchange for report rendering."""
     session_dir = state_dir / session_id
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    now = _next_timestamp()
     events = [
         {"type": "user.message", "data": {"content": "do something"}, "id": "u1", "timestamp": now, "parentId": None},
         {"type": "assistant.message", "data": {"content": "done", "toolRequests": []}, "id": "a1", "timestamp": now, "parentId": "u1"},
