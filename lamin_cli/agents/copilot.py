@@ -10,7 +10,7 @@ from lamin_cli.agents import _common
 
 # --- constants ---
 
-_STATE_DIR = Path(".claude")
+_STATE_DIR = Path(".copilot")
 _TRANSFORM_KEY = "__copilot__"
 _TRANSFORM_UID = "vl12ppCqQp2P0000"
 _SKILL_MARKER = "Base directory for this skill:"
