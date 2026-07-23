@@ -223,11 +223,7 @@ def _content_has_marker(content: object, marker: str) -> bool:
 
 
 def _is_bookkeeping_bash_cmd(cmd: str) -> bool:
-    # Match on the subcommand alone, not "lamin track claude" as one literal
-    # phrase — the binary itself may be invoked via a resolved variable (e.g.
-    # "$LAMIN_BIN" track claude ...) or a full path, not the literal word
-    # "lamin", so anchoring to "lamin " would miss the fallback-resolution form.
-    if "track claude" in cmd or "track finish" in cmd:
+    if "lamin track claude" in cmd or "lamin track finish" in cmd:
         return True
     # legacy: inline python -c form
     return ("ln.Transform(" in cmd and "ln.Run(transform)" in cmd) or (
