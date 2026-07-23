@@ -185,7 +185,7 @@ def track_copilot_session(name: str | None = None) -> None:
 
 
 def _is_bookkeeping_bash_cmd(cmd: str) -> bool:
-    return "lamin track copilot" in cmd or "lamin track finish" in cmd
+    return False
 
 
 def _parse_transcript(transcript_path: Path) -> list[dict]:

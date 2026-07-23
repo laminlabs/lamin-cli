@@ -101,12 +101,7 @@ def track_claudecode_session(name: str | None = None) -> None:
 
 
 def _is_bookkeeping_bash_cmd(cmd: str) -> bool:
-    if "lamin track claude" in cmd or "lamin track finish" in cmd:
-        return True
-    # legacy: inline python -c form
-    return ("ln.Transform(" in cmd and "ln.Run(transform)" in cmd) or (
-        "ln.Run.get(uid=" in cmd and "report" in cmd.lower()
-    )
+    return False
 
 
 def _parse_transcript(transcript_path: Path) -> list[dict]:
