@@ -153,7 +153,7 @@ def track_copilot_session(name: str | None = None) -> None:
             _common.warn("no lamindb instance connected, skipping session tracking")
             return
 
-        session_id = _resolve_session("lamin track copilot")
+        session_id = _resolve_session("track copilot")
         if session_id is None:
             _common.warn("could not resolve the active Copilot session, skipping session tracking")
             return
@@ -270,7 +270,7 @@ def finish_copilot_session() -> None:
         if len(candidates) == 1:
             run_uid_file = candidates[0]
         else:
-            session_id = _resolve_session("lamin track finish")
+            session_id = _resolve_session("track finish")
             match = _run_uid_file(session_id) if session_id else None
             if match is not None and match in candidates:
                 run_uid_file = match
