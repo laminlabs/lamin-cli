@@ -39,11 +39,13 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#
 ul{{list-style:none}}
 li.step{{display:flex;align-items:flex-start;gap:10px;padding:3px 0}}
 .dot{{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px}}
-.dg{{background:#23d18b}}.dy{{background:#bbb}}
+.dg{{background:#23d18b}}.dy{{background:#bbb}}.db{{background:#2472c8}}
 .bd{{flex:1;min-width:0}}
 .tt{{font-weight:600;color:#111}}
 .lb{{font-weight:400;color:#888;font-size:.85em;margin-left:6px}}
 .tx{{white-space:pre-wrap;word-wrap:break-word;color:#333;margin-top:2px}}
+.user-msg{{background:#eef4fd;border-radius:6px;padding:8px 10px;margin:2px 0}}
+.user-msg .tt{{color:#2472c8;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}}
 .io{{margin-top:6px;border-radius:4px;border:1px solid #e5e5e5;overflow:hidden;font-family:ui-monospace,monospace;font-size:.82rem}}
 .iotag{{padding:2px 8px;background:#f5f5f5;color:#888;font-size:.72rem;font-weight:700;letter-spacing:.08em}}
 .iopre{{padding:6px 10px;background:#fafafa;white-space:pre-wrap;word-wrap:break-word;color:#333}}
@@ -265,6 +267,14 @@ def _render_text(text: str) -> str:
     )
 
 
+def _render_user_text(text: str) -> str:
+    return (
+        '<li class="step"><div class="dot db"></div>'
+        '<div class="bd"><div class="user-msg"><div class="tt">User</div>'
+        f'<div class="tx">{_ansi_to_html(text[:_BLOCK_TRUNCATE])}</div></div></div></li>'
+    )
+
+
 def _render_tool(tool_use: dict, tool_result: dict | None) -> str:
     name = tool_use.get("name", "tool")
     inp = tool_use.get("input", {})
@@ -373,6 +383,10 @@ def _render_transcript_html(entries: list[dict]) -> str:
                 text = block.get("text", "").strip()
                 if text:
                     steps.append(_render_text(text))
+            elif btype == "text" and role == "user":
+                text = block.get("text", "").strip()
+                if text:
+                    steps.append(_render_user_text(text))
 
     # render any tool_use blocks that never got a result (session interrupted)
     for uid, tool_use in tool_use_map.items():
