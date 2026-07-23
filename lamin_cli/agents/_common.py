@@ -331,11 +331,14 @@ def stamp_transforms(
     script_path_keys: tuple[str, ...] = (),
     suffix_to_kind: dict[str, str] | None = None,
 ) -> None:
+    from pathlib import Path
+
     # Primary path: scripts run with LAMIN_INITIATED_BY_RUN_UID create child runs.
     already_stamped: set[str] = set()
     for child_run in run.initiated_runs.all():  # type: ignore[attr-defined]
         t = child_run.transform
-        already_stamped.add(t.key)
+        if t.key:
+            already_stamped.add(Path(t.key).name)
         if t.run_id is None:
             t.run = run
             t.save()
