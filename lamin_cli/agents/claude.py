@@ -178,6 +178,7 @@ def finish_claudecode_session() -> None:
             artifact = ln.Artifact(
                 tmp.name,
                 description="Claude Code session transcript (rendered)",
+                kind="__lamindb_run__",
                 run=False,
             ).save()
         finally:

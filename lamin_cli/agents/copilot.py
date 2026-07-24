@@ -313,6 +313,7 @@ def finish_copilot_session() -> None:
             artifact = ln.Artifact(
                 tmp.name,
                 description="Copilot session transcript (rendered)",
+                kind="__lamindb_run__",
                 run=False,
             ).save()
         finally:
