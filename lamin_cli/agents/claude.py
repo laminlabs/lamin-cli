@@ -11,7 +11,6 @@ from lamin_cli.agents import _common
 
 # --- constants ---
 
-_CLAUDE_DIR = Path(".claude")
 _TRANSFORM_KEY = "__claudecode__"
 _TRANSFORM_UID = "SnfuhjObaAKR0000"
 _SKILL_MARKER = "Base directory for this skill:"
@@ -36,12 +35,16 @@ def _session_id() -> str:
     return os.environ.get("CLAUDE_CODE_SESSION_ID", "default")
 
 
+def _claude_dir() -> Path:
+    return _common.resolve_state_dir(".claude")
+
+
 def _run_uid_file() -> Path:
-    return _CLAUDE_DIR / f".lamindb_run_uid_{_session_id()}"
+    return _claude_dir() / f".lamindb_run_uid_{_session_id()}"
 
 
 def _transcript_path_file() -> Path:
-    return _CLAUDE_DIR / f".lamindb_transcript_path_{_session_id()}"
+    return _claude_dir() / f".lamindb_transcript_path_{_session_id()}"
 
 
 def _get_transcript_path() -> Path:
@@ -89,7 +92,7 @@ def track_claudecode_session(name: str | None = None) -> None:
 
         run = ln.Run(transform, status="started", name=name).save()
 
-        _CLAUDE_DIR.mkdir(exist_ok=True)
+        _claude_dir().mkdir(parents=True, exist_ok=True)
         _run_uid_file().write_text(run.uid)
         _transcript_path_file().write_text(str(_get_transcript_path()))
         _common.info(f"started tracking Claude Code session: {run.uid}")

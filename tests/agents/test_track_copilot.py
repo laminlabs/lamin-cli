@@ -7,7 +7,6 @@ import lamindb as ln
 import pytest
 from lamin_cli.agents import copilot as copilot_agent
 from lamin_cli.agents.copilot import (
-    _STATE_DIR,
     _TRANSFORM_KEY,
     _run_uid_file,
     finish_copilot_session,

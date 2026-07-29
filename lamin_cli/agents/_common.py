@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import re
+from pathlib import Path
 from typing import Callable
 
 import click
@@ -119,6 +120,22 @@ def instance_connected(ln: object) -> bool:
     if hasattr(s, "is_configured"):
         return bool(s.is_configured)
     return bool(s._instance_exists)
+
+
+def resolve_state_dir(name: str) -> Path:
+    """Base directory for agent state files.
+
+    Prefers the instance's configured dev-dir over cwd, so `track <agent>` and
+    `track finish` agree on the same location even if invoked from different
+    working directories within the same session.
+    """
+    try:
+        from lamindb_setup import settings as ln_setup_settings
+
+        dev_dir = ln_setup_settings.dev_dir
+    except Exception:
+        dev_dir = None
+    return Path(dev_dir) / name if dev_dir is not None else Path(name)
 
 
 # --- HTML rendering ---
@@ -297,8 +314,6 @@ def extract_written_script_paths(
     script_path_keys: tuple[str, ...],
     suffix_to_kind: dict[str, str],
 ):
-    from pathlib import Path
-
     paths: list[Path] = []
     seen: set[str] = set()
     for msg in entries:
@@ -331,8 +346,6 @@ def stamp_transforms(
     script_path_keys: tuple[str, ...] = (),
     suffix_to_kind: dict[str, str] | None = None,
 ) -> None:
-    from pathlib import Path
-
     # Primary path: scripts run with LAMIN_INITIATED_BY_RUN_UID create child runs.
     already_stamped: set[str] = set()
     for child_run in run.initiated_runs.all():  # type: ignore[attr-defined]

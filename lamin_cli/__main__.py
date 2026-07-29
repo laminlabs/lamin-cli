@@ -1051,8 +1051,8 @@ def track_finish_command() -> None:
         from lamin_cli.agents.claude import finish_claudecode_session
         return finish_claudecode_session()
 
-    from lamin_cli.agents.copilot import _STATE_DIR as _copilot_state_dir
-    if list(_copilot_state_dir.glob(".lamindb_run_uid_copilot_*")):
+    from lamin_cli.agents.copilot import _state_dir as _copilot_state_dir
+    if list(_copilot_state_dir().glob(".lamindb_run_uid_copilot_*")):
         from lamin_cli.agents.copilot import finish_copilot_session
         return finish_copilot_session()
 

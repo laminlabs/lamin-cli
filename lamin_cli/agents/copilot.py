@@ -10,7 +10,6 @@ from lamin_cli.agents import _common
 
 # --- constants ---
 
-_STATE_DIR = Path(".copilot")
 _TRANSFORM_KEY = "__copilot__"
 _TRANSFORM_UID = "vl12ppCqQp2P0000"
 _SKILL_MARKER = "Base directory for this skill:"
@@ -130,8 +129,12 @@ def _resolve_session(match_text: str) -> str | None:
     return _resolve_session_via_self_invocation(match_text) or _resolve_session_via_workspace_scan()
 
 
+def _state_dir() -> Path:
+    return _common.resolve_state_dir(".copilot")
+
+
 def _run_uid_file(session_id: str) -> Path:
-    return _STATE_DIR / f".lamindb_run_uid_copilot_{session_id}"
+    return _state_dir() / f".lamindb_run_uid_copilot_{session_id}"
 
 
 def _transcript_path(session_id: str) -> Path:
@@ -171,7 +174,7 @@ def track_copilot_session(name: str | None = None) -> None:
 
         run = ln.Run(transform, status="started", name=name).save()
 
-        _STATE_DIR.mkdir(exist_ok=True)
+        _state_dir().mkdir(parents=True, exist_ok=True)
         _run_uid_file(session_id).write_text(run.uid)
         _common.info(f"started tracking Copilot session: {run.uid}")
     except Exception as e:
@@ -262,7 +265,7 @@ def finish_copilot_session() -> None:
             _common.warn("no lamindb instance connected, skipping session finish")
             return
 
-        candidates = sorted(_STATE_DIR.glob(".lamindb_run_uid_copilot_*"))
+        candidates = sorted(_state_dir().glob(".lamindb_run_uid_copilot_*"))
         if not candidates:
             _common.warn("no active Copilot session found, skipping session finish")
             return
