@@ -23,6 +23,7 @@ def connect(
         use_root_db_user=use_root_db_user,
         persist_global_env=False,
         show_dev_dir_hint=False,
+        show_connected_log=False,
     )
     cwd = Path.cwd().resolve()
     ln_setup.settings.dev_dir = cwd
