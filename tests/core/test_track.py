@@ -3,6 +3,8 @@ import subprocess
 from pathlib import Path
 
 import lamindb as ln
+from click.testing import CliRunner
+from lamin_cli.__main__ import main
 
 scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
@@ -63,3 +65,14 @@ def test_track_lineage_via_cli():
     output_artifact.delete(permanent=True)
     run.delete(permanent=True)
     transform.delete(permanent=True)
+
+
+def test_finish_canonical_and_track_finish_hidden_from_help() -> None:
+    root_help = CliRunner().invoke(main, ["--help"])
+    assert root_help.exit_code == 0
+    assert "finish" in root_help.output
+    assert "track finish" not in root_help.output
+
+    track_help = CliRunner().invoke(main, ["track", "--help"])
+    assert track_help.exit_code == 0
+    assert "track finish" not in track_help.output

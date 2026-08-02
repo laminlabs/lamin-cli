@@ -981,7 +981,7 @@ def track(ctx: click.Context):
     lamin load --key raw/file1.txt
     # do something
     lamin save processed_file1.txt --key processed/file1.txt
-    lamin finish   # mark the shell script run as finished
+    lamin finish   # mark the tracked run as finished
     ```
 
     If you run the script, input and output artifacts will be linked:
@@ -995,7 +995,7 @@ def track(ctx: click.Context):
     ```
     lamin track claude   # or: lamin track copilot
     # work with the agent
-    lamin track finish
+    lamin finish
     ```
 
     → Python/R alternative: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
@@ -1017,9 +1017,9 @@ def track_claude_command(name: str | None) -> None:
     """Start tracking a Claude Code session in LaminDB.
 
     Creates a new Claude Code run. Writes the run UID and trace path to
-    `.claude/` so that `lamin track finish` can close it.
+    `.claude/` so that `lamin finish` can close it.
 
-    On `lamin track finish`, records `n_tokens` (full billed total: input +
+    On `lamin finish`, records `n_tokens` (full billed total: input +
     output + cache tokens), `n_steps`, and `n_tool_calls` on `run.extra_data`.
     """
     from lamin_cli.agents.claude import track_claudecode_session
@@ -1037,20 +1037,19 @@ def track_copilot_command(name: str | None) -> None:
     """Start tracking a GitHub Copilot session in LaminDB.
 
     Creates a new Copilot run. Writes the run UID to `.claude/` so that
-    `lamin track finish` can close it.
+    `lamin finish` can close it.
 
-    On `lamin track finish`, records `n_steps` and `n_tool_calls` on
+    On `lamin finish`, records `n_steps` and `n_tool_calls` on
     `run.extra_data`. `n_tokens` is also recorded, but as an output-tokens-only
     lower bound: Copilot only persists full input/cache token accounting once
-    the CLI process exits, which is after `lamin track finish` already ran —
+    the CLI process exits, which is after `lamin finish` already ran —
     so it is *not* directly comparable to Claude Code's `n_tokens`.
     """
     from lamin_cli.agents.copilot import track_copilot_session
     return track_copilot_session(name=name)
 
 
-@track.command("finish")
-def track_finish_command() -> None:
+def _finish_tracked_session() -> None:
     """Finish a tracked session.
 
     This can be a shell script run, a Claude Code session, or a Copilot session.
@@ -1069,14 +1068,25 @@ def track_finish_command() -> None:
     return finish_()
 
 
+@track.command("finish", hidden=True)
+def track_finish_command() -> None:
+    """Deprecated alias for `lamin finish`."""
+    logger.warning(
+        "`lamin track finish` is deprecated and will be removed in a future release; "
+        "use `lamin finish` instead."
+    )
+    return _finish_tracked_session()
+
+
 @main.command()
 def finish():
-    """Finish a currently tracked run of a shell script.
+    """Finish a tracked session.
 
-    → Python/R alternative: {func}`~lamindb.finish()`
+    This can be a shell script run, a Claude Code session, or a Copilot session.
+
+    → Python/R alternative: {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
-    from lamin_cli._context import finish as finish_
-    return finish_()
+    return _finish_tracked_session()
 
 
 @main.command()
