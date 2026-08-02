@@ -42,6 +42,67 @@ def _write_transcript(tmp_path: Path) -> Path:
     return p
 
 
+def _write_transcript_with_usage(tmp_path: Path) -> Path:
+    """Mirror Claude Code's real format: one JSONL line per content block,
+    with every block of the same turn repeating the same message id and the
+    same usage totals (must be de-duplicated by id when summing tokens)."""
+    p = tmp_path / "session.jsonl"
+    usage_1 = {
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "cache_creation_input_tokens": 10,
+        "cache_read_input_tokens": 5,
+    }
+    usage_2 = {
+        "input_tokens": 20,
+        "output_tokens": 30,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 200,
+    }
+    entries = [
+        {"role": "user", "content": "do something"},
+        {
+            "role": "assistant",
+            "id": "msg_1",
+            "content": [{"type": "thinking", "thinking": "let me look"}],
+            "usage": usage_1,
+        },
+        {
+            "role": "assistant",
+            "id": "msg_1",
+            "content": [{"type": "text", "text": "on it"}],
+            "usage": usage_1,
+        },
+        {
+            "role": "assistant",
+            "id": "msg_1",
+            "content": [
+                {"type": "tool_use", "id": "tool_1", "name": "Bash", "input": {}}
+            ],
+            "usage": usage_1,
+        },
+        {"role": "user", "content": "continue"},
+        {
+            "role": "assistant",
+            "id": "msg_2",
+            "content": [{"type": "text", "text": "done"}],
+            "usage": usage_2,
+        },
+        {
+            "role": "assistant",
+            "id": "msg_2",
+            "content": [
+                {"type": "tool_use", "id": "tool_2", "name": "Bash", "input": {}}
+            ],
+            "usage": usage_2,
+        },
+    ]
+    with p.open("a") as f:
+        for entry in entries:
+            f.write(json.dumps({"message": entry}) + "\n")
+    return p
+
+
 def test_full_track_finish_flow(tmp_path):
     # track opens a run and writes state files
     track_claudecode_session(name="integration test")
@@ -75,6 +136,22 @@ def test_full_track_finish_flow(tmp_path):
     # Cleanup
     child_run.delete(permanent=True)
     child_transform.delete(permanent=True)
+
+
+def test_finish_extracts_deduped_usage_metrics(tmp_path):
+    track_claudecode_session(name="usage test")
+    uid = _run_uid_file().read_text().strip()
+
+    transcript = _write_transcript_with_usage(tmp_path)
+    _transcript_path_file().write_text(str(transcript))
+    finish_claudecode_session()
+
+    session_run = ln.Run.get(uid=uid)
+    assert session_run.extra_data == {
+        "n_tokens": 415,  # (100+20) + (50+30) + (5+200) + (10+0)
+        "n_steps": 2,  # msg_1 and msg_2, despite 5 raw assistant lines
+        "n_tool_calls": 2,
+    }
 
 
 def test_parallel_sessions_use_separate_state_files(monkeypatch):

@@ -29,7 +29,9 @@ def _next_timestamp() -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
-def _write_fake_session(state_dir: Path, session_id: str, cwd: str, command_texts: list[str]) -> None:
+def _write_fake_session(
+    state_dir: Path, session_id: str, cwd: str, command_texts: list[str]
+) -> None:
     session_dir = state_dir / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
     now = _next_timestamp()
@@ -37,14 +39,26 @@ def _write_fake_session(state_dir: Path, session_id: str, cwd: str, command_text
         f"id: {session_id}\ncwd: {cwd}\nclient_name: vscode\nname: test\ncreated_at: {now}\nupdated_at: {now}\n"
     )
     lines = [
-        json.dumps({"type": "session.start", "data": {"sessionId": session_id, "context": {"cwd": cwd}}, "id": "e0", "timestamp": now, "parentId": None})
+        json.dumps(
+            {
+                "type": "session.start",
+                "data": {"sessionId": session_id, "context": {"cwd": cwd}},
+                "id": "e0",
+                "timestamp": now,
+                "parentId": None,
+            }
+        )
     ]
     for i, cmd in enumerate(command_texts):
         lines.append(
             json.dumps(
                 {
                     "type": "tool.execution_start",
-                    "data": {"toolCallId": f"call{i}", "toolName": "bash", "arguments": {"command": cmd}},
+                    "data": {
+                        "toolCallId": f"call{i}",
+                        "toolName": "bash",
+                        "arguments": {"command": cmd},
+                    },
                     "id": f"e{i + 1}",
                     "timestamp": _next_timestamp(),
                     "parentId": "e0",
@@ -63,7 +77,11 @@ def _append_event(state_dir: Path, session_id: str, command_text: str) -> None:
             json.dumps(
                 {
                     "type": "tool.execution_start",
-                    "data": {"toolCallId": "call-finish", "toolName": "bash", "arguments": {"command": command_text}},
+                    "data": {
+                        "toolCallId": "call-finish",
+                        "toolName": "bash",
+                        "arguments": {"command": command_text},
+                    },
                     "id": "e-finish",
                     "timestamp": now,
                     "parentId": "e0",
@@ -74,12 +92,64 @@ def _append_event(state_dir: Path, session_id: str, command_text: str) -> None:
 
 
 def _write_full_transcript(state_dir: Path, session_id: str) -> None:
-    """Give a session a realistic user/assistant exchange for report rendering."""
+    """Give a session a realistic user/assistant exchange for report rendering.
+
+    Includes a tool call and `outputTokens` on the assistant messages, since
+    `outputTokens` is the only token field Copilot persists to events.jsonl
+    before actual CLI shutdown — used to verify usage-metric extraction.
+    """
     session_dir = state_dir / session_id
     now = _next_timestamp()
     events = [
-        {"type": "user.message", "data": {"content": "do something"}, "id": "u1", "timestamp": now, "parentId": None},
-        {"type": "assistant.message", "data": {"content": "done", "toolRequests": []}, "id": "a1", "timestamp": now, "parentId": "u1"},
+        {
+            "type": "user.message",
+            "data": {"content": "do something"},
+            "id": "u1",
+            "timestamp": now,
+            "parentId": None,
+        },
+        {
+            "type": "assistant.message",
+            "data": {
+                "content": "on it",
+                "toolRequests": [
+                    {
+                        "toolCallId": "t1",
+                        "name": "bash",
+                        "arguments": {"command": "echo hi"},
+                    }
+                ],
+                "outputTokens": 15,
+            },
+            "id": "a1",
+            "timestamp": now,
+            "parentId": "u1",
+        },
+        {
+            "type": "tool.execution_start",
+            "data": {
+                "toolCallId": "t1",
+                "toolName": "bash",
+                "arguments": {"command": "echo hi"},
+            },
+            "id": "tc1",
+            "timestamp": now,
+            "parentId": "a1",
+        },
+        {
+            "type": "tool.execution_complete",
+            "data": {"toolCallId": "t1", "success": True, "result": {"content": "hi"}},
+            "id": "tc2",
+            "timestamp": now,
+            "parentId": "tc1",
+        },
+        {
+            "type": "assistant.message",
+            "data": {"content": "done", "toolRequests": [], "outputTokens": 25},
+            "id": "a2",
+            "timestamp": now,
+            "parentId": "tc2",
+        },
     ]
     with (session_dir / "events.jsonl").open("a") as f:
         for e in events:
@@ -116,7 +186,9 @@ def test_full_track_finish_flow(isolated):
     state_dir, project_dir = isolated
     cwd = str(project_dir)
 
-    _write_fake_session(state_dir, "session-a", cwd, ["lamin track copilot --name integration-test"])
+    _write_fake_session(
+        state_dir, "session-a", cwd, ["lamin track copilot --name integration-test"]
+    )
     track_copilot_session(name="integration test")
 
     uid_file = _run_uid_file("session-a")
@@ -146,6 +218,34 @@ def test_full_track_finish_flow(isolated):
 
     child_run.delete(permanent=True)
     child_transform.delete(permanent=True)
+
+
+def test_finish_extracts_output_only_usage_metrics(isolated):
+    # single active session: finish resolves it directly without needing a
+    # self-invocation "lamin track finish" bookkeeping event, keeping the
+    # tool-call count easy to reason about.
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+
+    _write_fake_session(
+        state_dir, "session-a", cwd, ["lamin track copilot --name usage-test"]
+    )
+    track_copilot_session(name="usage test")
+    uid = _run_uid_file("session-a").read_text().strip()
+
+    _write_full_transcript(state_dir, "session-a")
+    finish_copilot_session()
+
+    session_run = ln.Run.get(uid=uid)
+    # n_tokens is an output-tokens-only lower bound here (not a full billed
+    # total like Claude Code's), since Copilot only persists full input/cache
+    # token accounting to events.jsonl in "session.shutdown", which hasn't
+    # fired yet at `lamin track finish` time.
+    assert session_run.extra_data == {
+        "n_tokens": 40,  # 15 (a1) + 25 (a2) output tokens
+        "n_steps": 2,  # a1, a2
+        "n_tool_calls": 2,  # the "lamin track copilot" bookkeeping call + "echo hi"
+    }
 
 
 def test_multiple_sessions_use_separate_state_files(isolated):
@@ -178,7 +278,9 @@ def test_track_reuses_transform_across_sessions(isolated):
     assert ln.Transform.filter(key=_TRANSFORM_KEY).count() == 1
 
 
-def test_finish_disambiguates_via_self_invocation_when_multiple_sessions_active(isolated):
+def test_finish_disambiguates_via_self_invocation_when_multiple_sessions_active(
+    isolated,
+):
     state_dir, project_dir = isolated
     cwd = str(project_dir)
 
