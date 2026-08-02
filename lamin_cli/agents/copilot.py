@@ -126,7 +126,10 @@ def _resolve_session_via_workspace_scan() -> str | None:
 
 
 def _resolve_session(match_text: str) -> str | None:
-    return _resolve_session_via_self_invocation(match_text) or _resolve_session_via_workspace_scan()
+    return (
+        _resolve_session_via_self_invocation(match_text)
+        or _resolve_session_via_workspace_scan()
+    )
 
 
 def _state_dir() -> Path:
@@ -158,7 +161,9 @@ def track_copilot_session(name: str | None = None) -> None:
 
         session_id = _resolve_session("track copilot")
         if session_id is None:
-            _common.warn("could not resolve the active Copilot session, skipping session tracking")
+            _common.warn(
+                "could not resolve the active Copilot session, skipping session tracking"
+            )
             return
 
         transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
@@ -178,7 +183,9 @@ def track_copilot_session(name: str | None = None) -> None:
         _run_uid_file(session_id).write_text(run.uid)
         _common.info(f"started tracking Copilot session: {run.uid}")
     except Exception as e:
-        _common.warn(f"lamindb session tracking failed, continuing without tracking: {e}")
+        _common.warn(
+            f"lamindb session tracking failed, continuing without tracking: {e}"
+        )
 
 
 # --- transcript parsing ---
@@ -191,7 +198,7 @@ def _is_bookkeeping_bash_cmd(cmd: str) -> bool:
     return False
 
 
-def _parse_transcript(transcript_path: Path) -> list[dict]:
+def _load_raw_events(transcript_path: Path) -> list[dict]:
     raw_events: list[dict] = []
     with transcript_path.open() as f:
         for line in f:
@@ -202,7 +209,10 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
                 raw_events.append(json.loads(line))
             except json.JSONDecodeError:
                 continue
+    return raw_events
 
+
+def _build_entries(raw_events: list[dict]) -> list[dict]:
     results_by_call_id: dict[str, object] = {}
     for event in raw_events:
         if event.get("type") == "tool.execution_complete":
@@ -219,7 +229,9 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
         if etype == "user.message":
             text = data.get("content", "")
             if isinstance(text, str) and text.strip():
-                entries.append({"role": "user", "content": [{"type": "text", "text": text}]})
+                entries.append(
+                    {"role": "user", "content": [{"type": "text", "text": text}]}
+                )
 
         elif etype == "assistant.message":
             content_blocks: list[dict] = []
@@ -248,6 +260,36 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
                 entries.append({"role": "assistant", "content": content_blocks})
 
     return entries
+
+
+def _parse_transcript(transcript_path: Path) -> list[dict]:
+    return _build_entries(_load_raw_events(transcript_path))
+
+
+# --- usage metrics ---
+# Copilot only persists full per-model token totals (input/cache tokens) to
+# events.jsonl in the "session.shutdown" event, which fires at actual CLI
+# process exit — i.e. *after* `lamin track finish` already ran, since finish
+# is invoked as the agent's own last bash tool call while the process is
+# still alive. The only token field persisted before shutdown is
+# "assistant.message.outputTokens", so that's all we can report here.
+
+
+def _extract_usage_metrics(raw_events: list[dict]) -> dict:
+    n_output = n_steps = n_tool_calls = 0
+    for event in raw_events:
+        etype = event.get("type")
+        data = event.get("data", {})
+        if etype == "assistant.message":
+            n_steps += 1
+            n_output += data.get("outputTokens") or 0
+        elif etype == "tool.execution_start":
+            n_tool_calls += 1
+    return {
+        "n_tokens_output": n_output,
+        "n_steps": n_steps,
+        "n_tool_calls": n_tool_calls,
+    }
 
 
 # --- session finish ---
@@ -300,7 +342,8 @@ def finish_copilot_session() -> None:
             run_uid_file.unlink()
             return
 
-        entries = _parse_transcript(transcript_path)
+        raw_events = _load_raw_events(transcript_path)
+        entries = _build_entries(raw_events)
         html_doc = _common.render_transcript_html(
             entries,
             is_bookkeeping_bash_cmd=_is_bookkeeping_bash_cmd,
@@ -331,6 +374,9 @@ def finish_copilot_session() -> None:
             script_path_keys=_SCRIPT_PATH_KEYS,
             suffix_to_kind=_SUFFIX_TO_KIND,
         )
+
+        usage_metrics = _extract_usage_metrics(raw_events)
+        run.extra_data = {**(run.extra_data or {}), **usage_metrics}
 
         run._status_code = 0  # completed
         run.finished_at = datetime.now(timezone.utc)

@@ -97,7 +97,9 @@ def track_claudecode_session(name: str | None = None) -> None:
         _transcript_path_file().write_text(str(_get_transcript_path()))
         _common.info(f"started tracking Claude Code session: {run.uid}")
     except Exception as e:
-        _common.warn(f"lamindb session tracking failed, continuing without tracking: {e}")
+        _common.warn(
+            f"lamindb session tracking failed, continuing without tracking: {e}"
+        )
 
 
 # --- transcript parsing ---
@@ -122,6 +124,47 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
             if msg and msg.get("role") in ("user", "assistant"):
                 entries.append(msg)
     return entries
+
+
+# --- usage metrics ---
+# Claude Code writes one JSONL line per content block (thinking/text/tool_use)
+# rather than one line per LLM turn — every block belonging to the same turn
+# repeats the same message "id" and the same "usage" totals. Summing "usage"
+# per line would therefore overcount tokens; dedup by message id first.
+
+
+def _extract_usage_metrics(entries: list[dict]) -> dict:
+    seen_steps: set = set()
+    seen_usage: set = set()
+    n_input = n_output = n_cache_read = n_cache_write = n_tool_calls = 0
+    for msg in entries:
+        if msg.get("role") != "assistant":
+            continue
+        key = msg.get("id") or id(msg)
+        seen_steps.add(key)
+        content = msg.get("content")
+        if isinstance(content, list):
+            n_tool_calls += sum(
+                1
+                for b in content
+                if isinstance(b, dict) and b.get("type") == "tool_use"
+            )
+        usage = msg.get("usage")
+        if usage and key not in seen_usage:
+            seen_usage.add(key)
+            n_input += usage.get("input_tokens") or 0
+            n_output += usage.get("output_tokens") or 0
+            n_cache_read += usage.get("cache_read_input_tokens") or 0
+            n_cache_write += usage.get("cache_creation_input_tokens") or 0
+    return {
+        "n_tokens": n_input + n_output + n_cache_read + n_cache_write,
+        "n_tokens_input": n_input,
+        "n_tokens_output": n_output,
+        "n_tokens_cache_read": n_cache_read,
+        "n_tokens_cache_write": n_cache_write,
+        "n_steps": len(seen_steps),
+        "n_tool_calls": n_tool_calls,
+    }
 
 
 # --- session finish ---
@@ -196,6 +239,9 @@ def finish_claudecode_session() -> None:
             script_path_keys=_SCRIPT_PATH_KEYS,
             suffix_to_kind=_SUFFIX_TO_KIND,
         )
+
+        usage_metrics = _extract_usage_metrics(entries)
+        run.extra_data = {**(run.extra_data or {}), **usage_metrics}
 
         run._status_code = 0  # completed
         run.finished_at = datetime.now(timezone.utc)
