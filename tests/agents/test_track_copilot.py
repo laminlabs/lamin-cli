@@ -220,7 +220,7 @@ def test_full_track_finish_flow(isolated):
     child_transform.delete(permanent=True)
 
 
-def test_finish_extracts_partial_usage_metrics(isolated):
+def test_finish_extracts_output_only_usage_metrics(isolated):
     # single active session: finish resolves it directly without needing a
     # self-invocation "lamin track finish" bookkeeping event, keeping the
     # tool-call count easy to reason about.
@@ -237,11 +237,12 @@ def test_finish_extracts_partial_usage_metrics(isolated):
     finish_copilot_session()
 
     session_run = ln.Run.get(uid=uid)
-    # only fields derivable from persisted events before actual CLI shutdown:
-    # no n_tokens / n_tokens_input / cache keys, since Copilot only persists
-    # those to events.jsonl in "session.shutdown", which hasn't fired yet.
+    # n_tokens is an output-tokens-only lower bound here (not a full billed
+    # total like Claude Code's), since Copilot only persists full input/cache
+    # token accounting to events.jsonl in "session.shutdown", which hasn't
+    # fired yet at `lamin track finish` time.
     assert session_run.extra_data == {
-        "n_tokens_output": 40,  # 15 (a1) + 25 (a2)
+        "n_tokens": 40,  # 15 (a1) + 25 (a2) output tokens
         "n_steps": 2,  # a1, a2
         "n_tool_calls": 2,  # the "lamin track copilot" bookkeeping call + "echo hi"
     }

@@ -131,12 +131,17 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
 # rather than one line per LLM turn — every block belonging to the same turn
 # repeats the same message "id" and the same "usage" totals. Summing "usage"
 # per line would therefore overcount tokens; dedup by message id first.
+#
+# n_tokens is the full billed total (input + output + cache-read +
+# cache-write), not just output tokens: in agentic coding sessions the
+# growing conversation gets resent as input on every turn, so input/cache
+# tokens usually dominate the actual dollar cost by a wide margin.
 
 
 def _extract_usage_metrics(entries: list[dict]) -> dict:
     seen_steps: set = set()
     seen_usage: set = set()
-    n_input = n_output = n_cache_read = n_cache_write = n_tool_calls = 0
+    n_tokens = n_tool_calls = 0
     for msg in entries:
         if msg.get("role") != "assistant":
             continue
@@ -152,16 +157,16 @@ def _extract_usage_metrics(entries: list[dict]) -> dict:
         usage = msg.get("usage")
         if usage and key not in seen_usage:
             seen_usage.add(key)
-            n_input += usage.get("input_tokens") or 0
-            n_output += usage.get("output_tokens") or 0
-            n_cache_read += usage.get("cache_read_input_tokens") or 0
-            n_cache_write += usage.get("cache_creation_input_tokens") or 0
+            # full billed total, matching Anthropic/ccusage's convention:
+            # input + output + cache-read + cache-write tokens
+            n_tokens += (
+                (usage.get("input_tokens") or 0)
+                + (usage.get("output_tokens") or 0)
+                + (usage.get("cache_read_input_tokens") or 0)
+                + (usage.get("cache_creation_input_tokens") or 0)
+            )
     return {
-        "n_tokens": n_input + n_output + n_cache_read + n_cache_write,
-        "n_tokens_input": n_input,
-        "n_tokens_output": n_output,
-        "n_tokens_cache_read": n_cache_read,
-        "n_tokens_cache_write": n_cache_write,
+        "n_tokens": n_tokens,
         "n_steps": len(seen_steps),
         "n_tool_calls": n_tool_calls,
     }

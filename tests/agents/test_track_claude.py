@@ -149,10 +149,6 @@ def test_finish_extracts_deduped_usage_metrics(tmp_path):
     session_run = ln.Run.get(uid=uid)
     assert session_run.extra_data == {
         "n_tokens": 415,  # (100+20) + (50+30) + (5+200) + (10+0)
-        "n_tokens_input": 120,
-        "n_tokens_output": 80,
-        "n_tokens_cache_read": 205,
-        "n_tokens_cache_write": 10,
         "n_steps": 2,  # msg_1 and msg_2, despite 5 raw assistant lines
         "n_tool_calls": 2,
     }

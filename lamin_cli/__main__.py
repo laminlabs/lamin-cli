@@ -1018,6 +1018,9 @@ def track_claude_command(name: str | None) -> None:
 
     Creates a new Claude Code run. Writes the run UID and trace path to
     `.claude/` so that `lamin track finish` can close it.
+
+    On `lamin track finish`, records `n_tokens` (full billed total: input +
+    output + cache tokens), `n_steps`, and `n_tool_calls` on `run.extra_data`.
     """
     from lamin_cli.agents.claude import track_claudecode_session
     return track_claudecode_session(name=name)
@@ -1035,6 +1038,12 @@ def track_copilot_command(name: str | None) -> None:
 
     Creates a new Copilot run. Writes the run UID to `.claude/` so that
     `lamin track finish` can close it.
+
+    On `lamin track finish`, records `n_steps` and `n_tool_calls` on
+    `run.extra_data`. `n_tokens` is also recorded, but as an output-tokens-only
+    lower bound: Copilot only persists full input/cache token accounting once
+    the CLI process exits, which is after `lamin track finish` already ran —
+    so it is *not* directly comparable to Claude Code's `n_tokens`.
     """
     from lamin_cli.agents.copilot import track_copilot_session
     return track_copilot_session(name=name)

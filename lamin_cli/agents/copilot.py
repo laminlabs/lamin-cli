@@ -272,21 +272,23 @@ def _parse_transcript(transcript_path: Path) -> list[dict]:
 # process exit — i.e. *after* `lamin track finish` already ran, since finish
 # is invoked as the agent's own last bash tool call while the process is
 # still alive. The only token field persisted before shutdown is
-# "assistant.message.outputTokens", so that's all we can report here.
+# "assistant.message.outputTokens", so n_tokens here is an output-tokens-only
+# lower bound, not a full billed total — unlike Claude Code's n_tokens, which
+# includes input/cache tokens. Not directly comparable across the two agents.
 
 
 def _extract_usage_metrics(raw_events: list[dict]) -> dict:
-    n_output = n_steps = n_tool_calls = 0
+    n_tokens = n_steps = n_tool_calls = 0
     for event in raw_events:
         etype = event.get("type")
         data = event.get("data", {})
         if etype == "assistant.message":
             n_steps += 1
-            n_output += data.get("outputTokens") or 0
+            n_tokens += data.get("outputTokens") or 0
         elif etype == "tool.execution_start":
             n_tool_calls += 1
     return {
-        "n_tokens_output": n_output,
+        "n_tokens": n_tokens,
         "n_steps": n_steps,
         "n_tool_calls": n_tool_calls,
     }
