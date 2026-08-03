@@ -990,7 +990,7 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the `lamindb` package at `.agents/skills/`. When working with Claude Code or GitHub Copilot, ask it to copy the skill to `.claude/skills/` so that it automatically tracks agent sessions. It will call:
+    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the `lamindb` package at `.agents/skills/`. Ask your coding agent to copy it to wherever it reads skills from — `.claude/skills/` for Claude Code, `.agents/skills/` for GitHub Copilot — so that it automatically tracks agent sessions. It will call:
 
     ```
     lamin track claude   # or: lamin track copilot
