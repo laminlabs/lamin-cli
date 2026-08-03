@@ -6,6 +6,8 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
+import click
+
 from lamin_cli.agents import _common
 
 # --- constants ---
@@ -25,6 +27,7 @@ _SCRIPT_PATH_KEYS: tuple[str, ...] = ()
 _SUFFIX_TO_KIND: dict[str, str] = {}
 
 _SELF_MATCH_WINDOW_SECONDS = 5.0
+_WORKSPACE_SCAN_STALENESS_SECONDS = 60.0
 
 
 # --- session resolution ---
@@ -93,12 +96,15 @@ def _resolve_session_via_self_invocation(
     return best_id
 
 
-def _resolve_session_via_workspace_scan() -> str | None:
+def _resolve_session_via_workspace_scan(
+    staleness_seconds: float = _WORKSPACE_SCAN_STALENESS_SECONDS,
+) -> str | None:
     state_dir = _copilot_session_state_dir()
     if not state_dir.exists():
         return None
 
     cwd = str(Path.cwd())
+    now = datetime.now(timezone.utc).timestamp()
     best_id: str | None = None
     best_updated = ""
 
@@ -122,7 +128,30 @@ def _resolve_session_via_workspace_scan() -> str | None:
             best_updated = updated
             best_id = session_dir.name
 
+    if best_id is None:
+        return None
+
+    # Guard against matching a stale, unrelated past session that merely
+    # shares this cwd: without a recency check, this fallback would happily
+    # bind a brand-new run to a session from days ago that has nothing to do
+    # with the current invocation (observed in practice).
+    try:
+        best_ts = datetime.fromisoformat(best_updated.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+    if now - best_ts > staleness_seconds:
+        return None
+
     return best_id
+
+
+def _hard_error_session_not_resolved() -> None:
+    _common.hard_error(
+        f"Cannot find your active Copilot session under {_copilot_session_state_dir()}. "
+        'This usually means "Local" is selected in the Copilot Chat panel instead of '
+        '"Copilot" — select "Copilot" instead and try again. '
+        "See https://docs.lamin.ai/api#track for details."
+    )
 
 
 def _resolve_session(match_text: str) -> str | None:
@@ -156,15 +185,14 @@ def track_copilot_session(name: str | None = None) -> None:
 
     try:
         if not _common.instance_connected(ln):
-            _common.warn("no lamindb instance connected, skipping session tracking")
-            return
+            _common.hard_error(
+                "No lamindb instance connected. Run `lamin connect <instance>` "
+                "(or `lamin init` for a new one) and try again."
+            )
 
         session_id = _resolve_session("track copilot")
         if session_id is None:
-            _common.warn(
-                "could not resolve the active Copilot session, skipping session tracking"
-            )
-            return
+            _hard_error_session_not_resolved()
 
         transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
         if transform is None:
@@ -181,7 +209,11 @@ def track_copilot_session(name: str | None = None) -> None:
 
         _state_dir().mkdir(parents=True, exist_ok=True)
         _run_uid_file(session_id).write_text(run.uid)
-        _common.info(f"started tracking Copilot session: {run.uid}")
+        _common.info(
+            f"started tracking Copilot session: SESSION_ID={session_id} run_uid={run.uid}"
+        )
+    except click.ClickException:
+        raise
     except Exception as e:
         _common.warn(
             f"lamindb session tracking failed, continuing without tracking: {e}"
@@ -306,8 +338,10 @@ def finish_copilot_session() -> None:
 
     try:
         if not _common.instance_connected(ln):
-            _common.warn("no lamindb instance connected, skipping session finish")
-            return
+            _common.hard_error(
+                "No lamindb instance connected. Run `lamin connect <instance>` "
+                "(or `lamin init` for a new one) and try again."
+            )
 
         candidates = sorted(_state_dir().glob(".lamindb_run_uid_copilot_*"))
         if not candidates:
@@ -317,17 +351,28 @@ def finish_copilot_session() -> None:
         if len(candidates) == 1:
             run_uid_file = candidates[0]
         else:
-            session_id = _resolve_session("track finish")
-            match = _run_uid_file(session_id) if session_id else None
-            if match is not None and match in candidates:
+            session_id = _resolve_session("lamin finish")
+            if session_id is None:
+                # Same root cause as track_copilot_session's hard error: no
+                # session resolves at all right now (almost always "Local"
+                # selected instead of "Copilot"). The candidate files below
+                # are very likely just stale leftovers, not genuinely
+                # competing active sessions — surface the same, clearer
+                # diagnosis instead of a confusing "which of N" error.
+                _hard_error_session_not_resolved()
+            match = _run_uid_file(session_id)
+            if match in candidates:
                 run_uid_file = match
             else:
-                # last resort: most recently written state file
-                _common.warn(
-                    "multiple active Copilot sessions found in this directory and could not "
-                    "disambiguate which one is finishing — using the most recently started"
+                candidate_ids = ", ".join(
+                    c.name.removeprefix(".lamindb_run_uid_copilot_") for c in candidates
                 )
-                run_uid_file = max(candidates, key=lambda p: p.stat().st_mtime)
+                _common.hard_error(
+                    f"Resolved active Copilot session {session_id!r}, but no matching "
+                    f"local state file was found among the candidates: {candidate_ids}. "
+                    "This looks like inconsistent leftover state — remove the stale "
+                    "files under .copilot/ and try again."
+                )
 
         session_id = run_uid_file.name.removeprefix(".lamindb_run_uid_copilot_")
         uid = run_uid_file.read_text().strip()
@@ -386,6 +431,8 @@ def finish_copilot_session() -> None:
 
         run_uid_file.unlink()
         _common.info(f"finished tracking Copilot session: {run.uid}")
+    except click.ClickException:
+        raise
     except Exception as e:
         _common.warn(f"lamindb session finish failed, continuing: {e}")
         _common.warn(traceback.format_exc())
