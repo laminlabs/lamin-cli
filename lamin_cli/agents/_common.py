@@ -112,6 +112,10 @@ def warn(msg: str) -> None:
     click.echo(f"! {msg}", err=True)
 
 
+def hard_error(msg: str) -> None:
+    raise click.ClickException(msg)
+
+
 # --- lamindb helpers ---
 
 

@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import click
 import lamindb as ln
 import pytest
 from lamin_cli.agents import copilot as copilot_agent

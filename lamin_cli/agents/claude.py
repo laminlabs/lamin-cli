@@ -7,6 +7,8 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
+import click
+
 from lamin_cli.agents import _common
 
 # --- constants ---
@@ -76,8 +78,10 @@ def track_claudecode_session(name: str | None = None) -> None:
 
     try:
         if not _common.instance_connected(ln):
-            _common.warn("no lamindb instance connected, skipping session tracking")
-            return
+            _common.hard_error(
+                "No lamindb instance connected. Run `lamin connect <instance>` "
+                "(or `lamin init` for a new one) and try again."
+            )
 
         transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
         if transform is None:
@@ -96,6 +100,8 @@ def track_claudecode_session(name: str | None = None) -> None:
         _run_uid_file().write_text(run.uid)
         _transcript_path_file().write_text(str(_get_transcript_path()))
         _common.info(f"started tracking Claude Code session: {run.uid}")
+    except click.ClickException:
+        raise
     except Exception as e:
         _common.warn(
             f"lamindb session tracking failed, continuing without tracking: {e}"
@@ -184,8 +190,10 @@ def finish_claudecode_session() -> None:
 
     try:
         if not _common.instance_connected(ln):
-            _common.warn("no lamindb instance connected, skipping session finish")
-            return
+            _common.hard_error(
+                "No lamindb instance connected. Run `lamin connect <instance>` "
+                "(or `lamin init` for a new one) and try again."
+            )
 
         run_uid_file = _run_uid_file()
         if not run_uid_file.exists():
@@ -255,6 +263,8 @@ def finish_claudecode_session() -> None:
         run_uid_file.unlink()
         _transcript_path_file().unlink()
         _common.info(f"finished tracking Claude Code session: {run.uid}")
+    except click.ClickException:
+        raise
     except Exception as e:
         _common.warn(f"lamindb session finish failed, continuing: {e}")
         _common.warn(traceback.format_exc())
