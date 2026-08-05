@@ -159,7 +159,7 @@ def _hard_error_session_not_resolved() -> None:
         f"Cannot find your active Copilot session under {_copilot_session_state_dir()}. "
         'This usually means "Local" is selected in the Copilot Chat panel instead of '
         '"Copilot" — select "Copilot" instead and try again. '
-        "See https://docs.lamin.ai/api#track for details."
+        "See https://docs.lamin.ai/cli#track for details."
     )
 
 
