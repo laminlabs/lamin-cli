@@ -79,8 +79,17 @@ def _resolve_session_via_self_invocation(
                 continue
             if entry.get("type") != "tool.execution_start":
                 continue
-            cmd = entry.get("data", {}).get("arguments", {}).get("command", "")
-            if match_text not in cmd:
+            data = entry.get("data")
+            if not isinstance(data, dict):
+                continue
+            arguments = data.get("arguments")
+            if not isinstance(arguments, dict):
+                # some tools (e.g. apply_patch) encode arguments as a raw
+                # string (a diff/patch), not {"command": ...} — can't be a
+                # match for a command-text search, so it's not a candidate.
+                continue
+            cmd = arguments.get("command", "")
+            if not isinstance(cmd, str) or match_text not in cmd:
                 continue
             ts_str = entry.get("timestamp", "")
             try:
