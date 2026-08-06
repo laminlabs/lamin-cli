@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,16 @@ _SUFFIX_TO_KIND: dict[str, str] = {}
 
 _SELF_MATCH_WINDOW_SECONDS = 5.0
 _WORKSPACE_SCAN_STALENESS_SECONDS = 60.0
+
+# Copilot logs a tool call to session-state asynchronously, so a resolution
+# attempt made immediately after issuing a command can race ahead of that
+# write landing on disk — especially for a brand-new session, which has to
+# create several files (workspace.yaml, session.db, events.jsonl, ...) rather
+# than just append to an existing one. Retrying briefly absorbs that lag
+# without permanently widening _SELF_MATCH_WINDOW_SECONDS itself, which would
+# also weaken the parallel-session disambiguation that window exists for.
+_RESOLVE_RETRY_INTERVAL_SECONDS = 0.3
+_RESOLVE_RETRY_TOTAL_SECONDS = 5.0
 
 
 # --- session resolution ---
@@ -163,11 +174,21 @@ def _hard_error_session_not_resolved() -> None:
     )
 
 
-def _resolve_session(match_text: str) -> str | None:
-    return (
-        _resolve_session_via_self_invocation(match_text)
-        or _resolve_session_via_workspace_scan()
-    )
+def _resolve_session(
+    match_text: str,
+    retry_total_seconds: float = _RESOLVE_RETRY_TOTAL_SECONDS,
+    retry_interval_seconds: float = _RESOLVE_RETRY_INTERVAL_SECONDS,
+) -> str | None:
+    deadline = time.monotonic() + retry_total_seconds
+    while True:
+        result = _resolve_session_via_self_invocation(
+            match_text
+        ) or _resolve_session_via_workspace_scan()
+        if result is not None:
+            return result
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(retry_interval_seconds)
 
 
 def _state_dir() -> Path:

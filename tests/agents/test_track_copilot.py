@@ -1,5 +1,7 @@
 import itertools
 import json
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -310,3 +312,59 @@ def test_finish_disambiguates_via_self_invocation_when_multiple_sessions_active(
 
 def test_finish_without_active_session_exits_cleanly(isolated):
     finish_copilot_session()
+
+
+def test_resolve_session_retries_until_delayed_write_appears(isolated):
+    """Simulates the write-lag race: the session's own event isn't on disk yet
+    when resolution starts, appears partway through the retry window, and
+    should be picked up as soon as it lands rather than requiring the full
+    retry budget or failing outright."""
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+
+    def write_delayed_session():
+        time.sleep(0.5)
+        _write_fake_session(state_dir, "delayed-session", cwd, ["lamin finish"])
+
+    writer = threading.Thread(target=write_delayed_session)
+    writer.start()
+
+    start = time.monotonic()
+    result = copilot_agent._resolve_session(
+        "lamin finish", retry_total_seconds=3.0, retry_interval_seconds=0.1
+    )
+    elapsed = time.monotonic() - start
+    writer.join()
+
+    assert result == "delayed-session"
+    assert 0.4 < elapsed < 2.0  # picked up shortly after the write landed, not the full budget
+
+
+def test_resolve_session_gives_up_after_retry_deadline(isolated):
+    """If nothing ever appears, resolution must still return None promptly at
+    the deadline rather than hanging indefinitely."""
+    start = time.monotonic()
+    result = copilot_agent._resolve_session(
+        "lamin finish", retry_total_seconds=0.5, retry_interval_seconds=0.1
+    )
+    elapsed = time.monotonic() - start
+
+    assert result is None
+    assert 0.4 < elapsed < 1.0
+
+
+def test_resolve_session_immediate_match_has_no_retry_overhead(isolated):
+    """An already-present match must resolve on the first attempt, not wait
+    out any part of the retry interval."""
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+    _write_fake_session(state_dir, "instant-session", cwd, ["lamin finish"])
+
+    start = time.monotonic()
+    result = copilot_agent._resolve_session(
+        "lamin finish", retry_total_seconds=5.0, retry_interval_seconds=0.3
+    )
+    elapsed = time.monotonic() - start
+
+    assert result == "instant-session"
+    assert elapsed < 0.3
