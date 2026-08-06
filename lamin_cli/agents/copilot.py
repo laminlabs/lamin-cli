@@ -18,11 +18,8 @@ _TRANSFORM_UID = "vl12ppCqQp2P0000"
 _SKILL_MARKER = "Base directory for this skill:"
 _SHELL_TOOL_NAMES = frozenset({"bash"})
 
-# Copilot's write/edit tool naming hasn't been directly observed yet, so the
-# transcript-scan fallback for transform stamping is left empty — the primary
-# path (child runs linked via LAMIN_INITIATED_BY_RUN_UID) is what matters and
-# is fully agent-agnostic already. Fill these in once verified against real
-# Copilot sessions that write files via a dedicated tool rather than bash.
+# Copilot's write/edit tool naming isn't observed yet, so transform-stamping
+# fallback stays empty; fill in once verified against real Copilot sessions.
 _SCRIPT_TOOL_NAMES: frozenset[str] = frozenset()
 _SCRIPT_PATH_KEYS: tuple[str, ...] = ()
 _SUFFIX_TO_KIND: dict[str, str] = {}
@@ -30,33 +27,22 @@ _SUFFIX_TO_KIND: dict[str, str] = {}
 _SELF_MATCH_WINDOW_SECONDS = 5.0
 _WORKSPACE_SCAN_STALENESS_SECONDS = 60.0
 
-# Copilot logs a tool call to session-state asynchronously, so a resolution
-# attempt made immediately after issuing a command can race ahead of that
-# write landing on disk — especially for a brand-new session, which has to
-# create several files (workspace.yaml, session.db, events.jsonl, ...) rather
-# than just append to an existing one. Retrying briefly absorbs that lag
-# without permanently widening _SELF_MATCH_WINDOW_SECONDS itself, which would
-# also weaken the parallel-session disambiguation that window exists for.
+# Copilot logs tool calls to session-state asynchronously; retrying absorbs
+# that write-lag without widening _SELF_MATCH_WINDOW_SECONDS itself.
 _RESOLVE_RETRY_INTERVAL_SECONDS = 0.3
 _RESOLVE_RETRY_TOTAL_SECONDS = 5.0
 
+# Excludes ancient leftover run_uid files (from past hard errors/crashes)
+# from candidate counts. Not a deletion age: only measures time since
+# `track copilot` ran, so an unrelated finish call must never delete it.
+_RUN_UID_FILE_STALENESS_SECONDS = 24 * 60 * 60
+
 
 # --- session resolution ---
-# Copilot has no equivalent of $CLAUDE_CODE_SESSION_ID, so "which session is
-# this" has to be resolved rather than read directly. Two strategies, tried
-# in order:
-#
-# 1. Self-invocation match: this process's own command text (e.g. "lamin
-#    track copilot") gets logged by Copilot to that session's events.jsonl
-#    as a tool.execution_start *before* this code even starts running
-#    (verified empirically: ~1ms after the tool call is issued, tens of ms
-#    before the shell actually executes) — so searching for a recent event
-#    containing that text reliably identifies which session issued this
-#    exact call, even with multiple sessions active in the same directory.
-# 2. Workspace scan fallback: match workspace.yaml's cwd against Path.cwd(),
-#    pick the most recently updated one. Only a heuristic, but it's the
-#    fallback path, not the primary one, and only matters if the log-based
-#    match somehow finds nothing (e.g. a very old/stale invocation).
+# Copilot has no $CLAUDE_CODE_SESSION_ID equivalent, so "which session is
+# this" is resolved via (1) matching this process's own command text against
+# recent tool-call events, then (2) falling back to a cwd-based workspace
+# scan if that finds nothing.
 
 
 def _copilot_session_state_dir() -> Path:
@@ -82,12 +68,24 @@ def _resolve_session_via_self_invocation(
             lines = events_file.read_text().splitlines()
         except OSError:
             continue
-        # only the tail is relevant; this call was issued very recently
-        for line in reversed(lines[-50:]):
+        # A single visible tool call logs several internal events (hooks,
+        # permission prompts, ...), so a fixed line count can put a busy
+        # session's own very recent event past the tail before this even
+        # runs. Walk backward and stop once timestamps age past the window
+        # instead — events are appended in order, so everything earlier is
+        # older still.
+        for line in reversed(lines):
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            ts_str = entry.get("timestamp", "")
+            try:
+                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                continue
+            if now - ts > window_seconds:
+                break
             if entry.get("type") != "tool.execution_start":
                 continue
             data = entry.get("data")
@@ -101,13 +99,6 @@ def _resolve_session_via_self_invocation(
                 continue
             cmd = arguments.get("command", "")
             if not isinstance(cmd, str) or match_text not in cmd:
-                continue
-            ts_str = entry.get("timestamp", "")
-            try:
-                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
-            except ValueError:
-                continue
-            if now - ts > window_seconds:
                 continue
             if ts > best_ts:
                 best_ts = ts
@@ -203,6 +194,27 @@ def _transcript_path(session_id: str) -> Path:
     return _copilot_session_state_dir() / session_id / "events.jsonl"
 
 
+def _active_run_uid_files(
+    staleness_seconds: float = _RUN_UID_FILE_STALENESS_SECONDS,
+) -> list[Path]:
+    """Run-uid files young enough to count as a genuinely active session.
+
+    Filters, never deletes — a `--session-id` lookup still finds a stale
+    file directly regardless of age.
+    """
+    now = time.time()
+    active: list[Path] = []
+    for f in sorted(_state_dir().glob(".lamindb_run_uid_copilot_*")):
+        try:
+            age = now - f.stat().st_mtime
+        except OSError:
+            continue
+        if age > staleness_seconds:
+            continue
+        active.append(f)
+    return active
+
+
 # --- session start ---
 
 
@@ -220,7 +232,12 @@ def track_copilot_session(name: str | None = None) -> None:
                 "(or `lamin init` for a new one) and try again."
             )
 
-        session_id = _resolve_session("track copilot")
+        # Matching on the generic "track copilot" text alone can't tell two
+        # parallel sessions apart if both call this within the same window —
+        # `name` is mandated by the skill to be a distinct one-sentence
+        # description, so prefer it when present; it's what actually
+        # differs between two genuinely simultaneous invocations.
+        session_id = _resolve_session(name if name else "track copilot")
         if session_id is None:
             _hard_error_session_not_resolved()
 
@@ -359,7 +376,7 @@ def _extract_usage_metrics(raw_events: list[dict]) -> dict:
 # --- session finish ---
 
 
-def finish_copilot_session() -> None:
+def finish_copilot_session(session_id: str | None = None) -> None:
     try:
         import lamindb as ln
     except Exception as e:
@@ -373,36 +390,42 @@ def finish_copilot_session() -> None:
                 "(or `lamin init` for a new one) and try again."
             )
 
-        candidates = sorted(_state_dir().glob(".lamindb_run_uid_copilot_*"))
-        if not candidates:
-            _common.warn("no active Copilot session found, skipping session finish")
-            return
-
-        if len(candidates) == 1:
-            run_uid_file = candidates[0]
-        else:
-            session_id = _resolve_session("lamin finish")
-            if session_id is None:
-                # Same root cause as track_copilot_session's hard error: no
-                # session resolves at all right now (almost always "Local"
-                # selected instead of "Copilot"). The candidate files below
-                # are very likely just stale leftovers, not genuinely
-                # competing active sessions — surface the same, clearer
-                # diagnosis instead of a confusing "which of N" error.
-                _hard_error_session_not_resolved()
-            match = _run_uid_file(session_id)
-            if match in candidates:
-                run_uid_file = match
-            else:
-                candidate_ids = ", ".join(
-                    c.name.removeprefix(".lamindb_run_uid_copilot_") for c in candidates
-                )
+        if session_id is not None:
+            # Caller already knows which session it is (skill captured
+            # SESSION_ID from track's own output) — skip log-based guessing.
+            run_uid_file = _run_uid_file(session_id)
+            if not run_uid_file.exists():
                 _common.hard_error(
-                    f"Resolved active Copilot session {session_id!r}, but no matching "
-                    f"local state file was found among the candidates: {candidate_ids}. "
-                    "This looks like inconsistent leftover state — remove the stale "
-                    "files under .copilot/ and try again."
+                    f"No active Copilot run found for session {session_id!r}. "
+                    "Run `lamin track copilot` first, or double check the "
+                    "SESSION_ID printed there was copied exactly."
                 )
+        else:
+            candidates = _active_run_uid_files()
+            if not candidates:
+                _common.warn("no active Copilot session found, skipping session finish")
+                return
+
+            if len(candidates) == 1:
+                run_uid_file = candidates[0]
+            else:
+                resolved_session_id = _resolve_session("lamin finish")
+                if resolved_session_id is None:
+                    _hard_error_session_not_resolved()
+                match = _run_uid_file(resolved_session_id)
+                if match in candidates:
+                    run_uid_file = match
+                else:
+                    candidate_ids = ", ".join(
+                        c.name.removeprefix(".lamindb_run_uid_copilot_")
+                        for c in candidates
+                    )
+                    _common.hard_error(
+                        f"Resolved active Copilot session {resolved_session_id!r}, but "
+                        "no matching local state file was found among the candidates: "
+                        f"{candidate_ids}. This looks like inconsistent leftover state "
+                        "— remove the stale files under .copilot/ and try again."
+                    )
 
         session_id = run_uid_file.name.removeprefix(".lamindb_run_uid_copilot_")
         uid = run_uid_file.read_text().strip()

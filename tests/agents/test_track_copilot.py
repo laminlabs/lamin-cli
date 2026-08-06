@@ -1,5 +1,6 @@
 import itertools
 import json
+import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -251,6 +252,34 @@ def test_finish_extracts_output_only_usage_metrics(isolated):
     }
 
 
+def test_resolve_finds_own_event_buried_past_a_fixed_line_count(isolated):
+    """A single visible tool call logs several internal events (hooks,
+    permission prompts, ...), so by the time resolution actually runs, many
+    more events can have piled up after the target one in the SAME
+    session's own log — a fixed line-count tail must not cause a session to
+    miss its own very recent event (which previously fell back to the
+    cwd-only workspace scan and could resolve to a different session
+    entirely)."""
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+
+    target_name = "Create a text file of all divisors of 360 and save it as a LaminDB artifact."
+    _write_fake_session(
+        state_dir, "session-a", cwd, [f'lamin track copilot --name "{target_name}"']
+    )
+    # pile on far more than the old fixed 50-line tail window, all still
+    # well within the 5s time window (10ms apart via the fake clock)
+    for i in range(80):
+        _append_event(state_dir, "session-a", f"some other internal event {i}")
+
+    # a second, unrelated session sharing the same cwd, created slightly
+    # later -- if resolution wrongly falls back to the cwd-only workspace
+    # scan, it lands here instead of session-a.
+    _write_fake_session(state_dir, "session-b", cwd, ["lamin track copilot --name b"])
+
+    assert copilot_agent._resolve_session_via_self_invocation(target_name) == "session-a"
+
+
 def test_multiple_sessions_use_separate_state_files(isolated):
     state_dir, project_dir = isolated
     cwd = str(project_dir)
@@ -266,6 +295,41 @@ def test_multiple_sessions_use_separate_state_files(isolated):
     assert uid_a != uid_b
     assert _run_uid_file("session-a").exists()
     assert _run_uid_file("session-b").exists()
+
+
+def test_track_disambiguates_parallel_sessions_via_distinct_names(isolated):
+    """Two sessions both calling `lamin track copilot` within the same
+    window must not collide just because both commands share the generic
+    "track copilot" substring — matching on the mandated, distinct --name
+    text instead must correctly resolve each to its own session, even
+    though both sessions' events are already on disk when each resolves
+    (simulating genuine overlap, not a sequential write-lag race)."""
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+
+    _write_fake_session(
+        state_dir,
+        "session-a",
+        cwd,
+        ['lamin track copilot --name "sum of squares of first 50 even numbers"'],
+    )
+    _write_fake_session(
+        state_dir,
+        "session-b",
+        cwd,
+        ['lamin track copilot --name "20th fibonacci number"'],
+    )
+
+    track_copilot_session(name="sum of squares of first 50 even numbers")
+    assert _run_uid_file("session-a").exists()
+    assert not _run_uid_file("session-b").exists()
+
+    track_copilot_session(name="20th fibonacci number")
+    assert _run_uid_file("session-b").exists()
+
+    uid_a = _run_uid_file("session-a").read_text().strip()
+    uid_b = _run_uid_file("session-b").read_text().strip()
+    assert uid_a != uid_b
 
 
 def test_track_reuses_transform_across_sessions(isolated):
@@ -351,6 +415,73 @@ def test_resolve_session_gives_up_after_retry_deadline(isolated):
 
     assert result is None
     assert 0.4 < elapsed < 1.0
+
+
+def test_finish_ignores_stale_run_uid_files_without_deleting_them(isolated):
+    """A run_uid file left behind by a past hard error/crash must not force
+    log-based resolution (or worse, wrongly route an unrelated plain
+    shell-script finish into the Copilot branch) — it should be excluded
+    from candidate counts. But it must NOT be deleted: its age only measures
+    time since `lamin track copilot` ran, not time since the session was
+    last active, so an unrelated finish call must never be able to destroy
+    another still-open session's bookkeeping just because it's old."""
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+
+    _write_fake_session(state_dir, "session-a", cwd, ["lamin track copilot --name a"])
+    track_copilot_session(name="session a")
+    uid_a = _run_uid_file("session-a").read_text().strip()
+
+    stale_uid_file = copilot_agent._run_uid_file("stale-abandoned-session")
+    stale_uid_file.write_text("does-not-matter")
+    old_time = time.time() - copilot_agent._RUN_UID_FILE_STALENESS_SECONDS - 3600
+    os.utime(stale_uid_file, (old_time, old_time))
+
+    assert copilot_agent._active_run_uid_files() == [_run_uid_file("session-a")]
+    assert stale_uid_file.exists()  # excluded from the count, but left on disk
+
+    # single genuinely active candidate -> resolves directly, no "lamin
+    # finish" event needed at all.
+    finish_copilot_session()
+
+    assert not _run_uid_file("session-a").exists()
+    assert ln.Run.get(uid=uid_a).finished_at is not None
+    assert stale_uid_file.exists()  # still untouched by an unrelated finish
+
+    stale_uid_file.unlink()
+
+
+def test_finish_with_explicit_session_id_bypasses_resolution(isolated):
+    """The whole point of passing --session-id: it must work even when log-based
+    resolution would fail or pick the wrong session (e.g. two sessions racing on
+    the identical generic command text) — no `_resolve_session` call needed."""
+    state_dir, project_dir = isolated
+    cwd = str(project_dir)
+
+    _write_fake_session(state_dir, "session-a", cwd, ["lamin track copilot --name a"])
+    track_copilot_session(name="session a")
+    uid_a = _run_uid_file("session-a").read_text().strip()
+
+    _write_fake_session(state_dir, "session-b", cwd, ["lamin track copilot --name b"])
+    track_copilot_session(name="session b")
+    uid_b = _run_uid_file("session-b").read_text().strip()
+
+    # No "lamin finish" event logged for either session at all — pure
+    # text-match resolution would return None here (hard error). Passing
+    # session_id explicitly must still succeed.
+    finish_copilot_session(session_id="session-b")
+
+    assert not _run_uid_file("session-b").exists()
+    assert _run_uid_file("session-a").exists()  # untouched
+    assert ln.Run.get(uid=uid_b).finished_at is not None
+    assert ln.Run.get(uid=uid_a).finished_at is None
+
+    ln.Run.get(uid=uid_a).delete(permanent=True)
+
+
+def test_finish_with_unknown_session_id_hard_errors(isolated):
+    with pytest.raises(click.ClickException, match="No active Copilot run found"):
+        finish_copilot_session(session_id="never-tracked-session")
 
 
 def test_resolve_session_immediate_match_has_no_retry_overhead(isolated):
