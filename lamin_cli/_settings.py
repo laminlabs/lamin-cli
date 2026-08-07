@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 if os.environ.get("NO_RICH"):
     import click as click
@@ -9,10 +12,23 @@ else:
     import rich_click as click
 
 
+def mount_storage_config_path() -> Path:
+    from lamindb_setup import settings as settings_
+
+    return settings_.settings_dir / "exec-mount-storage.txt"
+
+
+def read_mount_storage_config() -> tuple[str, ...]:
+    path = mount_storage_config_path()
+    if not path.exists():
+        return ()
+    return tuple(line.strip() for line in path.read_text().splitlines() if line.strip())
+
+
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage development, cache, modules, branch, and space settings.
+    """Manage development, cache, modules, branch, space, and exec mount-storage settings.
 
     Get or set a setting by name:
 
@@ -21,6 +37,7 @@ def settings(ctx):
     - `modules` → environment schema modules {attr}`~lamindb.setup.core.SetupSettings.modules`
     - `branch` → branch {attr}`~lamindb.setup.core.SetupSettings.branch`
     - `space` → space {attr}`~lamindb.setup.core.SetupSettings.space`
+    - `mount-storage` → machine-local exec mount mappings for `lamin exec`
 
     Display via [lamin info](https://docs.lamin.ai/cli#info)
 
@@ -46,6 +63,10 @@ def settings(ctx):
     # space
     lamin settings space get
     lamin settings space set all
+    # exec mount-storage
+    lamin settings mount-storage get
+    lamin settings mount-storage set s3://bucket/prefix=/mount/root
+    lamin settings mount-storage unset
     ```
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.modules`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
@@ -138,6 +159,46 @@ def modules_unset():
 
 
 settings.add_command(modules_group)
+
+
+# -----------------------------------------------------------------------------
+# mount-storage group (pattern: lamin settings mount-storage get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("mount-storage")
+def mount_storage_group():
+    """Get or set machine-local exec mount-storage mappings."""
+
+
+@mount_storage_group.command("get")
+def mount_storage_get():
+    """Show current machine-local exec mount-storage mappings."""
+    mappings = read_mount_storage_config()
+    click.echo("\n".join(mappings) if mappings else "None")
+
+
+@mount_storage_group.command("set")
+@click.argument("values", nargs=-1, type=str)
+def mount_storage_set(values: tuple[str, ...]):
+    """Set machine-local exec mount-storage mappings."""
+    from lamin_cli.__main__ import parse_mount_storage_mappings
+
+    if not values:
+        raise click.UsageError(
+            "Provide at least one <storage-root>=<mount-root> mapping."
+        )
+    parse_mount_storage_mappings(values)
+    mount_storage_config_path().write_text("\n".join(values) + "\n")
+
+
+@mount_storage_group.command("unset")
+def mount_storage_unset():
+    """Unset machine-local exec mount-storage mappings."""
+    mount_storage_config_path().unlink(missing_ok=True)
+
+
+settings.add_command(mount_storage_group)
 
 
 # -----------------------------------------------------------------------------
