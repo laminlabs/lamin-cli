@@ -96,9 +96,7 @@ def track_copilot_session(name: str | None = None) -> None:
 
         _state_dir().mkdir(parents=True, exist_ok=True)
         _run_uid_file(session_id).write_text(run.uid)
-        _common.info(
-            f"started tracking Copilot session: SESSION_ID={session_id} run_uid={run.uid}"
-        )
+        _common.info(f"started tracking Copilot session: {run.uid}")
     except click.ClickException:
         raise
     except Exception as e:
