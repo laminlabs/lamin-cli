@@ -1018,10 +1018,10 @@ def track(ctx: click.Context):
 @click.option(
     "--name",
     type=str,
-    required=True,
+    default=None,
     help="One-sentence name for this agent session.",
 )
-def track_claude_command(name: str) -> None:
+def track_claude_command(name: str | None) -> None:
     """Start tracking a Claude Code session in LaminDB.
 
     Creates a new Claude Code run. Writes the run UID and trace path to
@@ -1038,10 +1038,10 @@ def track_claude_command(name: str) -> None:
 @click.option(
     "--name",
     type=str,
-    required=True,
+    default=None,
     help="One-sentence name for this agent session.",
 )
-def track_copilot_command(name: str) -> None:
+def track_copilot_command(name: str | None) -> None:
     """Start tracking a GitHub Copilot session in LaminDB.
 
     Creates a new Copilot run. Writes the run UID to `.claude/` so that
@@ -1057,7 +1057,7 @@ def track_copilot_command(name: str) -> None:
     return track_copilot_session(name=name)
 
 
-def _finish_tracked_session(session_id: str | None = None) -> None:
+def _finish_tracked_session() -> None:
     """Finish a tracked session.
 
     This can be a shell script run, a Claude Code session, or a Copilot session.
@@ -1067,43 +1067,34 @@ def _finish_tracked_session(session_id: str | None = None) -> None:
         from lamin_cli.agents.claude import finish_claudecode_session
         return finish_claudecode_session()
 
-    from lamin_cli.agents.copilot import _active_run_uid_files
-    if session_id is not None or _active_run_uid_files():
+    from lamin_cli.agents.copilot import _session_id_from_env
+    if _session_id_from_env():
         from lamin_cli.agents.copilot import finish_copilot_session
-        return finish_copilot_session(session_id=session_id)
+        return finish_copilot_session()
 
     from lamin_cli._context import finish as finish_
     return finish_()
 
 
 @track.command("finish", hidden=True)
-@click.option("--session-id", type=str, default=None, hidden=True)
-def track_finish_command(session_id: str | None) -> None:
+def track_finish_command() -> None:
     """Deprecated alias for `lamin finish`."""
     logger.warning(
         "`lamin track finish` is deprecated and will be removed in a future release; "
         "use `lamin finish` instead."
     )
-    return _finish_tracked_session(session_id=session_id)
+    return _finish_tracked_session()
 
 
 @main.command()
-@click.option(
-    "--session-id",
-    type=str,
-    default=None,
-    help="The Copilot SESSION_ID printed by `lamin track copilot`. Only relevant "
-    "for Copilot sessions — pass it to finish the exact session that printed it, "
-    "instead of relying on log-based resolution.",
-)
-def finish(session_id: str | None):
+def finish():
     """Finish a tracked session.
 
     This can be a shell script run, a Claude Code session, or a Copilot session.
 
     → Python/R alternative: {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
-    return _finish_tracked_session(session_id=session_id)
+    return _finish_tracked_session()
 
 
 @main.command()
