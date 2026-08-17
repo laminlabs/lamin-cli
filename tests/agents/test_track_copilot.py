@@ -1,5 +1,7 @@
 import itertools
 import json
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -90,6 +92,34 @@ def _write_full_transcript(state_dir: Path, session_id: str) -> None:
             "timestamp": now,
             "parentId": "tc2",
         },
+        {
+            "type": "assistant.message",
+            "data": {
+                "content": "closing session",
+                "toolRequests": [
+                    {
+                        "toolCallId": "t2",
+                        "name": "bash",
+                        "arguments": {"command": "lamin finish"},
+                    }
+                ],
+                "outputTokens": 0,
+            },
+            "id": "a3",
+            "timestamp": now,
+            "parentId": "a2",
+        },
+        {
+            "type": "tool.execution_start",
+            "data": {
+                "toolCallId": "t2",
+                "toolName": "bash",
+                "arguments": {"command": "lamin finish"},
+            },
+            "id": "tc3",
+            "timestamp": now,
+            "parentId": "a3",
+        },
     ]
     _write_transcript(state_dir, session_id, events)
 
@@ -171,9 +201,9 @@ def test_finish_extracts_output_only_usage_metrics(isolated, monkeypatch):
     # token accounting to events.jsonl in "session.shutdown", which hasn't
     # fired yet at `lamin finish` time.
     assert session_run.extra_data == {
-        "n_tokens": 40,  # 15 (a1) + 25 (a2) output tokens
-        "n_steps": 2,  # a1, a2
-        "n_tool_calls": 1,  # "echo hi"
+        "n_tokens": 40,  # 15 (a1) + 25 (a2) output tokens; a3 (finish) has 0
+        "n_steps": 3,  # a1, a2, a3
+        "n_tool_calls": 2,  # "echo hi", "lamin finish"
     }
 
 
@@ -255,3 +285,65 @@ def test_track_without_name_still_works(isolated, monkeypatch):
     monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", "session-a")
     track_copilot_session()
     assert _run_uid_file("session-a").exists()
+
+
+def test_finish_waits_for_delayed_finish_command_write(isolated, monkeypatch):
+    """End-to-end proof (not just the isolated _common helper): if the
+    transcript is read before Copilot has flushed the closing `lamin finish`
+    command to disk, finish must wait for it rather than rendering an
+    incomplete report."""
+    state_dir, project_dir = isolated
+    monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", "session-a")
+
+    track_copilot_session(name="delayed write test")
+    uid = _run_uid_file("session-a").read_text().strip()
+
+    _write_transcript(
+        state_dir,
+        "session-a",
+        [
+            {
+                "type": "user.message",
+                "data": {"content": "do something"},
+                "id": "u1",
+                "timestamp": _next_timestamp(),
+                "parentId": None,
+            },
+        ],
+    )
+    events_path = state_dir / "session-a" / "events.jsonl"
+
+    def write_delayed_finish_command():
+        time.sleep(0.5)
+        # _build_entries only turns toolRequests on an assistant.message into
+        # tool_use blocks -- a bare tool.execution_start alone isn't enough.
+        event = {
+            "type": "assistant.message",
+            "data": {
+                "content": "closing session",
+                "toolRequests": [
+                    {
+                        "toolCallId": "tf",
+                        "name": "bash",
+                        "arguments": {"command": "lamin finish"},
+                    }
+                ],
+            },
+            "id": "af",
+            "timestamp": _next_timestamp(),
+            "parentId": "u1",
+        }
+        with events_path.open("a") as f:
+            f.write(json.dumps(event) + "\n")
+
+    writer = threading.Thread(target=write_delayed_finish_command)
+    writer.start()
+
+    start = time.monotonic()
+    finish_copilot_session()
+    elapsed = time.monotonic() - start
+    writer.join()
+
+    assert 0.4 < elapsed < 3.0  # picked up shortly after the write, not the full 8s budget
+    session_run = ln.Run.get(uid=uid)
+    assert session_run.finished_at is not None
