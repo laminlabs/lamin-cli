@@ -260,6 +260,7 @@ def finish_copilot_session() -> None:
             is_done_fn=lambda result: _common.contains_finish_invocation(
                 result[1], _SHELL_TOOL_NAMES
             ),
+            transcript_path=transcript_path,
         )
         html_doc = _common.render_transcript_html(
             entries,
