@@ -221,7 +221,12 @@ def finish_claudecode_session() -> None:
             _transcript_path_file().unlink()
             return
 
-        entries = _parse_transcript(transcript_path)
+        entries = _common.wait_for_finish_invocation(
+            read_fn=lambda: _parse_transcript(transcript_path),
+            is_done_fn=lambda entries: _common.contains_finish_invocation(
+                entries, _SHELL_TOOL_NAMES
+            ),
+        )
         html_doc = _common.render_transcript_html(
             entries,
             is_bookkeeping_bash_cmd=_is_bookkeeping_bash_cmd,

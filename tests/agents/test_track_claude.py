@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,6 +38,17 @@ def _write_transcript(tmp_path: Path) -> Path:
     for entry in [
         {"role": "user", "content": "do something"},
         {"role": "assistant", "content": "done"},
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "tool_finish",
+                    "name": "Bash",
+                    "input": {"command": "lamin finish"},
+                }
+            ],
+        },
     ]:
         with p.open("a") as f:
             f.write(json.dumps({"message": entry}) + "\n")
@@ -96,6 +109,20 @@ def _write_transcript_with_usage(tmp_path: Path) -> Path:
             ],
             "usage": usage_2,
         },
+        {
+            "role": "assistant",
+            "id": "msg_3",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "tool_finish",
+                    "name": "Bash",
+                    "input": {"command": "lamin finish"},
+                }
+            ],
+            # no usage on this one -- Claude Code hasn't returned a result for
+            # its own still-in-flight finish call yet, so no usage is billed
+        },
     ]
     with p.open("a") as f:
         for entry in entries:
@@ -148,9 +175,9 @@ def test_finish_extracts_deduped_usage_metrics(tmp_path):
 
     session_run = ln.Run.get(uid=uid)
     assert session_run.extra_data == {
-        "n_tokens": 415,  # (100+20) + (50+30) + (5+200) + (10+0)
-        "n_steps": 2,  # msg_1 and msg_2, despite 5 raw assistant lines
-        "n_tool_calls": 2,
+        "n_tokens": 415,  # (100+20) + (50+30) + (5+200) + (10+0); msg_3 has no usage yet
+        "n_steps": 3,  # msg_1, msg_2, msg_3
+        "n_tool_calls": 3,  # tool_1, tool_2, and the finish command itself
     }
 
 
@@ -178,3 +205,49 @@ def test_track_reuses_transform_across_sessions():
 def test_finish_without_active_session_exits_cleanly():
     # finish called with no prior track — must not raise
     finish_claudecode_session()
+
+
+def test_finish_waits_for_delayed_finish_command_write(tmp_path):
+    """End-to-end proof (not just the isolated _common helper): if the
+    transcript is read before Claude Code has flushed the closing `lamin
+    finish` command to disk, finish must wait for it rather than rendering
+    an incomplete report."""
+    track_claudecode_session(name="delayed write test")
+    uid = _run_uid_file().read_text().strip()
+
+    transcript = tmp_path / "session.jsonl"
+    for entry in [
+        {"role": "user", "content": "do something"},
+        {"role": "assistant", "content": "done"},
+    ]:
+        with transcript.open("a") as f:
+            f.write(json.dumps({"message": entry}) + "\n")
+    _transcript_path_file().write_text(str(transcript))
+
+    def write_delayed_finish_command():
+        time.sleep(0.5)
+        entry = {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "tool_finish",
+                    "name": "Bash",
+                    "input": {"command": "lamin finish"},
+                }
+            ],
+        }
+        with transcript.open("a") as f:
+            f.write(json.dumps({"message": entry}) + "\n")
+
+    writer = threading.Thread(target=write_delayed_finish_command)
+    writer.start()
+
+    start = time.monotonic()
+    finish_claudecode_session()
+    elapsed = time.monotonic() - start
+    writer.join()
+
+    assert 0.4 < elapsed < 3.0  # picked up shortly after the write, not the full 8s budget
+    session_run = ln.Run.get(uid=uid)
+    assert session_run.finished_at is not None

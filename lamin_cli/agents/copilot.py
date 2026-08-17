@@ -251,8 +251,16 @@ def finish_copilot_session() -> None:
             run_uid_file.unlink()
             return
 
-        raw_events = _load_raw_events(transcript_path)
-        entries = _build_entries(raw_events)
+        def _read() -> tuple[list[dict], list[dict]]:
+            raw_events = _load_raw_events(transcript_path)
+            return raw_events, _build_entries(raw_events)
+
+        raw_events, entries = _common.wait_for_finish_invocation(
+            read_fn=_read,
+            is_done_fn=lambda result: _common.contains_finish_invocation(
+                result[1], _SHELL_TOOL_NAMES
+            ),
+        )
         html_doc = _common.render_transcript_html(
             entries,
             is_bookkeeping_bash_cmd=_is_bookkeeping_bash_cmd,

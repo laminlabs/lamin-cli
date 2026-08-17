@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import html
 import re
+import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TypeVar
 
 import click
 
@@ -140,6 +141,62 @@ def resolve_state_dir(name: str) -> Path:
     except Exception:
         dev_dir = None
     return Path(dev_dir) / name if dev_dir is not None else Path(name)
+
+
+# --- finish transcript wait ---
+# Claude Code / Copilot log the `lamin finish` invocation itself to the
+# transcript asynchronously, so a read immediately after issuing it can race
+# ahead of that write landing on disk -- worse on long/heavy sessions, where
+# the lag can run several seconds. Rather than inferring completeness from
+# timing (fragile: no reliable threshold, and quiescence checks can trigger
+# mid-buffer), wait for the actual finish command to become visible in the
+# transcript before rendering the report.
+
+_T = TypeVar("_T")
+
+# CLI-invocation shape only (`lamin finish` / `"$LAMIN_BIN" finish`), not
+# `ln.finish(` -- a script being written or run may legitimately contain that
+# Python call, which isn't evidence the *session's own* closing command ran.
+_FINISH_INVOCATION_PATTERN = re.compile(r'\blamin\s+finish\b|LAMIN_BIN["\']?\s+finish\b')
+
+
+def _is_finish_invocation(cmd: str) -> bool:
+    return bool(_FINISH_INVOCATION_PATTERN.search(cmd))
+
+
+def contains_finish_invocation(entries: list[dict], shell_tool_names: frozenset[str]) -> bool:
+    """Whether the transcript's own `tool_use` entries show the finish command
+    itself having been invoked as a shell command (not just mentioned in
+    documentation text, or written as part of a script's source)."""
+    for msg in entries:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            if block.get("name") not in shell_tool_names:
+                continue
+            cmd = block.get("input", {}).get("command", "")
+            if isinstance(cmd, str) and _is_finish_invocation(cmd):
+                return True
+    return False
+
+
+def wait_for_finish_invocation(
+    read_fn: Callable[[], _T],
+    is_done_fn: Callable[[_T], bool],
+    budget_seconds: float = 8.0,
+    poll_interval_seconds: float = 0.3,
+) -> _T:
+    deadline = time.monotonic() + budget_seconds
+    while True:
+        result = read_fn()
+        if is_done_fn(result):
+            return result
+        if time.monotonic() >= deadline:
+            return result
+        time.sleep(poll_interval_seconds)
 
 
 # --- HTML rendering ---
