@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import re
+import shlex
 import time
 from pathlib import Path
 from typing import Callable, TypeVar
@@ -154,21 +155,48 @@ def resolve_state_dir(name: str) -> Path:
 
 _T = TypeVar("_T")
 
-# CLI-invocation shape only (`lamin finish` / `"$LAMIN_BIN" finish`), not
-# `ln.finish(` -- a script being written or run may legitimately contain that
-# Python call, which isn't evidence the *session's own* closing command ran.
-_FINISH_INVOCATION_PATTERN = re.compile(r'\blamin\s+finish\b|LAMIN_BIN["\']?\s+finish\b')
+# How many of the most-recent tool_use entries to check -- deliberately not
+# the whole session history. A substantially older, genuine `lamin finish`
+# call (e.g. from a stray retry) shouldn't count as evidence *this* closing
+# command has landed; scoping to a small recent window keeps that possible
+# without needing to scan everything that ever ran.
+_RECENT_ENTRIES_WINDOW = 3
+
+# A transcript untouched for this long isn't a live session generating new
+# content (e.g. `lamin finish` run manually to clean up after a crashed/
+# interrupted session) -- nothing will ever show up to wait for, so skip
+# straight to reading once, matching the pre-existing instant behavior.
+_LIVENESS_WINDOW_SECONDS = 60.0
 
 
 def _is_finish_invocation(cmd: str) -> bool:
-    return bool(_FINISH_INVOCATION_PATTERN.search(cmd))
+    """Whether `cmd` actually *invokes* `lamin finish` (or the `$LAMIN_BIN`
+    fallback) as the command being run -- not just text that mentions those
+    words somewhere. Tokenizes with shlex rather than substring-matching, so
+    e.g. `grep "lamin finish" tests/` (a real command, but one that merely
+    searches for that text) doesn't count: shlex keeps a quoted "lamin
+    finish" as one token, distinct from two adjacent unquoted ones.
+    """
+    try:
+        tokens = shlex.split(cmd)
+    except ValueError:
+        return False
+    for token, next_token in zip(tokens, tokens[1:]):
+        if next_token != "finish":
+            continue
+        if token == "lamin" or token.endswith("/lamin"):
+            return True
+        if token in ("$LAMIN_BIN", "LAMIN_BIN"):
+            return True
+    return False
 
 
 def contains_finish_invocation(entries: list[dict], shell_tool_names: frozenset[str]) -> bool:
-    """Whether the transcript's own `tool_use` entries show the finish command
-    itself having been invoked as a shell command (not just mentioned in
-    documentation text, or written as part of a script's source)."""
-    for msg in entries:
+    """Whether the transcript's own most recent `tool_use` entries show the
+    finish command itself having been invoked as a shell command (not just
+    mentioned in documentation text, written as part of a script's source,
+    or referenced as a search string in some other command)."""
+    for msg in entries[-_RECENT_ENTRIES_WINDOW:]:
         content = msg.get("content")
         if not isinstance(content, list):
             continue
@@ -186,9 +214,20 @@ def contains_finish_invocation(entries: list[dict], shell_tool_names: frozenset[
 def wait_for_finish_invocation(
     read_fn: Callable[[], _T],
     is_done_fn: Callable[[_T], bool],
+    transcript_path: Path,
     budget_seconds: float = 8.0,
     poll_interval_seconds: float = 0.3,
+    liveness_window_seconds: float = _LIVENESS_WINDOW_SECONDS,
 ) -> _T:
+    try:
+        recently_active = (
+            time.time() - transcript_path.stat().st_mtime
+        ) < liveness_window_seconds
+    except OSError:
+        recently_active = False
+    if not recently_active:
+        return read_fn()
+
     deadline = time.monotonic() + budget_seconds
     while True:
         result = read_fn()
