@@ -93,7 +93,7 @@ def snapshot(upload: bool, track: bool) -> None:
 
         ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
         if upload:
-            ln_setup.core._clone.upload_sqlite_clone(
+            ln_setup.core.upload_sqlite_clone(
                 local_sqlite_path=f"{instance_name}-clone/.lamindb/lamin.db",
                 compress=True,
             )
