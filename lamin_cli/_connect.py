@@ -20,7 +20,7 @@ def disconnect(*, here: bool = False) -> None:
 
     instance_slug = marker.read_text().strip()
     try:
-        connect(instance_slug, persist_global_env=False, show_dev_dir_hint=False)
+        connect(instance_slug, here=True)
         ln_setup.settings.dev_dir = None
         logger.success(
             f"disconnected local instance context: {instance_slug} and unset dev-dir"
