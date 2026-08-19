@@ -187,7 +187,7 @@ def schema_to_modules_callback(ctx, param, value):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, default = ".", help=DOC_STORAGE_ARG)
+@click.option("--storage", type=str, default="./storage", help=DOC_STORAGE_ARG)
 @click.option("--name", type=str, default=None, help=DOC_INSTANCE_NAME)
 @click.option("--db", type=str, default=None, help=DOC_DB)
 @click.option("--modules", type=str, default=None, help=DOC_MODULES)
