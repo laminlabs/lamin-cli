@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Literal
 import lamindb_setup as ln_setup
 from lamin_utils import logger
 from lamindb_setup._init_instance import (
+    DEFAULT_STORAGE_PATH,
     DOC_DB,
     DOC_INSTANCE_NAME,
     DOC_MODULES,
@@ -187,7 +188,7 @@ def schema_to_modules_callback(ctx, param, value):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, default="./storage", help=DOC_STORAGE_ARG)
+@click.option("--storage", type=str, default=DEFAULT_STORAGE_PATH, help=DOC_STORAGE_ARG)
 @click.option("--name", type=str, default=None, help=DOC_INSTANCE_NAME)
 @click.option("--db", type=str, default=None, help=DOC_DB)
 @click.option("--modules", type=str, default=None, help=DOC_MODULES)
