@@ -1,35 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import lamindb_setup as ln_setup
 from lamin_utils import logger
-from lamindb_setup._connect_instance import _connect_cli
+from lamindb_setup._connect_instance import _connect_cli as connect
 from lamindb_setup.core._settings_store import (
     find_local_current_instance_file,
     remove_local_current_instance,
 )
-
-
-def connect(
-    instance: str, *, here: bool = False, use_root_db_user: bool = False
-) -> None:
-    if not here:
-        _connect_cli(instance, use_root_db_user=use_root_db_user)
-        return None
-
-    _connect_cli(
-        instance,
-        use_root_db_user=use_root_db_user,
-        persist_global_env=False,
-        show_dev_dir_hint=False,
-        show_connected_log=False,
-    )
-    cwd = Path.cwd().resolve()
-    ln_setup.settings.dev_dir = cwd
-    logger.important(f"set dev-dir: {cwd}")
-    logger.important(f"connected lamindb: {ln_setup.settings.instance.slug}")
-    return None
 
 
 def disconnect(*, here: bool = False) -> None:
@@ -43,7 +20,7 @@ def disconnect(*, here: bool = False) -> None:
 
     instance_slug = marker.read_text().strip()
     try:
-        _connect_cli(instance_slug, persist_global_env=False, show_dev_dir_hint=False)
+        connect(instance_slug, persist_global_env=False, show_dev_dir_hint=False)
         ln_setup.settings.dev_dir = None
         logger.success(
             f"disconnected local instance context: {instance_slug} and unset dev-dir"
