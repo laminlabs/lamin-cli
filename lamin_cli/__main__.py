@@ -199,16 +199,33 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Initialize a database instance.
+    """Initialize a LaminDB instance.
 
-    Examples:
+    Create a new development directory for your source code and `cd` into it:
 
     ```
-    lamin init --storage ./mydata
+    mkdir mydata && cd mydata
+    ```
+
+    Initialize a local SQLitedatabase:
+
+    ```
+    lamin init
+    lamin init --modules bionty
+    lamin init --modules bionty,pertdb
+    ```
+
+    Initialize a SQLite database that's hosted on S3:
+
+    ```
     lamin init --storage s3://my-bucket
     lamin init --storage gs://my-bucket
-    lamin init --storage ./mydata --modules bionty
-    lamin init --storage ./mydata --modules bionty,pertdb
+    ```
+
+    Initialize a PostgresSQL database with a storage location on S3:
+
+    ```
+    lamin init --storage s3://my-bucket --db "postgresql://user:password@host:port/database"
     ```
 
     → Python/R alternative: {func}`~lamindb.setup.init`
