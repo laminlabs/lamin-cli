@@ -239,7 +239,7 @@ def init(
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
 def connect(instance: str, here: bool):
-    """Set the default database instance for this environment or directory.
+    """Set the default database for this environment or directory.
 
     This command updates your local configuration to target the specified instance:
     all subsequent CLI commands and Python/R sessions will auto-connect to this instance.
@@ -263,7 +263,7 @@ def connect(instance: str, here: bool):
 @main.command()
 @click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
 def disconnect(here: bool):
-    """Unset the default database instance for this environment or directory.
+    """Unset the default database for this environment or directory.
 
     - Without `--here`, it clears the global default instance.
     - With `--here`, it removes the nearest local marker from the current
@@ -933,7 +933,7 @@ def save(
     lamin save my-topic/my-note.md  # resolves `my-topic` as a record type
     ```
 
-    Save a **README** for the entire database instance:
+    Save a **README** for the entire database:
 
     ```
     lamin save README.md
