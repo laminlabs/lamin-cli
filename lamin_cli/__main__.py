@@ -1016,13 +1016,16 @@ def track(ctx: click.Context):
     lamin finish
     ```
 
-    ```{dropdown} `lamin track copilot` says it can't find the active session?
+    :::{dropdown} `lamin track copilot` says it can't find the active session?
 
     In VS Code, make sure **"Copilot"** is selected — not **"Local"** — in the mode picker below the chat input box. `lamin track copilot` can only see sessions that go through the "Copilot"; sessions run via "Local" aren't visible to it.
 
-    ![Copilot mode picker](https://lamin-site-assets.s3.amazonaws.com/.lamindb/f7Nw4RNYkvlw966d0000.png)
-
+    ```{image} https://lamin-site-assets.s3.amazonaws.com/.lamindb/f7Nw4RNYkvlw966d0000.png
+    :alt: Copilot mode picker
+    :width: 500px
     ```
+
+    :::
 
     → Python/R alternative: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
