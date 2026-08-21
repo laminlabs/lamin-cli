@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Literal
 
 import lamindb_setup as ln_setup
 from lamin_utils import logger
+from lamindb_setup import disconnect as disconnect_
+from lamindb_setup._connect_instance import _connect_cli as connect_
 from lamindb_setup._init_instance import (
     DEFAULT_STORAGE_PATH,
     DOC_DB,
@@ -21,8 +23,6 @@ from lamindb_setup._init_instance import (
     DOC_STORAGE_ARG,
 )
 
-from lamin_cli import connect as connect_
-from lamin_cli import disconnect as disconnect_
 from lamin_cli import init as init_
 from lamin_cli import login as login_
 from lamin_cli import logout as logout_
