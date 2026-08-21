@@ -207,7 +207,7 @@ def init(
     mkdir mydata && cd mydata
     ```
 
-    Initialize a local SQLitedatabase:
+    Initialize a local SQLite database in that directory:
 
     ```
     lamin init
@@ -215,7 +215,7 @@ def init(
     lamin init --modules bionty,pertdb
     ```
 
-    Initialize a SQLite database that's hosted on S3:
+    Initialize a SQLite database that's hosted on S3 along with all files managed by the LaminDB instance:
 
     ```
     lamin init --storage s3://my-bucket
