@@ -14,7 +14,10 @@ from lamindb_setup.core._settings_store import (
     local_current_instance_file,
     settings_dir,
 )
-from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
+from lamindb_setup.errors import (
+    CurrentInstanceNotConfigured,
+    NoWriteAccess,
+)
 
 
 def test_create_project():

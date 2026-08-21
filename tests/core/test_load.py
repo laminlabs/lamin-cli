@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 
+import lamindb_setup as ln_setup
 from lamin_cli._load import decompose_url
 
 
@@ -49,6 +50,8 @@ def test_decompose_url():
 
 
 def test_load_transform():
+    ln_setup.settings.dev_dir = None
+
     # check via a renamed instance
     result = subprocess.run(
         "lamin load"

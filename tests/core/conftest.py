@@ -1,3 +1,4 @@
+import os
 import shutil
 from pathlib import Path
 
@@ -24,6 +25,8 @@ def pytest_sessionstart(session: pytest.Session):
         storage="./default_storage_cli",
         name="lamin-cli-unit-tests",
     )
+    ln.setup.settings.dev_dir = None
+    os.system("lamin connect lamin-cli-unit-tests")
 
 
 def pytest_sessionfinish(session: pytest.Session):
