@@ -77,7 +77,11 @@ COMMAND_GROUPS = {
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
     import click as click
-    from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
+    from lamindb_setup.errors import (
+        ConnectWithinDevDirError,
+        CurrentInstanceNotConfigured,
+        NoWriteAccess,
+    )
 
     class OrderedExceptionHandlingGroup(click.Group):
         """Overwrites list_commands to return commands in order of definition."""
@@ -94,7 +98,11 @@ if os.environ.get("NO_RICH"):
         def invoke(self, ctx: click.Context):
             try:
                 return super().invoke(ctx)
-            except (CurrentInstanceNotConfigured, NoWriteAccess) as e:
+            except (
+                ConnectWithinDevDirError,
+                CurrentInstanceNotConfigured,
+                NoWriteAccess,
+            ) as e:
                 raise click.ClickException(str(e)) from None
 
         def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
@@ -104,13 +112,21 @@ if os.environ.get("NO_RICH"):
 
 else:
     import rich_click as click
-    from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
+    from lamindb_setup.errors import (
+        ConnectWithinDevDirError,
+        CurrentInstanceNotConfigured,
+        NoWriteAccess,
+    )
 
     class OrderedRichExceptionHandlingGroup(click.RichGroup):
         def invoke(self, ctx: click.Context):
             try:
                 return super().invoke(ctx)
-            except (CurrentInstanceNotConfigured, NoWriteAccess) as e:
+            except (
+                ConnectWithinDevDirError,
+                CurrentInstanceNotConfigured,
+                NoWriteAccess,
+            ) as e:
                 raise click.ClickException(str(e)) from None
 
     def lamin_group_decorator(f):

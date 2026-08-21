@@ -14,7 +14,11 @@ from lamindb_setup.core._settings_store import (
     local_current_instance_file,
     settings_dir,
 )
-from lamindb_setup.errors import CurrentInstanceNotConfigured, NoWriteAccess
+from lamindb_setup.errors import (
+    ConnectWithinDevDirError,
+    CurrentInstanceNotConfigured,
+    NoWriteAccess,
+)
 
 
 def test_create_project():
@@ -88,6 +92,24 @@ def test_list_space_maps_no_instance_to_click_exception(monkeypatch):
 
     assert result.exit_code == 1
     assert "No instance is connected" in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_connect_maps_dev_dir_error_to_click_exception(monkeypatch):
+    message = (
+        "You're trying to connect within the dev-dir of instance owner/name. "
+        "Either cd into another directory or unset the dev-dir: lamin settings dev-dir unset"
+    )
+
+    def raise_connect_within_dev_dir(*args, **kwargs):
+        raise ConnectWithinDevDirError(message)
+
+    monkeypatch.setattr("lamin_cli.__main__.connect_", raise_connect_within_dev_dir)
+    result = CliRunner().invoke(main, ["connect", "owner/other"])
+
+    assert result.exit_code == 1
+    assert message in result.output
     assert "Error" in result.output
     assert "Traceback" not in result.output
 
