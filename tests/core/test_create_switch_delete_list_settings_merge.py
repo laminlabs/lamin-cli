@@ -15,7 +15,6 @@ from lamindb_setup.core._settings_store import (
     settings_dir,
 )
 from lamindb_setup.errors import (
-    ConnectWithinDevDirError,
     CurrentInstanceNotConfigured,
     NoWriteAccess,
 )

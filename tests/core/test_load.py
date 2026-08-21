@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-import lamin_setup as ln_setup
+import lamindb_setup as ln_setup
 from lamin_cli._load import decompose_url
 
 
