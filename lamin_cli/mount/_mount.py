@@ -27,7 +27,8 @@ def prepare_mountpoint(mountpoint: Path, allow_non_empty: bool = False) -> None:
     """Create the mountpoint and refuse to shadow existing data."""
     if mountpoint.is_symlink():
         raise MountError(
-            f"{mountpoint} is already a symlink. Run 'lamin unmount {mountpoint}' first."
+            f"{mountpoint} is already a symlink. Run"
+            f" 'lamin settings unmount {mountpoint}' first."
         )
     if mountpoint.exists():
         if not mountpoint.is_dir():
@@ -268,7 +269,7 @@ def unmount(mountpoint: Path) -> None:
     if existing is not None and existing.external:
         raise MountError(
             f"{mountpoint} was mounted outside of lamin. Unmount it with the tool that"
-            " created it, or run 'lamin mount unregister' to forget it."
+            " created it, or run 'lamin settings mount unregister' to forget it."
         )
 
     if mountpoint.is_symlink():
