@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import re
 from pathlib import Path
@@ -23,6 +22,8 @@ def parse_store_kwargs(
         return None
     if isinstance(store_kwargs, dict):
         return store_kwargs
+    import json
+
     try:
         parsed = json.loads(store_kwargs)
     except json.JSONDecodeError as error:
