@@ -918,6 +918,12 @@ def update(
     default=None,
     help="Either 'artifact', 'transform', or 'record'. If not passed, chooses based on path suffix.",
 )
+@click.option(
+    "--store-kwargs",
+    type=str,
+    default=None,
+    help='JSON object of kwargs for artifact storage/upload, e.g. \'{"chunksize": 8000000}\'.',
+)
 def save(
     path: str,
     key: str,
@@ -928,6 +934,7 @@ def save(
     space: str,
     branch: str,
     registry: Literal["artifact", "transform", "record"] | None,
+    store_kwargs: str | None,
 ):
     """Save a file or folder as an `artifact`, `transform`, or `record`.
 
@@ -935,6 +942,12 @@ def save(
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv
+    ```
+
+    Pass `--store-kwargs` as a JSON object to forward options to artifact storage/upload:
+
+    ```
+    lamin save my_table.csv --key my_tables/my_table.csv --store-kwargs '{"chunksize": 8000000}'
     ```
 
     Save **source code** as {class}`~lamindb.Transform`:
@@ -999,6 +1012,7 @@ def save(
         space=space,
         branch=branch,
         registry=registry,
+        store_kwargs=store_kwargs,
     ) is not None:
         sys.exit(1)
 
