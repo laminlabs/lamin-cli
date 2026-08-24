@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 import click
 import lamindb_setup as ln_setup
@@ -11,6 +12,27 @@ from lamindb_setup.core.hashing import hash_file
 
 from lamin_cli._context import get_current_run_file
 from lamin_cli._notes import extract_note_target_from_path, resolve_note_record
+
+
+def parse_store_kwargs(
+    store_kwargs: str | dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Parse store_kwargs from a JSON object string or pass through a dict."""
+    if store_kwargs is None:
+        return None
+    if isinstance(store_kwargs, dict):
+        return store_kwargs
+    import json
+
+    try:
+        parsed = json.loads(store_kwargs)
+    except json.JSONDecodeError as error:
+        raise click.ClickException(
+            f"--store-kwargs must be valid JSON: {error}"
+        ) from error
+    if not isinstance(parsed, dict):
+        raise click.ClickException("--store-kwargs must be a JSON object")
+    return parsed
 
 
 def infer_registry_from_path(path: Path | str) -> str:
@@ -213,6 +235,7 @@ def save(
     space: str | None = None,
     branch: str | None = None,
     registry: str | None = None,
+    store_kwargs: str | dict[str, Any] | None = None,
 ) -> str | None:
     import lamindb as ln
     from lamindb._finish import save_context_core
@@ -230,6 +253,8 @@ def save(
     assert isinstance(ppath, UPath)
     if not ppath.exists():
         raise click.BadParameter(f"Path {ppath} does not exist", param_hint="path")
+
+    store_kwargs = parse_store_kwargs(store_kwargs)
 
     user_passed_registry = registry is not None
     if registry is None:
@@ -300,6 +325,11 @@ def save(
     ):
         registry = "record"
 
+    if store_kwargs is not None and registry != "artifact":
+        raise click.ClickException(
+            "--store-kwargs is only supported when saving artifacts"
+        )
+
     if registry == "record":
         if ppath.suffix.lower() != ".md":
             raise click.ClickException(
@@ -346,7 +376,7 @@ def save(
             branch=branch_record,
             space=space_record,
             run=current_run,
-        ).save()
+        ).save(store_kwargs=store_kwargs or {})
         if _is_readme_artifact_save(ppath, key):
             logger.warning(
                 "Saving README as an artifact is transitional and will be phased out; "
