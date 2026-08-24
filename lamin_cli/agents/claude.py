@@ -41,8 +41,9 @@ def _claude_dir() -> Path:
     return _common.resolve_state_dir(".claude")
 
 
-def _run_uid_file() -> Path:
-    return _claude_dir() / f".lamindb_run_uid_{_session_id()}"
+def _run_uid_file(session_id: str | None = None) -> Path:
+    sid = session_id if session_id is not None else _session_id()
+    return _claude_dir() / f".lamindb_run_uid_{sid}"
 
 
 def _transcript_path_file() -> Path:

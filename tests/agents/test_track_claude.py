@@ -191,8 +191,8 @@ def test_parallel_sessions_use_separate_state_files(monkeypatch):
     uid_b = _run_uid_file().read_text().strip()
 
     assert uid_a != uid_b
-    assert Path(".claude/.lamindb_run_uid_session-a").exists()
-    assert Path(".claude/.lamindb_run_uid_session-b").exists()
+    assert _run_uid_file("session-a").exists()
+    assert _run_uid_file("session-b").exists()
 
 
 def test_track_reuses_transform_across_sessions():
@@ -248,6 +248,8 @@ def test_finish_waits_for_delayed_finish_command_write(tmp_path):
     elapsed = time.monotonic() - start
     writer.join()
 
-    assert 0.4 < elapsed < 3.0  # picked up shortly after the write, not the full 8s budget
+    assert (
+        0.4 < elapsed < 3.0
+    )  # picked up shortly after the write, not the full 8s budget
     session_run = ln.Run.get(uid=uid)
     assert session_run.finished_at is not None
