@@ -68,7 +68,7 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Experimental",
-            "commands": ["run", "hub"],
+            "commands": ["run", "hub", "mount", "unmount"],
         },
     ]
 }
@@ -150,6 +150,7 @@ from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
 from lamin_cli.hub import hub
+from lamin_cli.mount import mount, unmount_command
 
 if TYPE_CHECKING:
     from click import Command, Context
@@ -1394,6 +1395,8 @@ def _deprecated_cache_get_cmd() -> None:
     _deprecated_cache_get()
 
 main.add_command(hub)
+main.add_command(mount)
+main.add_command(unmount_command, name="unmount")
 
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
