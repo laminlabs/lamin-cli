@@ -922,7 +922,7 @@ def update(
     "--store-kwargs",
     type=str,
     default=None,
-    help='JSON object of kwargs for artifact storage/upload, e.g. \'{"chunksize": 8000000}\'.',
+    help='Fine-grained settings for uploads as a JSON object (normally not needed), e.g. \'{"chunksize": 1000000}\'.',
 )
 def save(
     path: str,
@@ -944,10 +944,10 @@ def save(
     lamin save my_table.csv --key my_tables/my_table.csv
     ```
 
-    Pass `--store-kwargs` as a JSON object to forward options to artifact storage/upload:
+    Pass `--store-kwargs` as a JSON object for fine-grained upload settings (normally not needed):
 
     ```
-    lamin save my_table.csv --key my_tables/my_table.csv --store-kwargs '{"chunksize": 8000000}'
+    lamin save my_table.csv --key my_tables/my_table.csv --store-kwargs '{"chunksize": 1000000}'
     ```
 
     Save **source code** as {class}`~lamindb.Transform`:
