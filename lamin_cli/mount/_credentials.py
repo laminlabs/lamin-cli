@@ -169,7 +169,7 @@ def write_profile_config(
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     command = (
-        f"{shlex.quote(sys.executable)} -m lamin_cli mount credentials"
+        f"{shlex.quote(sys.executable)} -m lamin_cli settings mount credentials"
         f" --root {shlex.quote(storage_root)}"
     )
     if not_after is not None:

@@ -1,4 +1,4 @@
-"""The `lamin mount` command group."""
+"""The `lamin settings mount` command group."""
 
 from __future__ import annotations
 
@@ -103,12 +103,12 @@ def mount():
     Examples:
 
     ```
-    lamin mount backends                              # what can be used here
-    lamin mount storage ./mnt                         # the instance's default storage
-    lamin mount storage --uid 3TrLu3Ab ./mnt
-    lamin mount artifact --key my_file.parquet ./mnt
-    lamin mount space --name my-space ./mnt
-    lamin mount list
+    lamin settings mount backends                     # what can be used here
+    lamin settings mount storage ./mnt                # the instance's default storage
+    lamin settings mount storage --uid 3TrLu3Ab ./mnt
+    lamin settings mount artifact --key my_file.parquet ./mnt
+    lamin settings mount space --name my-space ./mnt
+    lamin settings mount list
     ```
     """
 
@@ -243,7 +243,7 @@ def _mount_targets(
     if multiple and foreground and not dry_run:
         logger.important(
             f"mounting {len(targets)} storage locations, detaching them so that they"
-            " can run side by side; unmount with 'lamin unmount --all'"
+            " can run side by side; unmount with 'lamin settings unmount --all'"
         )
         foreground = False
 
@@ -387,14 +387,15 @@ def credentials_command(root: str, not_after: str | None, reauth_seconds: int | 
 def register_command(mountpoint: Path, uid: str | None, root: str | None):
     """Register a mount that was established outside of lamin.
 
-    Afterwards `lamin mount path` finds artifacts through it. Lamin never unmounts or
-    remounts a registered external mount, because it does not own the process.
+    Afterwards `lamin settings mount path` finds artifacts through it. Lamin never
+    unmounts or remounts a registered external mount, because it does not own the
+    process.
 
     The storage location is auto-detected by reading `.lamindb/storage_uid.txt` at the
     mountpoint, so usually no options are needed:
 
     ```
-    lamin mount register /mnt/my-bucket
+    lamin settings mount register /mnt/my-bucket
     ```
     """
     import lamindb_setup as ln_setup
@@ -524,7 +525,7 @@ def path_command(uid, key, mountpoint, no_check, remount):
     Only the path goes to stdout, so it can be used directly:
 
     ```
-    head -c 100 "$(lamin mount path --key my_file.parquet)"
+    head -c 100 "$(lamin settings mount path --key my_file.parquet)"
     ```
 
     If the artifact is not visible through the mount but does exist in the storage
@@ -562,7 +563,8 @@ def path_command(uid, key, mountpoint, no_check, remount):
         else:
             raise click.ClickException(
                 f"Storage location {location.storage_root} is not mounted. Mount it"
-                f" with: lamin mount storage --uid {location.storage_uid} <mountpoint>"
+                f" with: lamin settings mount storage --uid {location.storage_uid}"
+                " <mountpoint>"
             )
 
     location.local_path = local_path
@@ -591,7 +593,7 @@ def path_command(uid, key, mountpoint, no_check, remount):
             remedy = (
                 "Refresh it with the tool that created it."
                 if location.mount is not None and location.mount.external
-                else f"Retry with --remount, or: lamin mount refresh {mount_root}"
+                else f"Retry with --remount, or: lamin settings mount refresh {mount_root}"
             )
             raise click.ClickException(
                 f"{local_path} is not visible through the mount although"
@@ -667,7 +669,7 @@ def refresh_command(mountpoint: Path | None, all_: bool):
 @click.option("--all", "all_", is_flag=True, default=False, help="Unmount all mounts created by lamin.")
 # fmt: on
 def unmount_command(mountpoint: Path | None, all_: bool):
-    """Unmount a storage location mounted by `lamin mount`."""
+    """Unmount a storage location mounted by `lamin settings mount`."""
     from . import _registry
 
     if all_ and mountpoint is not None:
