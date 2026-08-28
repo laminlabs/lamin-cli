@@ -68,7 +68,7 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Experimental",
-            "commands": ["run", "hub"],
+            "commands": ["run", "mcp", "hub"],
         },
     ]
 }
@@ -1356,6 +1356,14 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     )
 
     runner.run(filepath_in_mount_dir)
+
+
+@main.command()
+def mcp():
+    """Expose the current instance's LaminHub MCP tools over stdio."""
+    from lamin_cli._mcp import run_mcp_proxy
+
+    run_mcp_proxy()
 
 
 main.add_command(settings)
