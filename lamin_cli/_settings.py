@@ -47,7 +47,7 @@ def settings(ctx):
     lamin settings space set all
     # mount
     lamin settings mount storage ./mnt
-    lamin settings unmount ./mnt
+    lamin settings mount unset ./mnt
     ```
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.modules`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
@@ -199,8 +199,7 @@ def get_legacy(setting: str):
 # -----------------------------------------------------------------------------
 
 from lamin_cli._cache import cache
-from lamin_cli.mount import mount, unmount_command
+from lamin_cli.mount import mount
 
 settings.add_command(cache, "cache-dir")
 settings.add_command(mount)
-settings.add_command(unmount_command, name="unmount")

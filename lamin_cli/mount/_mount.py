@@ -28,7 +28,7 @@ def prepare_mountpoint(mountpoint: Path, allow_non_empty: bool = False) -> None:
     if mountpoint.is_symlink():
         raise MountError(
             f"{mountpoint} is already a symlink. Run"
-            f" 'lamin settings unmount {mountpoint}' first."
+            f" 'lamin settings mount unset {mountpoint}' first."
         )
     if mountpoint.exists():
         if not mountpoint.is_dir():
