@@ -109,6 +109,7 @@ def mount():
     lamin settings mount artifact --key my_file.parquet ./mnt
     lamin settings mount space --name my-space ./mnt
     lamin settings mount list
+    lamin settings mount unset ./mnt
     ```
     """
 
@@ -243,7 +244,7 @@ def _mount_targets(
     if multiple and foreground and not dry_run:
         logger.important(
             f"mounting {len(targets)} storage locations, detaching them so that they"
-            " can run side by side; unmount with 'lamin settings unmount --all'"
+            " can run side by side; unmount with 'lamin settings mount unset --all'"
         )
         foreground = False
 
@@ -664,11 +665,11 @@ def refresh_command(mountpoint: Path | None, all_: bool):
 
 
 # fmt: off
-@click.command("unmount")
+@mount.command("unset")
 @click.argument("mountpoint", type=click.Path(file_okay=False, path_type=Path), required=False)
 @click.option("--all", "all_", is_flag=True, default=False, help="Unmount all mounts created by lamin.")
 # fmt: on
-def unmount_command(mountpoint: Path | None, all_: bool):
+def unset_command(mountpoint: Path | None, all_: bool):
     """Unmount a storage location mounted by `lamin settings mount`."""
     from . import _registry
 
