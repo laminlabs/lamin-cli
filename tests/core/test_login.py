@@ -2,9 +2,12 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from click.testing import CliRunner
+from lamin_cli.__main__ import main
 from lamindb_setup import settings
 from lamindb_setup.core._hub_client import connect_hub_with_auth
 from lamindb_setup.core._hub_core import create_api_key
+from lamindb_setup.errors import ApiKeyExpired
 
 
 def test_entrypoint():
@@ -16,6 +19,20 @@ def test_cli_login():
     exit_status = os.system("lamin login testuser1")
     assert exit_status == 0
     assert settings.user.handle == "testuser1"
+
+
+def test_login_maps_api_key_expired_to_click_exception(monkeypatch):
+    message = "Your API key is expired."
+    monkeypatch.setattr(
+        "lamin_cli.__main__.login_",
+        lambda *args, **kwargs: (_ for _ in ()).throw(ApiKeyExpired()),
+    )
+    result = CliRunner().invoke(main, ["login", "testuser1"])
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert "Error" in result.output
+    assert "Traceback" not in result.output
 
 
 @pytest.mark.skip(reason="Creating more than five API keys is not allowed")
