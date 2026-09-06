@@ -35,6 +35,53 @@ def test_create_backward_compat():
     assert exit_status == 0
 
 
+@pytest.mark.parametrize(
+    ("entity", "lookup_args", "target_path", "expected_lookup"),
+    [
+        ("run", ["--uid", "runuid123"], "lamindb.Run.get", {"uid": "runuid123"}),
+        (
+            "feature",
+            ["--name", "my_feature"],
+            "lamindb.Feature.get",
+            {"name": "my_feature"},
+        ),
+        (
+            "project",
+            ["--uid", "projuid123"],
+            "lamindb.Project.get",
+            {"uid": "projuid123"},
+        ),
+    ],
+)
+def test_delete_supports_additional_entities(
+    monkeypatch, entity, lookup_args, target_path, expected_lookup
+):
+    calls = {"delete": []}
+
+    class DummyRecord:
+        def delete(self, permanent=None):
+            calls["delete"].append(permanent)
+
+    def fake_get(*args, **kwargs):
+        if args:
+            calls["lookup"] = {"uid": args[0]}
+        else:
+            calls["lookup"] = kwargs
+        return DummyRecord()
+
+    monkeypatch.setattr(target_path, fake_get)
+    result = CliRunner().invoke(main, ["delete", entity, *lookup_args, "--permanent"])
+    assert result.exit_code == 0
+    assert calls["lookup"] == expected_lookup
+    assert calls["delete"] == [True]
+
+
+def test_delete_run_requires_uid():
+    result = CliRunner().invoke(main, ["delete", "run"])
+    assert result.exit_code != 0
+    assert "For entity 'run' you must pass --uid" in result.output
+
+
 def _setup_create_no_write_access(monkeypatch, message: str) -> list[str]:
     class DummyProject:
         def __init__(self, name):

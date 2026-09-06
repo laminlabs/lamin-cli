@@ -539,17 +539,21 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, key: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an object.
 
-    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
+    Supports all entities that can be resolved by `--uid`, `--key`, or `--name`,
+    plus instance deletion. For example:
 
     ```
     # via --key or --name
     lamin delete artifact --key mydatasets/mytable.parquet
     lamin delete transform --key myanalyses/analysis.ipynb
     lamin delete branch --name my_branch
-    lamin delete instance --slug account/name
+    lamin delete project --name my_project
     # via registry and --uid
     lamin delete artifact --uid e2G7k9EVul4JbfsE
     lamin delete transform --uid Vul4JbfsEYAy5
+    lamin delete run --uid 6sofuDVvTANB0f48
+    # delete an instance by slug
+    lamin delete account/name
     # via URL
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
     lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
