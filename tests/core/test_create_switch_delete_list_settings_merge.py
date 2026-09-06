@@ -4,6 +4,7 @@ import subprocess
 import warnings
 from pathlib import Path
 
+import click
 import lamindb as ln
 import lamindb_setup as ln_setup
 import pytest
@@ -33,6 +34,106 @@ def test_create_backward_compat():
     assert exit_status == 0
     exit_status = os.system("lamin delete branch --name backcompatbranch")
     assert exit_status == 0
+
+
+@pytest.mark.parametrize(
+    ("entity", "lookup_args", "target_path", "expected_lookup"),
+    [
+        ("run", ["--uid", "runuid123"], "lamindb.Run.get", {"uid": "runuid123"}),
+        ("run", ["--name", "my_run"], "lamindb.Run.get", {"name": "my_run"}),
+        (
+            "feature",
+            ["--name", "my_feature"],
+            "lamindb.Feature.get",
+            {"name": "my_feature"},
+        ),
+        (
+            "project",
+            ["--uid", "projuid123"],
+            "lamindb.Project.get",
+            {"uid": "projuid123"},
+        ),
+    ],
+)
+def test_delete_supports_additional_entities(
+    monkeypatch, entity, lookup_args, target_path, expected_lookup
+):
+    calls = {"delete": []}
+
+    class DummyRecord:
+        def delete(self, permanent=None):
+            calls["delete"].append(permanent)
+
+    def fake_get(*args, **kwargs):
+        if args:
+            calls["lookup"] = {"uid": args[0]}
+        else:
+            calls["lookup"] = kwargs
+        return DummyRecord()
+
+    monkeypatch.setattr(target_path, fake_get)
+    result = CliRunner().invoke(main, ["delete", entity, *lookup_args, "--permanent"])
+    assert result.exit_code == 0
+    assert calls["lookup"] == expected_lookup
+    assert calls["delete"] == [True]
+
+
+def test_delete_run_requires_uid_or_name():
+    result = CliRunner().invoke(main, ["delete", "run"], standalone_mode=False)
+    assert result.exit_code != 0
+    assert isinstance(result.exception, click.ClickException)
+    assert "For entity 'run' you must pass --uid or --name" in str(result.exception)
+
+
+def test_delete_slug_deprecated_warns_and_maps_instance(monkeypatch):
+    calls: list[tuple[str, bool]] = []
+    warnings_: list[str] = []
+
+    def fake_delete(entity: str, force: bool = False):
+        calls.append((entity, force))
+        return None
+
+    def fake_warning(message: str):
+        warnings_.append(message)
+
+    monkeypatch.setattr("lamin_cli._delete.delete_instance", fake_delete)
+    monkeypatch.setattr("lamin_cli.__main__.logger.warning", fake_warning)
+    result = CliRunner().invoke(
+        main, ["delete", "instance", "--slug", "account/name", "--force"]
+    )
+
+    assert result.exit_code == 0
+    assert len(warnings_) == 1
+    assert "'--slug' is deprecated" in warnings_[0]
+    assert calls == [("account/name", True)]
+
+
+def test_delete_unknown_entity_routes_to_instance_delete(monkeypatch):
+    calls: list[tuple[str, bool]] = []
+
+    def fake_delete(entity: str, force: bool = False):
+        calls.append((entity, force))
+        return None
+
+    monkeypatch.setattr("lamin_cli._delete.delete_instance", fake_delete)
+    result = CliRunner().invoke(main, ["delete", "something-random", "--force"])
+
+    assert result.exit_code == 0
+    assert calls == [("something-random", True)]
+
+
+def test_delete_instance_slug_still_routes(monkeypatch):
+    calls: list[tuple[str, bool]] = []
+
+    def fake_delete(entity: str, force: bool = False):
+        calls.append((entity, force))
+        return None
+
+    monkeypatch.setattr("lamin_cli._delete.delete_instance", fake_delete)
+    result = CliRunner().invoke(main, ["delete", "account/name", "--force"])
+
+    assert result.exit_code == 0
+    assert calls == [("account/name", True)]
 
 
 def _setup_create_no_write_access(monkeypatch, message: str) -> list[str]:

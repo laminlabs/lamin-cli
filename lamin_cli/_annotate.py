@@ -2,6 +2,8 @@ from typing import get_args
 
 from lamindb.base.types import RegistryId
 
+from ._delete import ENTITIES_KEY, ENTITIES_NAME
+
 # Registries that have ablocks (can be annotated with readme)
 _REGISTRY_IDS = frozenset(get_args(RegistryId))
 _ABLOCK_REGISTRIES = frozenset(
@@ -10,27 +12,16 @@ _ABLOCK_REGISTRIES = frozenset(
 # branch and space have ablocks but aren't in RegistryId
 ANNOTATE_REGISTRIES = _ABLOCK_REGISTRIES | {"branch", "space"}
 
-ANNOTATE_ENTITIES_KEY = {"artifact", "transform", "collection"}
-ANNOTATE_ENTITIES_NAME = {
-    "record",
-    "project",
-    "ulabel",
-    "branch",
-    "feature",
-    "schema",
-    "space",
-}
-ANNOTATE_ENTITIES_UID_ONLY = {"run"}
 REGISTRIES_WITH_PROJECT_ULABEL_RECORD = {"artifact", "transform", "collection"}
 REGISTRIES_WITH_VERSION = {"artifact", "transform", "collection"}
-REGISTRIES_WITH_FEATURES = {"artifact", "transform"}
+REGISTRIES_WITH_FEATURES = {"artifact", "run", "record"}
 
 
 def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
     """Resolve entity by key, uid, or name."""
     import lamindb as ln
 
-    if registry in ANNOTATE_ENTITIES_KEY:
+    if registry in ENTITIES_KEY:
         if key is None and uid is None:
             raise ln.errors.InvalidArgument(f"For {registry} pass --key or --uid")
         model = (
@@ -43,7 +34,7 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
         if key is not None:
             return model.get(key=key)
         return model.get(uid)
-    if registry in ANNOTATE_ENTITIES_NAME:
+    if registry in ENTITIES_NAME:
         if uid is None and name is None:
             # Default to current branch when annotating branch
             if registry == "branch":
@@ -58,6 +49,7 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
                 "project": ln.Project.get,
                 "ulabel": ln.ULabel.get,
                 "branch": ln.Branch.get,
+                "run": ln.Run.get,
                 "feature": ln.Feature.get,
                 "schema": ln.Schema.get,
                 "space": ln.Space.get,
@@ -67,14 +59,12 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
             "project": ln.Project.get,
             "ulabel": ln.ULabel.get,
             "branch": ln.Branch.get,
+            "run": ln.Run.get,
             "feature": ln.Feature.get,
             "schema": ln.Schema.get,
             "space": ln.Space.get,
         }[registry](name=name)
-    # run - uid only
-    if uid is None:
-        raise ln.errors.InvalidArgument("For run pass --uid")
-    return ln.Run.get(uid)
+    raise ln.errors.InvalidArgument(f"Unsupported registry: {registry}")
 
 
 def _add_block(

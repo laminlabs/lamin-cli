@@ -532,6 +532,7 @@ def info(schema: bool):
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
+@click.option("--slug", type=str, default=None, hidden=True, help="Deprecated: instance slug. Pass slug as positional argument instead.")
 @click.option("--key", type=str, default=None, help="The key for the entity (artifact, transform).")
 @click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
@@ -539,25 +540,40 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, key: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an object.
 
-    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
-
     ```
     # via --key or --name
     lamin delete artifact --key mydatasets/mytable.parquet
     lamin delete transform --key myanalyses/analysis.ipynb
     lamin delete branch --name my_branch
-    lamin delete instance --slug account/name
-    # via registry and --uid
+    lamin delete project --name my_project
+    # via --uid
     lamin delete artifact --uid e2G7k9EVul4JbfsE
     lamin delete transform --uid Vul4JbfsEYAy5
     # via URL
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
+    lamin delete https://lamin.ai/account/db/artifact/e2G7k9EVul4JbfsE
+    ```
+
+    To permanently delete an object, pass `--permanent`.
+
+    To delete the entire database (will ask for confirmation):
+
+    ```
+    lamin delete account/name
     ```
 
     → Python/R alternative: {meth}`~lamindb.models.SQLRecord.delete` and {func}`~lamindb.setup.delete`
     """
     from lamin_cli._delete import delete as delete_
+
+    if slug is not None:
+        logger.warning(
+            "'--slug' is deprecated and will be removed in a future release. "
+            "Pass the instance slug as the positional argument instead, "
+            "e.g. `lamin delete account/name`."
+        )
+        # Backward compatibility for: lamin delete instance --slug account/name
+        if entity == "instance":
+            entity = slug
 
     return delete_(entity=entity, name=name, uid=uid, key=key, permanent=permanent, force=force)
 
@@ -1283,7 +1299,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
             obj.__class__.filter(uid=obj.uid).update(version_tag=version)
             obj.refresh_from_db()
 
-        # Handle feature annotations (artifact and transform only)
+        # Handle feature annotations (artifact, run, record only)
         if features and registry in REGISTRIES_WITH_FEATURES:
             feature_dict = _parse_features_list(features)
             obj.features.add_values(feature_dict)

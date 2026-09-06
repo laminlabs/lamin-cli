@@ -5,6 +5,18 @@ from lamindb_setup.errors import StorageNotEmpty
 
 from .urls import decompose_url
 
+ENTITIES_KEY: set[str] = {"artifact", "transform", "collection"}
+ENTITIES_NAME: set[str] = {
+    "record",
+    "project",
+    "ulabel",
+    "branch",
+    "run",
+    "feature",
+    "schema",
+    "space",
+}
+
 
 def delete(
     entity: str,
@@ -20,65 +32,45 @@ def delete(
         instance, entity, uid = decompose_url(url)
         connect(instance)
 
-    if entity == "branch":
-        assert name is not None, "You have to pass a name for deleting a branch."
-        from lamindb import Branch
+    if entity in ENTITIES_KEY | ENTITIES_NAME:
+        import lamindb as ln
 
-        Branch.get(name=name).delete(permanent=permanent)
-    elif entity == "artifact":
-        assert uid is not None or key is not None, (
-            "You have to pass a uid or key for deleting an artifact."
-        )
-        from lamindb import Artifact
-
-        if key is not None:
-            record = Artifact.objects.filter(key=key).order_by("-created_at").first()
-            if record is None:
-                raise SystemExit(f"Artifact with key={key} does not exist.")
-        else:
-            record = Artifact.get(uid)
-        record.delete(permanent=permanent)
-    elif entity == "transform":
-        assert uid is not None or key is not None, (
-            "You have to pass a uid or key for deleting a transform."
-        )
-        from lamindb import Transform
-
-        if key is not None:
-            record = Transform.objects.filter(key=key).order_by("-created_at").first()
-            if record is None:
-                raise SystemExit(f"Transform with key={key} does not exist.")
-        else:
-            record = Transform.get(uid)
-        record.delete(permanent=permanent)
-    elif entity == "collection":
-        assert uid is not None or key is not None, (
-            "You have to pass a uid or key for deleting a collection."
-        )
-        from lamindb import Collection
-
-        if key is not None:
-            record = Collection.objects.filter(key=key).order_by("-created_at").first()
-            if record is None:
-                raise SystemExit(f"Collection with key={key} does not exist.")
-        else:
-            record = Collection.get(uid)
-        record.delete(permanent=permanent)
-    elif entity == "record":
-        assert uid is not None or name is not None, (
-            "You have to pass a uid or name for deleting a record."
-        )
-        from lamindb import Record
-
-        if name is not None:
-            record = Record.objects.get(name=name)
-            if record is None:
-                raise SystemExit(f"Record with name={name} does not exist.")
-        else:
-            record = Record.get(uid)
+        if entity in ENTITIES_KEY:
+            if uid is None and key is None:
+                raise click.ClickException(
+                    f"For entity '{entity}' you must pass --uid or --key"
+                )
+            model = {
+                "artifact": ln.Artifact,
+                "transform": ln.Transform,
+                "collection": ln.Collection,
+            }[entity]
+            if key is not None:
+                record = model.objects.filter(key=key).order_by("-created_at").first()
+                if record is None:
+                    raise click.ClickException(
+                        f"{model.__name__} with key={key} does not exist."
+                    )
+            else:
+                record = model.get(uid)
+        elif entity in ENTITIES_NAME:
+            if uid is None and name is None:
+                raise click.ClickException(
+                    f"For entity '{entity}' you must pass --uid or --name"
+                )
+            model = {
+                "record": ln.Record,
+                "project": ln.Project,
+                "ulabel": ln.ULabel,
+                "branch": ln.Branch,
+                "run": ln.Run,
+                "feature": ln.Feature,
+                "schema": ln.Schema,
+                "space": ln.Space,
+            }[entity]
+            record = model.get(uid) if uid is not None else model.get(name=name)
         record.delete(permanent=permanent)
     else:
-        # could introduce "db" as an entity
         try:
             return delete_instance(entity, force=force)
         except StorageNotEmpty as e:
