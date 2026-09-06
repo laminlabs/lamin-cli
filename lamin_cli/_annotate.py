@@ -12,8 +12,6 @@ _ABLOCK_REGISTRIES = frozenset(
 # branch and space have ablocks but aren't in RegistryId
 ANNOTATE_REGISTRIES = _ABLOCK_REGISTRIES | {"branch", "space"}
 
-ANNOTATE_ENTITIES_KEY = ENTITIES_KEY
-ANNOTATE_ENTITIES_NAME = ENTITIES_NAME
 REGISTRIES_WITH_PROJECT_ULABEL_RECORD = {"artifact", "transform", "collection"}
 REGISTRIES_WITH_VERSION = {"artifact", "transform", "collection"}
 REGISTRIES_WITH_FEATURES = {"artifact", "run", "record"}
@@ -23,7 +21,7 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
     """Resolve entity by key, uid, or name."""
     import lamindb as ln
 
-    if registry in ANNOTATE_ENTITIES_KEY:
+    if registry in ENTITIES_KEY:
         if key is None and uid is None:
             raise ln.errors.InvalidArgument(f"For {registry} pass --key or --uid")
         model = (
@@ -36,7 +34,7 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
         if key is not None:
             return model.get(key=key)
         return model.get(uid)
-    if registry in ANNOTATE_ENTITIES_NAME:
+    if registry in ENTITIES_NAME:
         if uid is None and name is None:
             # Default to current branch when annotating branch
             if registry == "branch":
