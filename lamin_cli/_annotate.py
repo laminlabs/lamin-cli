@@ -2,6 +2,8 @@ from typing import get_args
 
 from lamindb.base.types import RegistryId
 
+from ._delete import ENTITIES_KEY, ENTITIES_NAME
+
 # Registries that have ablocks (can be annotated with readme)
 _REGISTRY_IDS = frozenset(get_args(RegistryId))
 _ABLOCK_REGISTRIES = frozenset(
@@ -10,17 +12,8 @@ _ABLOCK_REGISTRIES = frozenset(
 # branch and space have ablocks but aren't in RegistryId
 ANNOTATE_REGISTRIES = _ABLOCK_REGISTRIES | {"branch", "space"}
 
-ANNOTATE_ENTITIES_KEY = {"artifact", "transform", "collection"}
-ANNOTATE_ENTITIES_NAME = {
-    "record",
-    "project",
-    "ulabel",
-    "branch",
-    "run",
-    "feature",
-    "schema",
-    "space",
-}
+ANNOTATE_ENTITIES_KEY = ENTITIES_KEY
+ANNOTATE_ENTITIES_NAME = ENTITIES_NAME
 REGISTRIES_WITH_PROJECT_ULABEL_RECORD = {"artifact", "transform", "collection"}
 REGISTRIES_WITH_VERSION = {"artifact", "transform", "collection"}
 REGISTRIES_WITH_FEATURES = {"artifact", "run", "record"}

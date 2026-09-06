@@ -3,13 +3,19 @@ from lamindb_setup import connect
 from lamindb_setup import delete as delete_instance
 from lamindb_setup.errors import StorageNotEmpty
 
-from ._annotate import (
-    ANNOTATE_ENTITIES_KEY,
-    ANNOTATE_ENTITIES_NAME,
-)
 from .urls import decompose_url
 
-SUPPORTED_ENTITIES = ANNOTATE_ENTITIES_KEY | ANNOTATE_ENTITIES_NAME
+ENTITIES_KEY: set[str] = {"artifact", "transform", "collection"}
+ENTITIES_NAME: set[str] = {
+    "record",
+    "project",
+    "ulabel",
+    "branch",
+    "run",
+    "feature",
+    "schema",
+    "space",
+}
 
 
 def delete(
@@ -26,10 +32,10 @@ def delete(
         instance, entity, uid = decompose_url(url)
         connect(instance)
 
-    if entity in SUPPORTED_ENTITIES:
+    if entity in ENTITIES_KEY | ENTITIES_NAME:
         import lamindb as ln
 
-        if entity in ANNOTATE_ENTITIES_KEY:
+        if entity in ENTITIES_KEY:
             if uid is None and key is None:
                 raise SystemExit(f"For entity '{entity}' you must pass --uid or --key")
             model = {
@@ -43,7 +49,7 @@ def delete(
                     raise SystemExit(f"{model.__name__} with key={key} does not exist.")
             else:
                 record = model.get(uid)
-        elif entity in ANNOTATE_ENTITIES_NAME:
+        elif entity in ENTITIES_NAME:
             if uid is None and name is None:
                 raise SystemExit(f"For entity '{entity}' you must pass --uid or --name")
             model = {

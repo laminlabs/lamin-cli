@@ -106,11 +106,18 @@ def test_delete_slug_deprecated_warns_and_maps_instance(monkeypatch):
     assert calls == [("account/name", True)]
 
 
-def test_delete_unknown_entity_raises():
-    result = CliRunner().invoke(main, ["delete", "something-random"])
-    assert result.exit_code != 0
-    assert "Entity must be one of:" in result.output
-    assert "account/name" in result.output
+def test_delete_unknown_entity_routes_to_instance_delete(monkeypatch):
+    calls: list[tuple[str, bool]] = []
+
+    def fake_delete(entity: str, force: bool = False):
+        calls.append((entity, force))
+        return None
+
+    monkeypatch.setattr("lamin_cli._delete.delete_instance", fake_delete)
+    result = CliRunner().invoke(main, ["delete", "something-random", "--force"])
+
+    assert result.exit_code == 0
+    assert calls == [("something-random", True)]
 
 
 def test_delete_instance_slug_still_routes(monkeypatch):
