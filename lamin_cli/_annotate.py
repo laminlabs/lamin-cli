@@ -16,14 +16,14 @@ ANNOTATE_ENTITIES_NAME = {
     "project",
     "ulabel",
     "branch",
+    "run",
     "feature",
     "schema",
     "space",
 }
-ANNOTATE_ENTITIES_UID_ONLY = {"run"}
 REGISTRIES_WITH_PROJECT_ULABEL_RECORD = {"artifact", "transform", "collection"}
 REGISTRIES_WITH_VERSION = {"artifact", "transform", "collection"}
-REGISTRIES_WITH_FEATURES = {"artifact", "transform"}
+REGISTRIES_WITH_FEATURES = {"artifact", "run", "record"}
 
 
 def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
@@ -58,6 +58,7 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
                 "project": ln.Project.get,
                 "ulabel": ln.ULabel.get,
                 "branch": ln.Branch.get,
+                "run": ln.Run.get,
                 "feature": ln.Feature.get,
                 "schema": ln.Schema.get,
                 "space": ln.Space.get,
@@ -67,14 +68,12 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
             "project": ln.Project.get,
             "ulabel": ln.ULabel.get,
             "branch": ln.Branch.get,
+            "run": ln.Run.get,
             "feature": ln.Feature.get,
             "schema": ln.Schema.get,
             "space": ln.Space.get,
         }[registry](name=name)
-    # run - uid only
-    if uid is None:
-        raise ln.errors.InvalidArgument("For run pass --uid")
-    return ln.Run.get(uid)
+    raise ln.errors.InvalidArgument(f"Unsupported registry: {registry}")
 
 
 def _add_block(

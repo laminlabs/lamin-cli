@@ -39,6 +39,7 @@ def test_create_backward_compat():
     ("entity", "lookup_args", "target_path", "expected_lookup"),
     [
         ("run", ["--uid", "runuid123"], "lamindb.Run.get", {"uid": "runuid123"}),
+        ("run", ["--name", "my_run"], "lamindb.Run.get", {"name": "my_run"}),
         (
             "feature",
             ["--name", "my_feature"],
@@ -76,10 +77,10 @@ def test_delete_supports_additional_entities(
     assert calls["delete"] == [True]
 
 
-def test_delete_run_requires_uid():
+def test_delete_run_requires_uid_or_name():
     result = CliRunner().invoke(main, ["delete", "run"])
     assert result.exit_code != 0
-    assert "For entity 'run' you must pass --uid" in result.output
+    assert "For entity 'run' you must pass --uid or --name" in result.output
 
 
 def test_delete_slug_deprecated_warns_and_maps_instance(monkeypatch):
@@ -102,6 +103,27 @@ def test_delete_slug_deprecated_warns_and_maps_instance(monkeypatch):
     assert result.exit_code == 0
     assert len(warnings_) == 1
     assert "'--slug' is deprecated" in warnings_[0]
+    assert calls == [("account/name", True)]
+
+
+def test_delete_unknown_entity_raises():
+    result = CliRunner().invoke(main, ["delete", "something-random"])
+    assert result.exit_code != 0
+    assert "Entity must be one of:" in result.output
+    assert "account/name" in result.output
+
+
+def test_delete_instance_slug_still_routes(monkeypatch):
+    calls: list[tuple[str, bool]] = []
+
+    def fake_delete(entity: str, force: bool = False):
+        calls.append((entity, force))
+        return None
+
+    monkeypatch.setattr("lamin_cli._delete.delete_instance", fake_delete)
+    result = CliRunner().invoke(main, ["delete", "account/name", "--force"])
+
+    assert result.exit_code == 0
     assert calls == [("account/name", True)]
 
 

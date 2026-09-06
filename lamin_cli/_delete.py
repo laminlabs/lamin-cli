@@ -6,9 +6,10 @@ from lamindb_setup.errors import StorageNotEmpty
 from ._annotate import (
     ANNOTATE_ENTITIES_KEY,
     ANNOTATE_ENTITIES_NAME,
-    ANNOTATE_ENTITIES_UID_ONLY,
 )
 from .urls import decompose_url
+
+SUPPORTED_ENTITIES = ANNOTATE_ENTITIES_KEY | ANNOTATE_ENTITIES_NAME
 
 
 def delete(
@@ -25,10 +26,7 @@ def delete(
         instance, entity, uid = decompose_url(url)
         connect(instance)
 
-    if (
-        entity
-        in ANNOTATE_ENTITIES_KEY | ANNOTATE_ENTITIES_NAME | ANNOTATE_ENTITIES_UID_ONLY
-    ):
+    if entity in SUPPORTED_ENTITIES:
         import lamindb as ln
 
         if entity in ANNOTATE_ENTITIES_KEY:
@@ -53,18 +51,14 @@ def delete(
                 "project": ln.Project,
                 "ulabel": ln.ULabel,
                 "branch": ln.Branch,
+                "run": ln.Run,
                 "feature": ln.Feature,
                 "schema": ln.Schema,
                 "space": ln.Space,
             }[entity]
             record = model.get(uid) if uid is not None else model.get(name=name)
-        else:
-            if uid is None:
-                raise SystemExit("For entity 'run' you must pass --uid")
-            record = ln.Run.get(uid)
         record.delete(permanent=permanent)
     else:
-        # could introduce "db" as an entity
         try:
             return delete_instance(entity, force=force)
         except StorageNotEmpty as e:

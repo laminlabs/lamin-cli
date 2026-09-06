@@ -1299,7 +1299,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
             obj.__class__.filter(uid=obj.uid).update(version_tag=version)
             obj.refresh_from_db()
 
-        # Handle feature annotations (artifact and transform only)
+        # Handle feature annotations (artifact, run, record only)
         if features and registry in REGISTRIES_WITH_FEATURES:
             feature_dict = _parse_features_list(features)
             obj.features.add_values(feature_dict)
