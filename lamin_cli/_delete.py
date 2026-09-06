@@ -37,7 +37,9 @@ def delete(
 
         if entity in ENTITIES_KEY:
             if uid is None and key is None:
-                raise SystemExit(f"For entity '{entity}' you must pass --uid or --key")
+                raise click.ClickException(
+                    f"For entity '{entity}' you must pass --uid or --key"
+                )
             model = {
                 "artifact": ln.Artifact,
                 "transform": ln.Transform,
@@ -46,12 +48,16 @@ def delete(
             if key is not None:
                 record = model.objects.filter(key=key).order_by("-created_at").first()
                 if record is None:
-                    raise SystemExit(f"{model.__name__} with key={key} does not exist.")
+                    raise click.ClickException(
+                        f"{model.__name__} with key={key} does not exist."
+                    )
             else:
                 record = model.get(uid)
         elif entity in ENTITIES_NAME:
             if uid is None and name is None:
-                raise SystemExit(f"For entity '{entity}' you must pass --uid or --name")
+                raise click.ClickException(
+                    f"For entity '{entity}' you must pass --uid or --name"
+                )
             model = {
                 "record": ln.Record,
                 "project": ln.Project,
