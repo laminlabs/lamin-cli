@@ -4,6 +4,7 @@ import subprocess
 import warnings
 from pathlib import Path
 
+import click
 import lamindb as ln
 import lamindb_setup as ln_setup
 import pytest
@@ -78,9 +79,10 @@ def test_delete_supports_additional_entities(
 
 
 def test_delete_run_requires_uid_or_name():
-    result = CliRunner().invoke(main, ["delete", "run"])
+    result = CliRunner().invoke(main, ["delete", "run"], standalone_mode=False)
     assert result.exit_code != 0
-    assert "For entity 'run' you must pass --uid or --name" in result.output
+    assert isinstance(result.exception, click.ClickException)
+    assert "For entity 'run' you must pass --uid or --name" in str(result.exception)
 
 
 def test_delete_slug_deprecated_warns_and_maps_instance(monkeypatch):
