@@ -82,6 +82,29 @@ def test_delete_run_requires_uid():
     assert "For entity 'run' you must pass --uid" in result.output
 
 
+def test_delete_slug_deprecated_warns_and_maps_instance(monkeypatch):
+    calls: list[tuple[str, bool]] = []
+    warnings_: list[str] = []
+
+    def fake_delete(entity: str, force: bool = False):
+        calls.append((entity, force))
+        return None
+
+    def fake_warning(message: str):
+        warnings_.append(message)
+
+    monkeypatch.setattr("lamin_cli._delete.delete_instance", fake_delete)
+    monkeypatch.setattr("lamin_cli.__main__.logger.warning", fake_warning)
+    result = CliRunner().invoke(
+        main, ["delete", "instance", "--slug", "account/name", "--force"]
+    )
+
+    assert result.exit_code == 0
+    assert len(warnings_) == 1
+    assert "'--slug' is deprecated" in warnings_[0]
+    assert calls == [("account/name", True)]
+
+
 def _setup_create_no_write_access(monkeypatch, message: str) -> list[str]:
     class DummyProject:
         def __init__(self, name):
