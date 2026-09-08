@@ -1,17 +1,41 @@
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 from lamin_cli.agents import _common
 
 _SHELL_TOOL_NAMES = frozenset({"Bash"})
 
 
+def test_persistent_run_uid_file_is_scoped_by_instance(tmp_path):
+    active_file = tmp_path / ".lamindb_run_uid_session-a"
+
+    def fake_ln(slug: str):
+        return SimpleNamespace(
+            setup=SimpleNamespace(
+                settings=SimpleNamespace(instance=SimpleNamespace(slug=slug))
+            )
+        )
+
+    first = _common.persistent_run_uid_file(active_file, fake_ln("account/first"))
+    second = _common.persistent_run_uid_file(active_file, fake_ln("account/second"))
+
+    assert first != second
+    assert first.parent == active_file.parent
+    assert first.name.startswith(active_file.name)
+
+
 def _bash_entry(command: str) -> dict:
     return {
         "role": "assistant",
         "content": [
-            {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": command}}
+            {
+                "type": "tool_use",
+                "id": "t1",
+                "name": "Bash",
+                "input": {"command": command},
+            }
         ],
     }
 
@@ -59,11 +83,15 @@ def test_is_finish_invocation_matches_lamin_bin_fallback():
 def test_is_finish_invocation_does_not_match_python_method_call():
     # a script being written or run may legitimately contain ln.finish() --
     # that's not evidence the session's own closing command was invoked.
-    assert not _common._is_finish_invocation("import lamindb as ln\nln.track()\nln.finish()")
+    assert not _common._is_finish_invocation(
+        "import lamindb as ln\nln.track()\nln.finish()"
+    )
 
 
 def test_is_finish_invocation_does_not_match_unrelated_text():
-    assert not _common._is_finish_invocation("echo all done, task finished successfully")
+    assert not _common._is_finish_invocation(
+        "echo all done, task finished successfully"
+    )
 
 
 def test_is_finish_invocation_does_not_match_quoted_search_string():

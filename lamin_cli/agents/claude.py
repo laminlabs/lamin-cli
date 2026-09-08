@@ -46,6 +46,10 @@ def _run_uid_file(session_id: str | None = None) -> Path:
     return _claude_dir() / f".lamindb_run_uid_{sid}"
 
 
+def _persistent_run_uid_file(ln: object) -> Path:
+    return _common.persistent_run_uid_file(_run_uid_file(), ln)
+
+
 def _transcript_path_file() -> Path:
     return _claude_dir() / f".lamindb_transcript_path_{_session_id()}"
 
@@ -95,12 +99,23 @@ def track_claudecode_session(name: str | None = None) -> None:
                 },
             )
 
-        run = ln.Run(transform, status="started", name=name).save()
-
         _claude_dir().mkdir(parents=True, exist_ok=True)
-        _run_uid_file().write_text(run.uid)
+        active_file = _run_uid_file()
+        mapping_file = _persistent_run_uid_file(ln)
+        with _common.session_state_lock(mapping_file):
+            run = _common.get_mapped_run(ln, mapping_file, _TRANSFORM_UID)
+            if run is None:
+                run = ln.Run(transform, status="started", name=name).save()
+                mapping_file.write_text(run.uid)
+                message = "started tracking"
+            else:
+                run._status_code = -2  # re-started
+                run.finished_at = None
+                run.save()
+                message = "resumed tracking"
+            active_file.write_text(run.uid)
         _transcript_path_file().write_text(str(_get_transcript_path()))
-        _common.info(f"started tracking Claude Code session: {run.uid}")
+        _common.info(f"{message} Claude Code session: {run.uid}")
     except click.ClickException:
         raise
     except Exception as e:
@@ -241,16 +256,15 @@ def finish_claudecode_session() -> None:
         try:
             tmp.write(html_doc)
             tmp.close()
-            artifact = ln.Artifact(
-                tmp.name,
+            _common.save_or_replace_report(
+                run,
+                tmp_path,
                 description="Claude Code session transcript (rendered)",
-                kind="__lamindb_run__",
-                run=False,
-            ).save()
+                ln=ln,
+            )
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        run.report = artifact
         _common.stamp_transforms(
             run,
             entries,

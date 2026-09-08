@@ -11,6 +11,7 @@ import pytest
 from lamin_cli.agents import copilot as copilot_agent
 from lamin_cli.agents.copilot import (
     _TRANSFORM_KEY,
+    _persistent_run_uid_file,
     _run_uid_file,
     finish_copilot_session,
     track_copilot_session,
@@ -185,6 +186,88 @@ def test_full_track_finish_flow(isolated, monkeypatch):
     child_transform.delete(permanent=True)
 
 
+def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
+    state_dir, _ = isolated
+    monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", "session-a")
+
+    track_copilot_session(name="first task")
+    uid = _run_uid_file("session-a").read_text().strip()
+    _write_full_transcript(state_dir, "session-a")
+    finish_copilot_session()
+
+    run = ln.Run.get(uid=uid)
+    report_uid = run.report.uid
+    first_hash = run.report.hash
+
+    track_copilot_session(name="follow-up task")
+    assert _run_uid_file("session-a").read_text().strip() == uid
+    assert ln.Run.get(uid=uid).finished_at is None
+
+    events_path = state_dir / "session-a" / "events.jsonl"
+    with events_path.open("a") as f:
+        for event in [
+            {
+                "type": "user.message",
+                "data": {"content": "do a follow-up"},
+                "id": "u2",
+                "timestamp": _next_timestamp(),
+                "parentId": "a3",
+            },
+            {
+                "type": "assistant.message",
+                "data": {
+                    "content": "follow-up done",
+                    "toolRequests": [
+                        {
+                            "toolCallId": "t3",
+                            "name": "bash",
+                            "arguments": {"command": "lamin finish"},
+                        }
+                    ],
+                    "outputTokens": 10,
+                },
+                "id": "a4",
+                "timestamp": _next_timestamp(),
+                "parentId": "u2",
+            },
+        ]:
+            f.write(json.dumps(event) + "\n")
+
+    finish_copilot_session()
+
+    run = ln.Run.get(uid=uid)
+    assert run.finished_at is not None
+    assert run.report.uid == report_uid
+    assert run.report.hash != first_hash
+    assert run.extra_data["n_tokens"] == 50
+    assert "do a follow-up" in run.report.path.read_text()
+    assert run.transform.runs.count() == 1
+
+
+def test_stale_mapping_creates_a_new_run(isolated, monkeypatch):
+    state_dir, _ = isolated
+    monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", "session-a")
+
+    track_copilot_session(name="first task")
+    old_uid = _run_uid_file("session-a").read_text().strip()
+    mapping_file = _persistent_run_uid_file("session-a", ln)
+    _write_full_transcript(state_dir, "session-a")
+    finish_copilot_session()
+
+    old_run = ln.Run.get(uid=old_uid)
+    old_report = old_run.report
+    old_run.report = None
+    old_run.save()
+    old_run.delete(permanent=True)
+    old_report.delete(permanent=True)
+
+    track_copilot_session(name="replacement task")
+
+    new_uid = _run_uid_file("session-a").read_text().strip()
+    assert new_uid != old_uid
+    assert mapping_file.read_text().strip() == new_uid
+
+
 def test_finish_extracts_output_only_usage_metrics(isolated, monkeypatch):
     state_dir, project_dir = isolated
     monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", "session-a")
@@ -344,6 +427,8 @@ def test_finish_waits_for_delayed_finish_command_write(isolated, monkeypatch):
     elapsed = time.monotonic() - start
     writer.join()
 
-    assert 0.4 < elapsed < 3.0  # picked up shortly after the write, not the full 8s budget
+    assert (
+        0.4 < elapsed < 3.0
+    )  # picked up shortly after the write, not the full 8s budget
     session_run = ln.Run.get(uid=uid)
     assert session_run.finished_at is not None

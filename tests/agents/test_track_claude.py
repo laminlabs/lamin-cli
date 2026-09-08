@@ -165,6 +165,50 @@ def test_full_track_finish_flow(tmp_path):
     child_transform.delete(permanent=True)
 
 
+def test_follow_up_reuses_run_and_replaces_report(tmp_path):
+    track_claudecode_session(name="first task")
+    uid = _run_uid_file().read_text().strip()
+    transcript = _write_transcript(tmp_path)
+    _transcript_path_file().write_text(str(transcript))
+    finish_claudecode_session()
+
+    run = ln.Run.get(uid=uid)
+    report_uid = run.report.uid
+    first_hash = run.report.hash
+
+    track_claudecode_session(name="follow-up task")
+    assert _run_uid_file().read_text().strip() == uid
+    assert ln.Run.get(uid=uid).finished_at is None
+
+    for entry in [
+        {"role": "user", "content": "do a follow-up"},
+        {"role": "assistant", "content": "follow-up done"},
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "tool_finish_again",
+                    "name": "Bash",
+                    "input": {"command": "lamin finish"},
+                }
+            ],
+        },
+    ]:
+        with transcript.open("a") as f:
+            f.write(json.dumps({"message": entry}) + "\n")
+    _transcript_path_file().write_text(str(transcript))
+
+    finish_claudecode_session()
+
+    run = ln.Run.get(uid=uid)
+    assert run.finished_at is not None
+    assert run.report.uid == report_uid
+    assert run.report.hash != first_hash
+    assert "do a follow-up" in run.report.path.read_text()
+    assert run.transform.runs.count() == 1
+
+
 def test_finish_extracts_deduped_usage_metrics(tmp_path):
     track_claudecode_session(name="usage test")
     uid = _run_uid_file().read_text().strip()

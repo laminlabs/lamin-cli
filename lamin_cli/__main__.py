@@ -1095,8 +1095,9 @@ def track(ctx: click.Context):
 def track_claude_command(name: str | None) -> None:
     """Start tracking a Claude Code session in LaminDB.
 
-    Creates a new Claude Code run. Writes the run UID and trace path to
-    `.claude/` so that `lamin finish` can close it.
+    Creates a Claude Code run, or resumes the existing run for a follow-up in
+    the same conversation. Writes the active run UID and trace path to
+    `.claude/` so that `lamin finish` can close the active tracking cycle.
 
     On `lamin finish`, records `n_tokens` (full billed total: input +
     output + cache tokens), `n_steps`, and `n_tool_calls` on `run.extra_data`.
@@ -1115,8 +1116,9 @@ def track_claude_command(name: str | None) -> None:
 def track_copilot_command(name: str | None) -> None:
     """Start tracking a GitHub Copilot session in LaminDB.
 
-    Creates a new Copilot run. Writes the run UID to `.claude/` so that
-    `lamin finish` can close it.
+    Creates a Copilot run, or resumes the existing run for a follow-up in the
+    same conversation. Writes the active run UID to `.copilot/` so that
+    `lamin finish` can close the active tracking cycle.
 
     On `lamin finish`, records `n_steps` and `n_tool_calls` on
     `run.extra_data`. `n_tokens` is also recorded, but as an output-tokens-only
