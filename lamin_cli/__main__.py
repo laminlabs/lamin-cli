@@ -1130,6 +1130,57 @@ def track_copilot_command(name: str | None) -> None:
     return track_copilot_session(name=name)
 
 
+@track.command("artifact")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--key", type=str, required=True, help="Storage key for the artifact.")
+@click.option(
+    "--description",
+    type=str,
+    required=True,
+    help="Description of the artifact.",
+)
+def track_artifact_command(path: Path, key: str, description: str) -> None:
+    """Attach a directly created file to the active agent-session run."""
+    import lamindb as ln
+
+    if os.environ.get("CLAUDE_CODE_SESSION_ID"):
+        from lamin_cli.agents.claude import _run_uid_file
+
+        run_uid_file = _run_uid_file()
+        agent = "Claude Code"
+    elif os.environ.get("COPILOT_AGENT_SESSION_ID"):
+        from lamin_cli.agents.copilot import (
+            _run_uid_file,
+            _session_id_from_env,
+        )
+
+        run_uid_file = _run_uid_file(_session_id_from_env())
+        agent = "Copilot"
+    else:
+        raise click.ClickException(
+            "Cannot find an active Claude Code or Copilot session in the environment."
+        )
+
+    if not run_uid_file.exists():
+        raise click.ClickException(
+            f"Cannot find an active {agent} run. Run `lamin track "
+            f"{'claude' if agent == 'Claude Code' else 'copilot'}` first."
+        )
+
+    run_uid = run_uid_file.read_text().strip()
+    run = ln.Run.get(uid=run_uid)
+    artifact = ln.Artifact(
+        path,
+        key=key,
+        description=description,
+        run=run,
+    ).save()
+    click.echo(f"attached artifact {artifact.uid} to {agent} session {run.uid}")
+
+
 def _finish_tracked_session() -> None:
     """Finish a tracked session.
 
