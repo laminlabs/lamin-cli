@@ -76,27 +76,3 @@ def test_finish_canonical_and_track_finish_hidden_from_help() -> None:
     track_help = CliRunner().invoke(main, ["track", "--help"])
     assert track_help.exit_code == 0
     assert "track finish" not in track_help.output
-    assert "artifact" in track_help.output
-
-
-def test_track_artifact_requires_agent_session(tmp_path, monkeypatch) -> None:
-    path = tmp_path / "output.txt"
-    path.write_text("output")
-    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
-    monkeypatch.delenv("COPILOT_AGENT_SESSION_ID", raising=False)
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "track",
-            "artifact",
-            str(path),
-            "--key",
-            "test/output.txt",
-            "--description",
-            "Test output",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "Cannot find an active Claude Code or Copilot session" in result.output

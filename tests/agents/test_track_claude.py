@@ -6,8 +6,6 @@ from pathlib import Path
 
 import lamindb as ln
 import pytest
-from click.testing import CliRunner
-from lamin_cli.__main__ import main
 from lamin_cli.agents.claude import (
     _TRANSFORM_KEY,
     _run_uid_file,
@@ -225,31 +223,6 @@ def test_finish_extracts_deduped_usage_metrics(tmp_path):
         "n_steps": 3,  # msg_1, msg_2, msg_3
         "n_tool_calls": 3,  # tool_1, tool_2, and the finish command itself
     }
-
-
-def test_track_artifact_attaches_to_active_run(tmp_path):
-    track_claudecode_session(name="artifact test")
-    run_uid = _run_uid_file().read_text().strip()
-    path = tmp_path / "output.txt"
-    path.write_text("output")
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "track",
-            "artifact",
-            str(path),
-            "--key",
-            "test/claude-output.txt",
-            "--description",
-            "Claude output",
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    artifact = ln.Artifact.get(key="test/claude-output.txt")
-    assert artifact.run.uid == run_uid
-    artifact.delete(permanent=True)
 
 
 def test_parallel_sessions_use_separate_state_files(monkeypatch):

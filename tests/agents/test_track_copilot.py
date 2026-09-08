@@ -8,8 +8,6 @@ from pathlib import Path
 import click
 import lamindb as ln
 import pytest
-from click.testing import CliRunner
-from lamin_cli.__main__ import main
 from lamin_cli.agents import copilot as copilot_agent
 from lamin_cli.agents.copilot import (
     _TRANSFORM_KEY,
@@ -186,33 +184,6 @@ def test_full_track_finish_flow(isolated, monkeypatch):
 
     child_run.delete(permanent=True)
     child_transform.delete(permanent=True)
-
-
-def test_track_artifact_attaches_to_active_run(isolated, monkeypatch):
-    _, project_dir = isolated
-    monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", "session-a")
-    track_copilot_session(name="artifact test")
-    run_uid = _run_uid_file("session-a").read_text().strip()
-    path = project_dir / "output.txt"
-    path.write_text("output")
-
-    result = CliRunner().invoke(
-        main,
-        [
-            "track",
-            "artifact",
-            str(path),
-            "--key",
-            "test/copilot-output.txt",
-            "--description",
-            "Copilot output",
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    artifact = ln.Artifact.get(key="test/copilot-output.txt")
-    assert artifact.run.uid == run_uid
-    artifact.delete(permanent=True)
 
 
 def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
