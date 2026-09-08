@@ -56,6 +56,10 @@ def _run_uid_file(session_id: str) -> Path:
     return _state_dir() / f".lamindb_run_uid_copilot_{session_id}"
 
 
+def _persistent_run_uid_file(session_id: str, ln: object) -> Path:
+    return _common.persistent_run_uid_file(_run_uid_file(session_id), ln)
+
+
 def _transcript_path(session_id: str) -> Path:
     return _copilot_session_state_dir() / session_id / "events.jsonl"
 
@@ -92,11 +96,22 @@ def track_copilot_session(name: str | None = None) -> None:
                 },
             )
 
-        run = ln.Run(transform, status="started", name=name).save()
-
         _state_dir().mkdir(parents=True, exist_ok=True)
-        _run_uid_file(session_id).write_text(run.uid)
-        _common.info(f"started tracking Copilot session: {run.uid}")
+        active_file = _run_uid_file(session_id)
+        mapping_file = _persistent_run_uid_file(session_id, ln)
+        with _common.session_state_lock(mapping_file):
+            run = _common.get_mapped_run(ln, mapping_file, _TRANSFORM_UID)
+            if run is None:
+                run = ln.Run(transform, status="started", name=name).save()
+                mapping_file.write_text(run.uid)
+                message = "started tracking"
+            else:
+                run._status_code = -2  # re-started
+                run.finished_at = None
+                run.save()
+                message = "resumed tracking"
+            active_file.write_text(run.uid)
+        _common.info(f"{message} Copilot session: {run.uid}")
     except click.ClickException:
         raise
     except Exception as e:
@@ -274,16 +289,15 @@ def finish_copilot_session() -> None:
         try:
             tmp.write(html_doc)
             tmp.close()
-            artifact = ln.Artifact(
-                tmp.name,
+            _common.save_or_replace_report(
+                run,
+                tmp_path,
                 description="Copilot session transcript (rendered)",
-                kind="__lamindb_run__",
-                run=False,
-            ).save()
+                ln=ln,
+            )
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        run.report = artifact
         _common.stamp_transforms(
             run,
             entries,

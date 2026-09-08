@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 import shlex
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import click
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # --- constants ---
 
@@ -46,8 +51,26 @@ details[open] summary::before{{content:'▼ '}}
 </ul></body></html>"""
 
 _ANSI_SGR = re.compile(r"\x1b\[([0-9;]*)m")
-_ANSI_BASE_COLORS = ["#000", "#cd3131", "#0dbc79", "#e5e510", "#2472c8", "#bc3fbc", "#11a8cd", "#e5e5e5"]
-_ANSI_BRIGHT_COLORS = ["#666", "#f14c4c", "#23d18b", "#f5f543", "#3b8eea", "#d670d6", "#29b8db", "#fff"]
+_ANSI_BASE_COLORS = [
+    "#000",
+    "#cd3131",
+    "#0dbc79",
+    "#e5e510",
+    "#2472c8",
+    "#bc3fbc",
+    "#11a8cd",
+    "#e5e5e5",
+]
+_ANSI_BRIGHT_COLORS = [
+    "#666",
+    "#f14c4c",
+    "#23d18b",
+    "#f5f543",
+    "#3b8eea",
+    "#d670d6",
+    "#29b8db",
+    "#fff",
+]
 
 
 def ansi_to_html(text: str) -> str:
@@ -68,7 +91,7 @@ def ansi_to_html(text: str) -> str:
         return ";".join(parts)
 
     for m in _ANSI_SGR.finditer(text):
-        result.append(html.escape(text[cursor:m.start()]))
+        result.append(html.escape(text[cursor : m.start()]))
         cursor = m.end()
         codes = [int(c) for c in m.group(1).split(";") if c] if m.group(1) else [0]
         i = 0
@@ -144,6 +167,78 @@ def resolve_state_dir(name: str) -> Path:
     return Path(dev_dir) / name if dev_dir is not None else Path(name)
 
 
+def persistent_run_uid_file(active_file: Path, ln: object) -> Path:
+    """Return an instance-scoped mapping for an agent session's Run."""
+    instance_slug = ln.setup.settings.instance.slug  # type: ignore[attr-defined]
+    instance_key = hashlib.sha256(instance_slug.encode()).hexdigest()[:12]
+    return active_file.with_name(f"{active_file.name}_{instance_key}")
+
+
+@contextmanager
+def session_state_lock(state_file: Path, timeout_seconds: float = 10.0):
+    """Serialize state transitions for one agent session."""
+    lock_dir = state_file.with_name(f"{state_file.name}.lock")
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            lock_dir.mkdir()
+            break
+        except FileExistsError:
+            try:
+                is_stale = time.time() - lock_dir.stat().st_mtime > 60
+            except OSError:
+                is_stale = False
+            if is_stale:
+                try:
+                    lock_dir.rmdir()
+                except OSError:
+                    pass
+                continue
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"timed out waiting for session lock: {lock_dir}"
+                ) from None
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        try:
+            lock_dir.rmdir()
+        except OSError:
+            pass
+
+
+def get_mapped_run(ln: object, mapping_file: Path, transform_uid: str):
+    """Resolve a persisted Run mapping, ignoring stale or corrupt state."""
+    if not mapping_file.exists():
+        return None
+    uid = mapping_file.read_text().strip()
+    if not uid:
+        return None
+    run = ln.Run.filter(uid=uid).one_or_none()  # type: ignore[attr-defined]
+    if run is None or run.transform.uid != transform_uid:
+        mapping_file.unlink(missing_ok=True)
+        return None
+    return run
+
+
+def save_or_replace_report(
+    run: object, report_path: Path, *, description: str, ln: object
+) -> None:
+    """Attach the first report and replace its content on later finishes."""
+    if run.report is None:  # type: ignore[attr-defined]
+        artifact = ln.Artifact(  # type: ignore[attr-defined]
+            report_path,
+            description=description,
+            kind="__lamindb_run__",
+            run=False,
+        ).save()
+        run.report = artifact  # type: ignore[attr-defined]
+    else:
+        run.report.replace(report_path, run=False)  # type: ignore[attr-defined]
+        run.report.save()  # type: ignore[attr-defined]
+
+
 # --- finish transcript wait ---
 # Claude Code / Copilot log the `lamin finish` invocation itself to the
 # transcript asynchronously, so a read immediately after issuing it can race
@@ -170,8 +265,10 @@ _LIVENESS_WINDOW_SECONDS = 60.0
 
 
 def _is_finish_invocation(cmd: str) -> bool:
-    """Whether `cmd` actually *invokes* `lamin finish` (or the `$LAMIN_BIN`
-    fallback) as the command being run -- not just text that mentions those
+    """Detect an actual `lamin finish` invocation.
+
+    This includes the `$LAMIN_BIN` fallback as the command being run, not just
+    text that mentions those
     words somewhere. Tokenizes with shlex rather than substring-matching, so
     e.g. `grep "lamin finish" tests/` (a real command, but one that merely
     searches for that text) doesn't count: shlex keeps a quoted "lamin
@@ -181,7 +278,7 @@ def _is_finish_invocation(cmd: str) -> bool:
         tokens = shlex.split(cmd)
     except ValueError:
         return False
-    for token, next_token in zip(tokens, tokens[1:]):
+    for token, next_token in zip(tokens, tokens[1:], strict=False):
         if next_token != "finish":
             continue
         if token == "lamin" or token.endswith("/lamin"):
@@ -191,11 +288,15 @@ def _is_finish_invocation(cmd: str) -> bool:
     return False
 
 
-def contains_finish_invocation(entries: list[dict], shell_tool_names: frozenset[str]) -> bool:
-    """Whether the transcript's own most recent `tool_use` entries show the
-    finish command itself having been invoked as a shell command (not just
+def contains_finish_invocation(
+    entries: list[dict], shell_tool_names: frozenset[str]
+) -> bool:
+    """Detect a recent transcript-level `lamin finish` invocation.
+
+    The finish command must have been invoked as a shell command (not just
     mentioned in documentation text, written as part of a script's source,
-    or referenced as a search string in some other command)."""
+    or referenced as a search string in some other command).
+    """
     for msg in entries[-_RECENT_ENTRIES_WINDOW:]:
         content = msg.get("content")
         if not isinstance(content, list):
@@ -247,7 +348,7 @@ def wait_for_finish_invocation(
 def render_thinking(thinking: str) -> str:
     return (
         '<li class="step"><div class="dot dy"></div><div class="bd">'
-        f'<details><summary>Thinking</summary>'
+        f"<details><summary>Thinking</summary>"
         f'<div class="thk">{html.escape(thinking[:BLOCK_TRUNCATE])}</div>'
         "</details></div></li>"
     )
@@ -268,7 +369,9 @@ def render_user_text(text: str) -> str:
     )
 
 
-def render_tool(tool_use: dict, tool_result: dict | None, shell_tool_names: frozenset[str]) -> str:
+def render_tool(
+    tool_use: dict, tool_result: dict | None, shell_tool_names: frozenset[str]
+) -> str:
     name = tool_use.get("name", "tool")
     inp = tool_use.get("input", {})
 
@@ -335,12 +438,18 @@ def render_transcript_html(
             return marker in content
         if isinstance(content, list):
             return any(
-                isinstance(b, dict) and b.get("type") == "text" and marker in b.get("text", "")
+                isinstance(b, dict)
+                and b.get("type") == "text"
+                and marker in b.get("text", "")
                 for b in content
             )
         return False
 
-    filtered = [msg for msg in entries if not content_has_marker(msg.get("content"), skill_marker)]
+    filtered = [
+        msg
+        for msg in entries
+        if not content_has_marker(msg.get("content"), skill_marker)
+    ]
 
     bookkeeping_ids: set[str] = {
         block.get("id", "")
@@ -356,7 +465,9 @@ def render_transcript_html(
         block.get("id", ""): block
         for msg in filtered
         for block in (msg.get("content") or [])
-        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("id")
+        if isinstance(block, dict)
+        and block.get("type") == "tool_use"
+        and block.get("id")
     }
 
     paired_ids: set[str] = set()
@@ -421,7 +532,10 @@ def extract_written_script_paths(
         if not isinstance(content, list):
             continue
         for block in content:
-            if block.get("type") != "tool_use" or block.get("name") not in script_tool_names:
+            if (
+                block.get("type") != "tool_use"
+                or block.get("name") not in script_tool_names
+            ):
                 continue
             inp = block.get("input", {})
             file_path = next((inp.get(k) for k in script_path_keys if inp.get(k)), None)
