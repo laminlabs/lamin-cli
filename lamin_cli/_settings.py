@@ -20,6 +20,7 @@ def settings(ctx):
     - `modules` → environment schema modules {attr}`~lamindb.setup.core.SetupSettings.modules`
     - `branch` → branch {attr}`~lamindb.setup.core.SetupSettings.branch`
     - `space` → space {attr}`~lamindb.setup.core.SetupSettings.space`
+    - `worktree` → whether dev-dir is a worktree parent
 
     Display via [lamin info](https://docs.lamin.ai/cli#info)
 
@@ -45,6 +46,10 @@ def settings(ctx):
     # space
     lamin settings space get
     lamin settings space set all
+    # worktree
+    lamin settings worktree get
+    lamin settings worktree set true
+    lamin settings worktree unset
     # mount
     lamin settings mount storage ./mnt
     lamin settings mount unset ./mnt
@@ -101,6 +106,51 @@ settings.add_command(dev_dir_group)
 
 
 # -----------------------------------------------------------------------------
+# worktree group (pattern: lamin settings worktree get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("worktree")
+def worktree_group():
+    """Get or set whether dev-dir is interpreted as a worktree parent."""
+
+
+@worktree_group.command("get")
+def worktree_get():
+    """Show whether worktree mode is enabled."""
+    from lamindb_setup import settings as settings_
+
+    click.echo("true" if settings_.worktree else "false")
+
+
+@worktree_group.command("set")
+@click.argument("value", type=str)
+def worktree_set(value: str):
+    """Enable or disable worktree mode."""
+    from lamindb_setup import settings as settings_
+
+    value_normalized = value.strip().lower()
+    if value_normalized in {"1", "true", "yes"}:
+        settings_.worktree = True
+        return
+    if value_normalized in {"0", "false", "no"}:
+        settings_.worktree = False
+        return
+    raise click.ClickException("Invalid value for worktree. Pass one of: true, false.")
+
+
+@worktree_group.command("unset")
+def worktree_unset():
+    """Unset worktree mode (equivalent to false)."""
+    from lamindb_setup import settings as settings_
+
+    settings_.worktree = False
+
+
+settings.add_command(worktree_group)
+
+
+# -----------------------------------------------------------------------------
 # modules group (pattern: lamin settings modules get/set)
 # -----------------------------------------------------------------------------
 
@@ -151,7 +201,8 @@ settings.add_command(modules_group)
 @click.argument(
     "setting",
     type=click.Choice(
-        ["auto-connect", "private-django-api", "dev-dir"], case_sensitive=False
+        ["auto-connect", "private-django-api", "dev-dir", "worktree"],
+        case_sensitive=False,
     ),
 )
 @click.argument("value")  # No explicit type - let Click handle it
@@ -167,13 +218,22 @@ def set_legacy(setting: str, value: str):
         if value.lower() == "none":
             value = None  # type: ignore[assignment]
         settings_.dev_dir = value
+    if setting == "worktree":
+        settings_.worktree = click.BOOL(value)
 
 
 @settings.command("get", hidden=True)
 @click.argument(
     "setting",
     type=click.Choice(
-        ["auto-connect", "private-django-api", "space", "branch", "dev-dir"],
+        [
+            "auto-connect",
+            "private-django-api",
+            "space",
+            "branch",
+            "dev-dir",
+            "worktree",
+        ],
         case_sensitive=False,
     ),
 )
@@ -189,6 +249,8 @@ def get_legacy(setting: str):
         value = settings_.dev_dir
         if value is None:
             value = "None"
+    elif setting == "worktree":
+        value = "true" if settings_.worktree else "false"
     else:
         value = getattr(settings_, setting.replace("-", "_"))
     click.echo(value)

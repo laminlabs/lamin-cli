@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import time
 import warnings
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from click.testing import CliRunner
 from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
+    local_current_branch_file,
     local_current_instance_file,
     settings_dir,
 )
@@ -313,6 +315,73 @@ def test_hub_switch_branch_writes_branch_file(monkeypatch):
             branch_file.write_text(original_contents)
 
 
+def test_hub_switch_branch_writes_branch_file_in_dev_dir(monkeypatch, tmp_path: Path):
+    from lamin_cli.hub.switch import switch_branch
+
+    previous_dev_dir = ln_setup.settings.dev_dir
+    instance = ln_setup.settings.instance
+    legacy_branch_file = (
+        settings_dir / f"current-branch--{instance.owner}--{instance.name}.txt"
+    )
+    legacy_original = (
+        legacy_branch_file.read_text() if legacy_branch_file.exists() else None
+    )
+
+    ln_setup.settings.dev_dir = tmp_path
+    branch_file = local_current_branch_file(tmp_path.resolve())
+    original_contents = branch_file.read_text() if branch_file.exists() else None
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        return {"uid": "z9x8c7v6b5n4m3k2", "name": "managedbranch"}
+
+    monkeypatch.setattr("lamin_cli.hub.switch.request_json", fake_request_json)
+    try:
+        switch_branch("managedbranch")
+        assert branch_file.read_text() == "z9x8c7v6b5n4m3k2\nmanagedbranch"
+    finally:
+        if original_contents is None:
+            branch_file.unlink(missing_ok=True)
+        else:
+            branch_file.write_text(original_contents)
+        ln_setup.settings.dev_dir = previous_dev_dir
+        if legacy_original is None:
+            legacy_branch_file.unlink(missing_ok=True)
+        else:
+            legacy_branch_file.write_text(legacy_original)
+
+
+def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance_marker(
+    monkeypatch, tmp_path: Path
+):
+    from lamin_cli.hub.switch import switch_branch
+
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    previous_cwd = Path.cwd()
+
+    worktree_parent = tmp_path / "worktrees"
+    child = worktree_parent / "feature-a"
+    child.mkdir(parents=True, exist_ok=True)
+
+    ln_setup.settings.dev_dir = worktree_parent
+    ln_setup.settings.worktree = True
+    branch_file = local_current_branch_file(child)
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        return {"uid": "z9x8c7v6b5n4m3k2", "name": "managedbranch"}
+
+    monkeypatch.setattr("lamin_cli.hub.switch.request_json", fake_request_json)
+    try:
+        os.chdir(child)
+        switch_branch("managedbranch")
+        assert branch_file.read_text() == "z9x8c7v6b5n4m3k2\nmanagedbranch"
+    finally:
+        os.chdir(previous_cwd)
+        branch_file.unlink(missing_ok=True)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
 def test_hub_switch_branch_create_existing_raises(monkeypatch):
     from lamin_cli.hub._click import click as hub_click
     from lamin_cli.hub.switch import switch_branch
@@ -507,6 +576,122 @@ def test_dev_dir_legacy_get_set():
     assert result.stdout.strip().split("\n")[-1] == str(this_path.parent)
     exit_status = os.system("lamin settings set dev-dir none")
     assert exit_status == 0
+
+
+def test_worktree_setting_get_set_and_legacy():
+    previous = ln_setup.settings.worktree
+    try:
+        result = subprocess.run(
+            "lamin settings worktree get",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip().split("\n")[-1] in {"true", "false"}
+
+        assert os.system("lamin settings worktree set true") == 0
+        assert ln_setup.settings.worktree is True
+        result = subprocess.run(
+            "lamin settings worktree get",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip().split("\n")[-1] == "true"
+
+        assert os.system("lamin settings set worktree false") == 0
+        assert ln_setup.settings.worktree is False
+        result = subprocess.run(
+            "lamin settings get worktree",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip().split("\n")[-1] == "false"
+    finally:
+        ln_setup.settings.worktree = previous
+
+
+def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
+    tmp_path: Path,
+):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    previous_cwd = Path.cwd()
+    worktree_parent = tmp_path / "worktrees"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    branch_name = f"wt-{time.time_ns()}"
+    child = worktree_parent / branch_name
+    branch_file = local_current_branch_file(child)
+    root_instance_marker = local_current_instance_file(worktree_parent)
+    child_instance_marker = local_current_instance_file(child)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+
+        outside = subprocess.run(
+            "lamin switch main",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=worktree_parent,
+        )
+        assert outside.returncode != 0
+        assert "worktree mode is enabled" in (outside.stderr + outside.stdout)
+
+        inside = subprocess.run(
+            f"lamin switch -c {branch_name}",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=worktree_parent,
+        )
+        assert inside.returncode == 0, inside.stderr
+        assert child.exists()
+        assert branch_file.exists()
+        branch_content = branch_file.read_text().strip().split("\n")
+        assert len(branch_content) == 2
+        assert branch_content[1] == branch_name
+        assert root_instance_marker.exists()
+        assert not child_instance_marker.exists()
+        assert f"switched to {branch_name}" not in (inside.stdout + inside.stderr)
+        assert f"to switch, cd into {branch_name}" in (inside.stdout + inside.stderr)
+    finally:
+        subprocess.run(
+            f"lamin delete branch --name {branch_name}",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        os.chdir(previous_cwd)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_worktree_branch_name_with_slash_raises(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+
+        result = subprocess.run(
+            "lamin switch -c feature/test",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=worktree_parent,
+        )
+        assert result.returncode != 0
+        assert "not supported in worktree mode" in (result.stderr + result.stdout)
+    finally:
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
 
 
 def test_settings_cache_get_set_reset():

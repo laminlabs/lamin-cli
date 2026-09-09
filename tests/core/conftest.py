@@ -26,6 +26,7 @@ def pytest_sessionstart(session: pytest.Session):
         name="lamin-cli-unit-tests",
     )
     ln.setup.settings.dev_dir = None
+    ln.setup.settings.worktree = False
     os.system("lamin connect lamin-cli-unit-tests")
 
 

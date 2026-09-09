@@ -161,7 +161,7 @@ def resolve_state_dir(name: str) -> Path:
     try:
         from lamindb_setup import settings as ln_setup_settings
 
-        dev_dir = ln_setup_settings.dev_dir
+        dev_dir = ln_setup_settings.effective_dev_dir
     except Exception:
         dev_dir = None
     return Path(dev_dir) / name if dev_dir is not None else Path(name)
