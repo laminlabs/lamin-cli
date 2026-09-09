@@ -12,6 +12,7 @@ from click.testing import CliRunner
 from lamin_cli.__main__ import main
 from lamindb_setup.core._settings_store import (
     current_modules_file,
+    local_current_branch_file,
     local_current_instance_file,
     settings_dir,
 )
@@ -311,6 +312,41 @@ def test_hub_switch_branch_writes_branch_file(monkeypatch):
             branch_file.unlink(missing_ok=True)
         else:
             branch_file.write_text(original_contents)
+
+
+def test_hub_switch_branch_writes_branch_file_in_dev_dir(monkeypatch, tmp_path: Path):
+    from lamin_cli.hub.switch import switch_branch
+
+    previous_dev_dir = ln_setup.settings.dev_dir
+    instance = ln_setup.settings.instance
+    legacy_branch_file = (
+        settings_dir / f"current-branch--{instance.owner}--{instance.name}.txt"
+    )
+    legacy_original = (
+        legacy_branch_file.read_text() if legacy_branch_file.exists() else None
+    )
+
+    ln_setup.settings.dev_dir = tmp_path
+    branch_file = local_current_branch_file(tmp_path.resolve())
+    original_contents = branch_file.read_text() if branch_file.exists() else None
+
+    def fake_request_json(method, path, *, params=None, body=None):
+        return {"uid": "z9x8c7v6b5n4m3k2", "name": "managedbranch"}
+
+    monkeypatch.setattr("lamin_cli.hub.switch.request_json", fake_request_json)
+    try:
+        switch_branch("managedbranch")
+        assert branch_file.read_text() == "z9x8c7v6b5n4m3k2\nmanagedbranch"
+    finally:
+        if original_contents is None:
+            branch_file.unlink(missing_ok=True)
+        else:
+            branch_file.write_text(original_contents)
+        ln_setup.settings.dev_dir = previous_dev_dir
+        if legacy_original is None:
+            legacy_branch_file.unlink(missing_ok=True)
+        else:
+            legacy_branch_file.write_text(legacy_original)
 
 
 def test_hub_switch_branch_create_existing_raises(monkeypatch):

@@ -4,7 +4,6 @@ from typing import Any
 
 import lamindb_setup as ln_setup
 from lamin_utils import logger
-from lamindb_setup.core._settings_store import settings_dir
 
 from ._click import click
 from ._client import module_model_path, request_json
@@ -51,8 +50,7 @@ def _get_branch(target: str) -> dict[str, Any] | None:
 
 
 def _branch_settings_path():
-    instance = ln_setup.settings.instance
-    return settings_dir / f"current-branch--{instance.owner}--{instance.name}.txt"
+    return ln_setup.settings._branch_path
 
 
 def _write_current_branch(uid: str, name: str) -> None:
