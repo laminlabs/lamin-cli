@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import lamindb_setup as ln_setup
@@ -54,7 +55,9 @@ def _branch_settings_path():
 
 
 def _write_current_branch(uid: str, name: str) -> None:
-    _branch_settings_path().write_text(f"{uid}\n{name}")
+    path = _branch_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{uid}\n{name}")
     # Clear cache so current process reloads branch from file on next access.
     ln_setup.settings._branch = None
 
@@ -65,6 +68,14 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
             "Please pass a branch name or uid. Example: lamin switch main"
         )
     if create:
+        is_worktree_bootstrap = (
+            ln_setup.settings.worktree
+            and target is not None
+            and ln_setup.settings.dev_dir is not None
+            and Path.cwd().resolve().parent == ln_setup.settings.dev_dir.resolve()
+            and Path.cwd().resolve().name == target
+            and not ln_setup.settings._branch_path.exists()
+        )
         created_branch = create_branch(target)
         uid, name = _extract_uid_name(created_branch)
         if uid is None or name is None:
@@ -84,4 +95,7 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
             )
 
     _write_current_branch(uid, name)
-    logger.important(f"switched to {target}")
+    if create and is_worktree_bootstrap:
+        logger.important_hint(f"to switch, cd into {target}")
+    else:
+        logger.important(f"switched to {target}")

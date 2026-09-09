@@ -496,6 +496,7 @@ def switch(
         raise click.ClickException("Too many arguments. Use 'lamin switch <target>' or 'lamin switch --space <space>'.")
     target_str = target[0] if len(target) == 1 else None
     if not space and create and ln_setup.settings.worktree:
+        _validate_worktree_branch_name(target_str)
         if target_str is None:
             raise click.ClickException(
                 "Please pass a branch name. Example: lamin switch -c my_branch"
@@ -516,7 +517,6 @@ def switch(
                 )
             child_dir.mkdir(parents=True, exist_ok=True)
             _switch_in_directory(target_str, switch_space=False, cwd=child_dir)
-            logger.important_hint(f"next step: cd {target_str}")
             return
     if not space and ln_setup.settings.worktree:
         ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
