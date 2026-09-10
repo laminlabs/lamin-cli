@@ -32,6 +32,21 @@ def test_enable_worktree_empty_dev_dir(tmp_path: Path):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_enable_worktree_ignores_root_config_directories(tmp_path: Path):
+    settings = FakeSettings(tmp_path)
+    for directory in (".agents", ".claude", ".lamin", ".vscode"):
+        config_file = tmp_path / directory / "config.txt"
+        config_file.parent.mkdir()
+        config_file.write_text(directory)
+
+    _enable_worktree(settings)
+
+    assert settings.worktree is True
+    assert not (tmp_path / "main").exists()
+    for directory in (".agents", ".claude", ".lamin", ".vscode"):
+        assert (tmp_path / directory / "config.txt").read_text() == directory
+
+
 def test_enable_worktree_is_idempotent(tmp_path: Path):
     settings = FakeSettings(tmp_path)
     settings.worktree = True
@@ -56,6 +71,15 @@ def test_enable_worktree_migrates_existing_workspace(
     (nested / "result.csv").write_text("value\n1\n")
     hidden = tmp_path / ".gitignore"
     hidden.write_text(".cache\n")
+    root_config_files = {
+        ".agents": "skill instructions",
+        ".claude": "claude settings",
+        ".vscode": "editor settings",
+    }
+    for directory, content in root_config_files.items():
+        config_file = tmp_path / directory / "config.txt"
+        config_file.parent.mkdir()
+        config_file.write_text(content)
     monkeypatch.setattr("lamin_cli._settings.click.confirm", lambda *a, **k: True)
 
     _enable_worktree(settings)
@@ -66,6 +90,9 @@ def test_enable_worktree_migrates_existing_workspace(
     assert (main / "data" / "result.csv").read_text() == "value\n1\n"
     assert (main / ".gitignore").read_text() == ".cache\n"
     assert (root_lamin / "current_instance").read_text() == "account/instance"
+    for directory, content in root_config_files.items():
+        assert (tmp_path / directory / "config.txt").read_text() == content
+        assert not (main / directory).exists()
     assert local_current_branch_file(main).read_text() == "branchuid123\nmain"
     assert not (tmp_path / "analysis.py").exists()
 
@@ -196,12 +223,23 @@ def test_disable_worktree_restores_manual_workspace(
     local_current_branch_file(main).parent.mkdir()
     local_current_branch_file(main).write_text("branchuid123\nmain")
     (main / "analysis.py").write_text("print('hello')\n")
+    root_config_files = {
+        ".agents": "skill instructions",
+        ".claude": "claude settings",
+        ".vscode": "editor settings",
+    }
+    for directory, content in root_config_files.items():
+        config_file = tmp_path / directory / "config.txt"
+        config_file.parent.mkdir()
+        config_file.write_text(content)
     monkeypatch.setattr("lamin_cli._settings.click.confirm", lambda *a, **k: True)
 
     _disable_worktree(settings)
 
     assert settings.worktree is False
     assert (tmp_path / "analysis.py").read_text() == "print('hello')\n"
+    for directory, content in root_config_files.items():
+        assert (tmp_path / directory / "config.txt").read_text() == content
     assert not main.exists()
 
 

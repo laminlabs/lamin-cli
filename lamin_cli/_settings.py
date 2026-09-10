@@ -9,6 +9,9 @@ else:
     import rich_click as click
 
 
+_WORKTREE_ROOT_ENTRIES = {".agents", ".claude", ".lamin", ".vscode"}
+
+
 def _enable_worktree(settings_) -> None:
     """Enable worktree mode and migrate an existing manual workspace."""
     if settings_.worktree:
@@ -25,7 +28,9 @@ def _enable_worktree(settings_) -> None:
 
     dev_dir = Path(dev_dir).resolve()
     dev_dir.mkdir(parents=True, exist_ok=True)
-    entries = [entry for entry in dev_dir.iterdir() if entry.name != ".lamin"]
+    entries = [
+        entry for entry in dev_dir.iterdir() if entry.name not in _WORKTREE_ROOT_ENTRIES
+    ]
     if not entries:
         settings_.worktree = True
         return
