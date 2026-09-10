@@ -578,9 +578,14 @@ def test_dev_dir_legacy_get_set():
     assert exit_status == 0
 
 
-def test_worktree_setting_get_set_and_legacy():
+def test_worktree_setting_get_set_and_legacy(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
     previous = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees-setting"
+    worktree_parent.mkdir()
     try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = False
         result = subprocess.run(
             "lamin settings worktree get",
             capture_output=True,
@@ -613,6 +618,7 @@ def test_worktree_setting_get_set_and_legacy():
         assert result.stdout.strip().split("\n")[-1] == "false"
     finally:
         ln_setup.settings.worktree = previous
+        ln_setup.settings.dev_dir = previous_dev_dir
 
 
 def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
