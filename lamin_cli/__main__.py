@@ -703,6 +703,12 @@ def _resolve_entity_for_get_update(
         raise click.ClickException(str(e)) from None
 
 
+def _complete_path_argument(ctx, param, incomplete: str):
+    # Keep `save path` typed as str (needed for cloud URIs) while exposing
+    # local filesystem completion metadata to Click shells.
+    return click.Path(path_type=Path).shell_complete(ctx, param, incomplete)
+
+
 def _describe(
     entity: str = "artifact",
     uid: str | None = None,
@@ -974,7 +980,7 @@ def update(
 
 
 @main.command()
-@click.argument("path", type=str)
+@click.argument("path", type=str, shell_complete=_complete_path_argument)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
 @click.option("--kind", type=str, default=None, help="Artifact kind (e.g. 'plan', 'dataset', 'model'). Overrides auto-inferred kind for plan files.")
