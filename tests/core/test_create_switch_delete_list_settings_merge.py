@@ -361,10 +361,11 @@ def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance
 
     worktree_parent = tmp_path / "worktrees"
     child = worktree_parent / "feature-a"
-    child.mkdir(parents=True, exist_ok=True)
+    worktree_parent.mkdir()
 
     ln_setup.settings.dev_dir = worktree_parent
     ln_setup.settings.worktree = True
+    child.mkdir()
     branch_file = local_current_branch_file(child)
 
     def fake_request_json(method, path, *, params=None, body=None):
@@ -378,8 +379,12 @@ def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance
     finally:
         os.chdir(previous_cwd)
         branch_file.unlink(missing_ok=True)
-        ln_setup.settings.worktree = previous_worktree
+        if child.exists():
+            shutil.rmtree(child)
+        ln_setup.settings.worktree = False
         ln_setup.settings.dev_dir = previous_dev_dir
+        if previous_worktree:
+            ln_setup.settings._worktree_path.write_text("true")
 
 
 def test_hub_switch_branch_create_existing_raises(monkeypatch):
@@ -673,8 +678,12 @@ def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
             shell=True,
         )
         os.chdir(previous_cwd)
-        ln_setup.settings.worktree = previous_worktree
+        if child.exists():
+            shutil.rmtree(child)
+        ln_setup.settings.worktree = False
         ln_setup.settings.dev_dir = previous_dev_dir
+        if previous_worktree:
+            ln_setup.settings._worktree_path.write_text("true")
 
 
 def test_worktree_branch_name_with_slash_raises(tmp_path: Path):
