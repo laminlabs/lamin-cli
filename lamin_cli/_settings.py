@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 if os.environ.get("NO_RICH"):
     import click as click
@@ -9,146 +8,11 @@ else:
     import rich_click as click
 
 
-_WORKTREE_ROOT_ENTRIES = {".agents", ".claude", ".lamin", ".vscode"}
-
-
-def _enable_worktree(settings_) -> None:
-    """Enable worktree mode and migrate an existing manual dev-dir."""
-    if settings_.worktree:
-        return
-
-    dev_dir = settings_.dev_dir
-    if dev_dir is None:
-        raise click.ClickException(
-            "worktree mode requires a configured dev-dir. "
-            "Run: lamin settings dev-dir set <path>"
-        )
-
-    from lamindb_setup.core._settings_store import local_current_branch_file
-
-    dev_dir = Path(dev_dir).resolve()
-    dev_dir.mkdir(parents=True, exist_ok=True)
-    entries = [
-        entry for entry in dev_dir.iterdir() if entry.name not in _WORKTREE_ROOT_ENTRIES
-    ]
-    if not entries:
-        settings_.worktree = True
-        return
-
-    branch_idlike, branch_name = settings_._read_branch_idlike_name()
-    branch_dir = dev_dir / branch_name
-    if branch_dir.exists():
-        raise click.ClickException(
-            f"Cannot enable worktree mode because '{branch_dir}' already exists."
-        )
-
-    click.echo(
-        f"Existing files in '{dev_dir}' will be moved to branch directory "
-        f"'{branch_dir}'."
-    )
-    if not click.confirm("Continue?", default=True):
-        raise click.Abort()
-
-    branch_dir.mkdir()
-    moved_entries: list[tuple[Path, Path]] = []
-    try:
-        for source in entries:
-            destination = branch_dir / source.name
-            source.replace(destination)
-            moved_entries.append((source, destination))
-
-        branch_marker = local_current_branch_file(branch_dir)
-        branch_marker.parent.mkdir(parents=True, exist_ok=True)
-        branch_marker.write_text(f"{branch_idlike}\n{branch_name}")
-        settings_.worktree = True
-    except Exception:
-        settings_.worktree = False
-        for source, destination in reversed(moved_entries):
-            if destination.exists() and not source.exists():
-                destination.replace(source)
-        branch_marker = local_current_branch_file(branch_dir)
-        branch_marker.unlink(missing_ok=True)
-        if branch_marker.parent.exists() and not any(branch_marker.parent.iterdir()):
-            branch_marker.parent.rmdir()
-        if branch_dir.exists() and not any(branch_dir.iterdir()):
-            branch_dir.rmdir()
-        raise
-
-    click.echo(f"Moved existing files to '{branch_dir}'.")
-
-
 def _set_worktree(settings_, enabled: bool) -> None:
-    if enabled:
-        _enable_worktree(settings_)
-    else:
-        _disable_worktree(settings_)
-
-
-def _disable_worktree(settings_) -> None:
-    """Disable worktree mode and restore a single manual dev-dir."""
-    if not settings_.worktree:
-        return
-
-    dev_dir = settings_.dev_dir
-    if dev_dir is None:
-        settings_.worktree = False
-        return
-
-    from lamindb_setup.core._settings_store import local_current_branch_file
-
-    dev_dir = Path(dev_dir).resolve()
-    branch_dirs = [
-        path
-        for path in dev_dir.iterdir()
-        if path.is_dir() and local_current_branch_file(path).exists()
-    ]
-    if not branch_dirs:
-        settings_.worktree = False
-        return
-    if len(branch_dirs) > 1:
-        names = ", ".join(sorted(path.name for path in branch_dirs))
-        raise click.ClickException(
-            "Cannot disable worktree mode while multiple branch directories exist: "
-            f"{names}. Merge or remove the other branch directories first."
-        )
-
-    branch_dir = branch_dirs[0]
-    entries = [entry for entry in branch_dir.iterdir() if entry.name != ".lamin"]
-    collisions = [entry.name for entry in entries if (dev_dir / entry.name).exists()]
-    if collisions:
-        raise click.ClickException(
-            "Cannot disable worktree mode because these paths already exist in the "
-            f"dev-dir: {', '.join(sorted(collisions))}."
-        )
-
-    click.echo(
-        f"Files in branch directory '{branch_dir}' will be moved back to '{dev_dir}'."
-    )
-    if not click.confirm("Continue?", default=True):
-        raise click.Abort()
-
-    moved_entries: list[tuple[Path, Path]] = []
     try:
-        for source in entries:
-            destination = dev_dir / source.name
-            source.replace(destination)
-            moved_entries.append((source, destination))
-        settings_.worktree = False
-    except Exception:
-        settings_.worktree = True
-        for source, destination in reversed(moved_entries):
-            if destination.exists() and not source.exists():
-                destination.replace(source)
-        raise
-
-    branch_marker = local_current_branch_file(branch_dir)
-    branch_marker.unlink(missing_ok=True)
-    branch_lamin_dir = branch_marker.parent
-    if branch_lamin_dir.exists() and not any(branch_lamin_dir.iterdir()):
-        branch_lamin_dir.rmdir()
-    if branch_dir.exists() and not any(branch_dir.iterdir()):
-        branch_dir.rmdir()
-    click.echo(f"Restored files from '{branch_dir}' to '{dev_dir}'.")
+        settings_.worktree = enabled
+    except RuntimeError as error:
+        raise click.ClickException(str(error)) from error
 
 
 @click.group(invoke_without_command=True)
