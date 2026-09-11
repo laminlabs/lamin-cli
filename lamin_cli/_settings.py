@@ -55,7 +55,7 @@ def settings(ctx):
     lamin settings space set all
     # worktree
     lamin settings worktree get
-    lamin settings worktree set true  # moves the content of dev-dir into the directory for the main branch
+    lamin settings worktree set true
     lamin settings worktree unset
     # mount
     lamin settings mount storage ./mnt
@@ -133,7 +133,7 @@ def worktree_get():
 @worktree_group.command("set")
 @click.argument("value", type=str)
 def worktree_set(value: str):
-    """Enable or disable worktree mode, migrating the existing dev-dir safely."""
+    """Enable or disable worktree mode."""
     from lamindb_setup import settings as settings_
 
     value_normalized = value.strip().lower()
