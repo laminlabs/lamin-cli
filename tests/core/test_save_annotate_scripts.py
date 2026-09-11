@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -66,7 +67,6 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
     child = worktree_parent / branch_name
     script_path = child / "pipelines" / f"worktree-script-{unique}.py"
     expected_key = f"pipelines/{script_path.name}"
-    previous_cwd = Path.cwd()
     try:
         worktree_parent.mkdir()
         assert (
@@ -84,13 +84,30 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        os.chdir(child)
-        assert ln.Transform.filter(key=expected_key).count() >= 1
+        query_result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import lamindb as ln; "
+                f"assert ln.Transform.filter(key={expected_key!r}).count() >= 1",
+            ],
+            cwd=child,
+            capture_output=True,
+            text=True,
+        )
+        assert query_result.returncode == 0, (
+            f"stdout: {query_result.stdout}\nstderr: {query_result.stderr}"
+        )
     finally:
-        os.chdir(previous_cwd)
-        for transform in ln.Transform.filter(key=expected_key):
-            transform.delete(permanent=True)
         if child.exists():
+            run_lamin(
+                "delete",
+                "transform",
+                "--key",
+                expected_key,
+                "--permanent",
+                cwd=child,
+            )
             run_lamin("delete", "branch", "--name", branch_name, cwd=child)
             shutil.rmtree(child)
         run_lamin("settings", "worktree", "set", "false")
