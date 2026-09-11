@@ -13,7 +13,7 @@ _WORKTREE_ROOT_ENTRIES = {".agents", ".claude", ".lamin", ".vscode"}
 
 
 def _enable_worktree(settings_) -> None:
-    """Enable worktree mode and migrate an existing manual workspace."""
+    """Enable worktree mode and migrate an existing manual dev-dir."""
     if settings_.worktree:
         return
 
@@ -85,7 +85,7 @@ def _set_worktree(settings_, enabled: bool) -> None:
 
 
 def _disable_worktree(settings_) -> None:
-    """Disable worktree mode and restore a single manual workspace."""
+    """Disable worktree mode and restore a single manual dev-dir."""
     if not settings_.worktree:
         return
 
@@ -191,7 +191,7 @@ def settings(ctx):
     lamin settings space set all
     # worktree
     lamin settings worktree get
-    lamin settings worktree set true  # moves an existing workspace into its branch directory
+    lamin settings worktree set true  # moves the content of dev-dir into the directory for the main branch
     lamin settings worktree unset
     # mount
     lamin settings mount storage ./mnt
@@ -269,7 +269,7 @@ def worktree_get():
 @worktree_group.command("set")
 @click.argument("value", type=str)
 def worktree_set(value: str):
-    """Enable or disable worktree mode, migrating the existing workspace safely."""
+    """Enable or disable worktree mode, migrating the existing dev-dir safely."""
     from lamindb_setup import settings as settings_
 
     value_normalized = value.strip().lower()

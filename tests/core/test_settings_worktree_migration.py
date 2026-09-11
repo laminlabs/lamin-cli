@@ -58,7 +58,7 @@ def test_enable_worktree_is_idempotent(tmp_path: Path):
     assert source.exists()
 
 
-def test_enable_worktree_migrates_existing_workspace(
+def test_enable_worktree_migrates_existing_dev_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     settings = FakeSettings(tmp_path)
@@ -113,7 +113,7 @@ def test_enable_worktree_preserves_non_main_branch(
     )
 
 
-def test_enable_worktree_cancel_leaves_workspace_unchanged(
+def test_enable_worktree_cancel_leaves_dev_dir_unchanged(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     settings = FakeSettings(tmp_path)
@@ -195,7 +195,7 @@ def test_both_worktree_command_forms_migrate(
         ["worktree", "unset"],
     ),
 )
-def test_all_disable_command_forms_restore_workspace(
+def test_all_disable_command_forms_restore_dev_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, arguments: list[str]
 ):
     fake_settings = FakeSettings(tmp_path)
@@ -213,7 +213,7 @@ def test_all_disable_command_forms_restore_workspace(
     assert (tmp_path / "analysis.py").exists()
 
 
-def test_disable_worktree_restores_manual_workspace(
+def test_disable_worktree_restores_manual_dev_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     settings = FakeSettings(tmp_path)
