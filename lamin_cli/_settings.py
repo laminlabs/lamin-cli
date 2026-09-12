@@ -10,9 +10,9 @@ else:
 from lamindb_setup.errors import DevDirNonEmpty, NoDevDirConfigured
 
 
-def _set_worktree(settings_, enabled: bool) -> None:
+def _set_worktree(settings_, value: bool) -> None:
     try:
-        settings_.worktree = enabled
+        settings_.worktree = value
     except (NoDevDirConfigured, DevDirNonEmpty) as error:
         raise click.ClickException(str(error)) from error
 
