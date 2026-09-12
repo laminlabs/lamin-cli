@@ -356,7 +356,6 @@ def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance
     from lamin_cli.hub.switch import switch_branch
 
     previous_dev_dir = ln_setup.settings.dev_dir
-    previous_worktree = ln_setup.settings.worktree
     previous_cwd = Path.cwd()
 
     worktree_parent = tmp_path / "worktrees"
@@ -383,8 +382,6 @@ def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance
             shutil.rmtree(child)
         ln_setup.settings.worktree = False
         ln_setup.settings.dev_dir = previous_dev_dir
-        if previous_worktree:
-            ln_setup.settings._worktree_path.write_text("true")
 
 
 def test_hub_switch_branch_create_existing_raises(monkeypatch):
@@ -626,11 +623,31 @@ def test_worktree_setting_get_set_and_legacy(tmp_path: Path):
         ln_setup.settings.dev_dir = previous_dev_dir
 
 
+def test_worktree_setting_set_true_rejects_non_empty_dev_dir(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    worktree_parent = tmp_path / "worktrees-non-empty"
+    worktree_parent.mkdir()
+    (worktree_parent / "analysis.py").write_text("data")
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        result = subprocess.run(
+            "lamin settings worktree set true",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        assert result.returncode != 0
+        assert "Cannot enable worktree mode" in (result.stderr + result.stdout)
+        assert "analysis.py" in (result.stderr + result.stdout)
+    finally:
+        ln_setup.settings.worktree = False
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
 def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
     tmp_path: Path,
 ):
     previous_dev_dir = ln_setup.settings.dev_dir
-    previous_worktree = ln_setup.settings.worktree
     previous_cwd = Path.cwd()
     worktree_parent = tmp_path / "worktrees"
     worktree_parent.mkdir(parents=True, exist_ok=True)
@@ -682,8 +699,6 @@ def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
             shutil.rmtree(child)
         ln_setup.settings.worktree = False
         ln_setup.settings.dev_dir = previous_dev_dir
-        if previous_worktree:
-            ln_setup.settings._worktree_path.write_text("true")
 
 
 def test_worktree_branch_name_with_slash_raises(tmp_path: Path):

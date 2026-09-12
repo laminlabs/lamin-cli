@@ -13,10 +13,11 @@ scripts_dir = Path(__file__).parent.parent.resolve() / "scripts"
 
 def run_lamin(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["lamin", *args],
+        f"lamin {' '.join(args)}",
+        shell=True,
         capture_output=True,
         text=True,
-        cwd=cwd,
+        cwd=str(cwd) if cwd is not None else None,
     )
 
 
@@ -60,12 +61,12 @@ def test_save_resave_script_no_uids():
 def test_save_script_in_worktree_uses_active_worktree_relative_key():
     unique = time.time_ns()
     previous_dev_dir = settings.dev_dir
-    previous_worktree = settings.worktree
     worktree_parent = scripts_dir / f"worktrees-{unique}"
     branch_name = f"feature-a-{unique}"
     child = worktree_parent / branch_name
     script_path = child / "pipelines" / f"worktree-script-{unique}.py"
     expected_key = f"pipelines/{script_path.name}"
+    previous_cwd = Path.cwd()
     try:
         worktree_parent.mkdir()
         assert (
@@ -76,23 +77,17 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
         assert (
             run_lamin("switch", "-c", branch_name, cwd=worktree_parent).returncode == 0
         )
-        script_path.parent.mkdir(parents=True)
+        script_path.parent.mkdir(parents=True, exist_ok=True)
         script_path.write_text("print('worktree save test')\n")
-        result = run_lamin("save", str(script_path), cwd=child)
+        os.chdir(child)
+        result = run_lamin("save", str(script_path))
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
         assert ln.Transform.filter(key=expected_key).count() >= 1
     finally:
+        os.chdir(previous_cwd)
         if child.exists():
-            run_lamin(
-                "delete",
-                "transform",
-                "--key",
-                expected_key,
-                "--permanent",
-                cwd=child,
-            )
             run_lamin("delete", "branch", "--name", branch_name, cwd=child)
             shutil.rmtree(child)
         run_lamin("settings", "worktree", "set", "false")
@@ -100,8 +95,8 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
             run_lamin("settings", "dev-dir", "unset")
         else:
             run_lamin("settings", "dev-dir", "set", str(previous_dev_dir))
-        if previous_worktree:
-            settings._worktree_path.touch()
+        for transform in ln.Transform.filter(key=expected_key):
+            transform.delete(permanent=True)
         if worktree_parent.exists():
             shutil.rmtree(worktree_parent)
 
