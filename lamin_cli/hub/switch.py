@@ -68,6 +68,21 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
             "Please pass a branch name or uid. Example: lamin switch main"
         )
     if create:
+        if ln_setup.settings.worktree:
+            from lamindb_setup._switch import (
+                missing_branch_create_and_navigate_message,
+                worktree_switch_instruction,
+            )
+
+            instruction = worktree_switch_instruction(target, create=True)
+            if instruction is not None:
+                existing_branch = _get_branch(target)
+                uid_existing, name_existing = _extract_uid_name(existing_branch)
+                if uid_existing is None or name_existing is None:
+                    raise click.ClickException(
+                        missing_branch_create_and_navigate_message(target, instruction)
+                    )
+                raise click.ClickException(instruction)
         is_worktree_bootstrap = (
             ln_setup.settings.worktree
             and target is not None
@@ -91,8 +106,15 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
         uid, name = _extract_uid_name(resolved_branch)
         if uid is None or name is None:
             raise click.ClickException(
-                f"Branch '{target}', please check on the hub UI whether you have the correct `uid` or `name`."
+                f"Branch '{target}' does not exist. "
+                f"To create and switch, run: lamin switch -c {target}"
             )
+        if ln_setup.settings.worktree:
+            from lamindb_setup._switch import worktree_switch_instruction
+
+            instruction = worktree_switch_instruction(name, create=False)
+            if instruction is not None:
+                raise click.ClickException(instruction)
 
     _write_current_branch(uid, name)
     if create and is_worktree_bootstrap:
