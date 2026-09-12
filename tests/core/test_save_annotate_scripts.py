@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -61,35 +62,55 @@ def test_save_resave_script_no_uids():
 def test_save_script_in_worktree_uses_active_worktree_relative_key():
     unique = time.time_ns()
     previous_dev_dir = settings.dev_dir
-    previous_worktree = settings.worktree
     worktree_parent = scripts_dir / f"worktrees-{unique}"
-    child = worktree_parent / "feature-a"
+    branch_name = f"feature-a-{unique}"
+    child = worktree_parent / branch_name
     script_path = child / "pipelines" / f"worktree-script-{unique}.py"
-    script_path.parent.mkdir(parents=True, exist_ok=True)
-    script_path.write_text("print('worktree save test')\n")
     expected_key = f"pipelines/{script_path.name}"
     previous_cwd = Path.cwd()
     try:
+        worktree_parent.mkdir()
         assert (
             run_lamin("settings", "dev-dir", "set", str(worktree_parent)).returncode
             == 0
         )
         assert run_lamin("settings", "worktree", "set", "true").returncode == 0
-        result = run_lamin("save", str(script_path), cwd=child)
+        assert (
+            run_lamin("switch", "-c", branch_name, cwd=worktree_parent).returncode == 0
+        )
+        script_path.parent.mkdir(parents=True, exist_ok=True)
+        script_path.write_text("print('worktree save test')\n")
+        os.chdir(child)
+        result = run_lamin("save", str(script_path))
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        os.chdir(child)
-        assert ln.Transform.filter(key=expected_key).count() >= 1
+        # Query in a subprocess from the same child cwd so transform lookup uses
+        # the same active worktree context as `lamin save`.
+        query_result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import lamindb as ln; "
+                f"assert ln.Transform.filter(key={expected_key!r}).count() >= 1",
+            ],
+            cwd=child,
+            capture_output=True,
+            text=True,
+        )
+        assert query_result.returncode == 0, (
+            f"stdout: {query_result.stdout}\nstderr: {query_result.stderr}"
+        )
     finally:
         os.chdir(previous_cwd)
+        if child.exists():
+            run_lamin("delete", "branch", "--name", branch_name, cwd=child)
+            shutil.rmtree(child)
         run_lamin("settings", "worktree", "set", "false")
         if previous_dev_dir is None:
             run_lamin("settings", "dev-dir", "unset")
         else:
             run_lamin("settings", "dev-dir", "set", str(previous_dev_dir))
-        settings.worktree = previous_worktree
-        settings.dev_dir = previous_dev_dir
         for transform in ln.Transform.filter(key=expected_key):
             transform.delete(permanent=True)
         if worktree_parent.exists():
