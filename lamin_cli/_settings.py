@@ -7,11 +7,13 @@ if os.environ.get("NO_RICH"):
 else:
     import rich_click as click
 
+from lamindb_setup.errors import DevDirNonEmpty, NoDevDirConfigured
+
 
 def _set_worktree(settings_, enabled: bool) -> None:
     try:
         settings_.worktree = enabled
-    except RuntimeError as error:
+    except (NoDevDirConfigured, DevDirNonEmpty) as error:
         raise click.ClickException(str(error)) from error
 
 
