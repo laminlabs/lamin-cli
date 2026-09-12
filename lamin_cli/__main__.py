@@ -353,6 +353,13 @@ def create(
         )
 
     if registry == "branch":
+        branch_dir: Path | None = None
+        if ln_setup.settings.worktree and ln_setup.settings.dev_dir is not None:
+            branch_dir = ln_setup.settings.dev_dir.resolve() / resolved_name
+            if branch_dir.exists() and not branch_dir.is_dir():
+                raise click.ClickException(
+                    f"Cannot create worktree directory '{branch_dir}': path exists and is not a directory."
+                )
         if ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import create_branch
 
@@ -362,6 +369,8 @@ def create(
             from lamindb import Branch
 
             created_name = Branch(name=resolved_name).save().name
+        if branch_dir is not None:
+            branch_dir.mkdir(parents=True, exist_ok=True)
     elif registry == "project":
         from lamindb import Project
 
@@ -462,12 +471,6 @@ def switch(
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
     def _switch_target(target_name: str | None, *, switch_space: bool) -> None:
-        if not switch_space and target_name is not None and ln_setup.settings.worktree:
-            from lamindb_setup._switch import worktree_switch_instruction
-
-            instruction = worktree_switch_instruction(target_name, create=create)
-            if instruction is not None:
-                raise click.ClickException(instruction)
         if not switch_space and ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import switch_branch
 

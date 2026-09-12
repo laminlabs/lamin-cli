@@ -466,6 +466,7 @@ def test_switch_nonexistent_branch():
         or "not found" in err_output
         or "nonexistent" in err_output
     )
+    assert "lamin switch -c nonexistent_branch_xyz" in (result.stderr + result.stdout)
 
 
 def test_switch_create_existing_branch_raises():
@@ -762,7 +763,7 @@ def test_worktree_branch_switch_from_child_requires_cd_to_sibling(tmp_path: Path
         ln_setup.settings.dev_dir = previous_dev_dir
 
 
-def test_worktree_branch_switch_from_child_requires_mkdir_for_missing_sibling(
+def test_worktree_branch_switch_from_child_suggests_create_for_missing_branch(
     tmp_path: Path,
 ):
     previous_dev_dir = ln_setup.settings.dev_dir
@@ -783,12 +784,75 @@ def test_worktree_branch_switch_from_child_requires_mkdir_for_missing_sibling(
             cwd=child_main,
         )
         assert result.returncode != 0
-        assert "To switch, run: mkdir ../testcontrib && cd ../testcontrib" in (
-            result.stderr + result.stdout
-        )
+        assert "lamin switch -c testcontrib" in (result.stderr + result.stdout)
     finally:
         if child_main.exists():
             shutil.rmtree(child_main)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_worktree_branch_switch_create_from_child_missing_branch_shows_full_guidance(
+    tmp_path: Path,
+):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    child_main = worktree_parent / "main"
+    branch_name = f"testcontrib-{time.time_ns()}"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        child_main.mkdir(parents=True, exist_ok=True)
+
+        result = subprocess.run(
+            f"lamin switch -c {branch_name}",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=child_main,
+        )
+        assert result.returncode != 0
+        output = result.stderr + result.stdout
+        assert f"lamin create branch {branch_name}" in output
+        assert f"mkdir ../{branch_name} && cd ../{branch_name}" in output
+        assert f"lamin switch {branch_name}" in output
+    finally:
+        if child_main.exists():
+            shutil.rmtree(child_main)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_worktree_create_branch_command_creates_branch_directory(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    branch_name = f"createdir-{time.time_ns()}"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    target_dir = worktree_parent / branch_name
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        result = subprocess.run(
+            f"lamin create branch {branch_name}",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=worktree_parent,
+        )
+        assert result.returncode == 0, result.stderr
+        assert target_dir.exists() and target_dir.is_dir()
+    finally:
+        subprocess.run(
+            f"lamin delete branch --name {branch_name}",
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
         ln_setup.settings.worktree = previous_worktree
         ln_setup.settings.dev_dir = previous_dev_dir
 
