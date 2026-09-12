@@ -2,7 +2,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -75,8 +74,7 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
         )
         assert run_lamin("settings", "worktree", "set", "true").returncode == 0
         assert (
-            run_lamin("switch", "-c", branch_name, cwd=worktree_parent).returncode
-            == 0
+            run_lamin("switch", "-c", branch_name, cwd=worktree_parent).returncode == 0
         )
         script_path.parent.mkdir(parents=True)
         script_path.write_text("print('worktree save test')\n")
@@ -84,20 +82,7 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        query_result = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                "import lamindb as ln; "
-                f"assert ln.Transform.filter(key={expected_key!r}).count() >= 1",
-            ],
-            cwd=child,
-            capture_output=True,
-            text=True,
-        )
-        assert query_result.returncode == 0, (
-            f"stdout: {query_result.stdout}\nstderr: {query_result.stderr}"
-        )
+        assert ln.Transform.filter(key=expected_key).count() >= 1
     finally:
         if child.exists():
             run_lamin(
@@ -116,7 +101,7 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
         else:
             run_lamin("settings", "dev-dir", "set", str(previous_dev_dir))
         if previous_worktree:
-            settings._worktree_path.write_text("true")
+            settings._worktree_path.touch()
         if worktree_parent.exists():
             shutil.rmtree(worktree_parent)
 
