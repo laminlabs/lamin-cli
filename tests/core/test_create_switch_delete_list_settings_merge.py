@@ -680,7 +680,7 @@ def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
             cwd=worktree_parent,
         )
         assert outside.returncode != 0
-        assert "To switch, run: mkdir main && cd main" in (
+        assert "To switch in worktree mode, run: mkdir main && cd main" in (
             outside.stderr + outside.stdout
         )
 
@@ -735,7 +735,9 @@ def test_worktree_branch_switch_from_root_to_existing_dir_prints_cd_only(
             cwd=worktree_parent,
         )
         assert result.returncode != 0
-        assert "To switch, run: cd main" in (result.stderr + result.stdout)
+        assert "To switch in worktree mode, run: cd main" in (
+            result.stderr + result.stdout
+        )
     finally:
         if existing_branch_dir.exists():
             shutil.rmtree(existing_branch_dir)
@@ -770,7 +772,7 @@ def test_worktree_branch_switch_from_child_requires_cd_to_sibling(tmp_path: Path
         )
         assert result.returncode != 0
         output = result.stderr + result.stdout
-        assert f"To switch, run: cd ../{branch_name}" in output
+        assert f"To switch in worktree mode, run: cd ../{branch_name}" in output
     finally:
         if branch_created:
             ln.Branch.filter(name=branch_name).delete(permanent=True)
