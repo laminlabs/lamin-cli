@@ -5,7 +5,7 @@ from pathlib import Path
 import lamindb as ln
 import pytest
 from lamin_utils import logger
-from lamindb_setup.core._settings_store import settings_dir
+from lamindb_setup.core._settings_store import local_current_instance_file, settings_dir
 
 
 def pytest_sessionstart(session: pytest.Session):
@@ -14,11 +14,12 @@ def pytest_sessionstart(session: pytest.Session):
     for pattern in (
         "current-branch--*--lamin-cli-unit-tests.txt",
         "current-space--*--lamin-cli-unit-tests.txt",
-        "worktree--*--lamin-cli-unit-tests.txt",
         "dev-dir--*--lamin-cli-unit-tests.txt",
     ):
         for f in settings_dir.glob(pattern):
             f.unlink(missing_ok=True)
+    # Avoid auto-connecting to a stale local instance marker in repo roots.
+    local_current_instance_file(Path.cwd()).unlink(missing_ok=True)
     # Ensure clean state if previous run didn't finish (sessionfinish didn't run)
     storage_path = Path("./default_storage_cli")
     if storage_path.exists():
