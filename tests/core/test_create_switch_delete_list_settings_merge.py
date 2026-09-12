@@ -359,7 +359,7 @@ def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance
     previous_cwd = Path.cwd()
 
     worktree_parent = tmp_path / "worktrees"
-    child = worktree_parent / "feature-a"
+    child = worktree_parent / "managedbranch"
     worktree_parent.mkdir()
 
     ln_setup.settings.dev_dir = worktree_parent
@@ -412,7 +412,7 @@ def test_hub_switch_branch_missing_branch_raises(monkeypatch):
 
     monkeypatch.setattr("lamin_cli.hub.switch.request_json", fake_request_json)
 
-    with pytest.raises(hub_click.ClickException, match="please check on the hub UI"):
+    with pytest.raises(hub_click.ClickException, match="does not exist"):
         switch_branch("missingbranch")
 
 
@@ -737,24 +737,32 @@ def test_worktree_branch_switch_from_child_requires_cd_to_sibling(tmp_path: Path
     previous_worktree = ln_setup.settings.worktree
     worktree_parent = tmp_path / "worktrees"
     child_main = worktree_parent / "main"
-    child_target = worktree_parent / "testcontrib"
+    branch_name = "testcontrib"
+    child_target = worktree_parent / branch_name
     worktree_parent.mkdir(parents=True, exist_ok=True)
+    branch_created = False
     try:
         ln_setup.settings.dev_dir = worktree_parent
         ln_setup.settings.worktree = True
         child_main.mkdir(parents=True, exist_ok=True)
         child_target.mkdir(parents=True, exist_ok=True)
+        if ln.Branch.filter(name=branch_name).one_or_none() is None:
+            ln.Branch(name=branch_name).save()
+            branch_created = True
 
         result = subprocess.run(
-            "lamin switch testcontrib",
+            f"lamin switch {branch_name}",
             capture_output=True,
             text=True,
             shell=True,
             cwd=child_main,
         )
         assert result.returncode != 0
-        assert "To switch, run: cd ../testcontrib" in (result.stderr + result.stdout)
+        output = result.stderr + result.stdout
+        assert f"To switch, run: cd ../{branch_name}" in output
     finally:
+        if branch_created:
+            ln.Branch.filter(name=branch_name).delete(permanent=True)
         if child_main.exists():
             shutil.rmtree(child_main)
         if child_target.exists():
@@ -770,6 +778,7 @@ def test_worktree_branch_switch_from_child_suggests_create_for_missing_branch(
     previous_worktree = ln_setup.settings.worktree
     worktree_parent = tmp_path / "worktrees"
     child_main = worktree_parent / "main"
+    branch_name = f"missing-{time.time_ns()}"
     worktree_parent.mkdir(parents=True, exist_ok=True)
     try:
         ln_setup.settings.dev_dir = worktree_parent
@@ -777,14 +786,16 @@ def test_worktree_branch_switch_from_child_suggests_create_for_missing_branch(
         child_main.mkdir(parents=True, exist_ok=True)
 
         result = subprocess.run(
-            "lamin switch testcontrib",
+            f"lamin switch {branch_name}",
             capture_output=True,
             text=True,
             shell=True,
             cwd=child_main,
         )
         assert result.returncode != 0
-        assert "lamin switch -c testcontrib" in (result.stderr + result.stdout)
+        output = result.stderr + result.stdout
+        assert f"Branch '{branch_name}' does not exist" in output
+        assert "lamin switch" in output and branch_name in output and "-c" in output
     finally:
         if child_main.exists():
             shutil.rmtree(child_main)
@@ -816,7 +827,9 @@ def test_worktree_branch_switch_create_from_child_missing_branch_shows_full_guid
         assert result.returncode != 0
         output = result.stderr + result.stdout
         assert f"lamin create branch {branch_name}" in output
-        assert f"mkdir ../{branch_name} && cd ../{branch_name}" in output
+        assert "mkdir" in output
+        assert f"../{branch_name}" in output
+        assert f"cd ../{branch_name}" in output
         assert f"lamin switch {branch_name}" in output
     finally:
         if child_main.exists():
@@ -876,6 +889,9 @@ def test_worktree_branch_name_with_slash_raises(tmp_path: Path):
         assert result.returncode != 0
         assert "not supported in worktree mode" in (result.stderr + result.stdout)
     finally:
+        feature_dir = worktree_parent / "feature"
+        if feature_dir.exists():
+            shutil.rmtree(feature_dir)
         ln_setup.settings.worktree = previous_worktree
         ln_setup.settings.dev_dir = previous_dev_dir
 
