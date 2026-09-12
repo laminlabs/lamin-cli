@@ -668,7 +668,9 @@ def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
             cwd=worktree_parent,
         )
         assert outside.returncode != 0
-        assert "worktree mode is enabled" in (outside.stderr + outside.stdout)
+        assert "To switch, run: mkdir main && cd main" in (
+            outside.stderr + outside.stdout
+        )
 
         inside = subprocess.run(
             f"lamin switch -c {branch_name}",
@@ -698,6 +700,96 @@ def test_worktree_branch_switch_create_from_root_creates_child_and_branch_file(
         if child.exists():
             shutil.rmtree(child)
         ln_setup.settings.worktree = False
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_worktree_branch_switch_from_root_to_existing_dir_prints_cd_only(
+    tmp_path: Path,
+):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    existing_branch_dir = worktree_parent / "main"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        existing_branch_dir.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            "lamin switch main",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=worktree_parent,
+        )
+        assert result.returncode != 0
+        assert "To switch, run: cd main" in (result.stderr + result.stdout)
+    finally:
+        if existing_branch_dir.exists():
+            shutil.rmtree(existing_branch_dir)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_worktree_branch_switch_from_child_requires_cd_to_sibling(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    child_main = worktree_parent / "main"
+    child_target = worktree_parent / "testcontrib"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        child_main.mkdir(parents=True, exist_ok=True)
+        child_target.mkdir(parents=True, exist_ok=True)
+
+        result = subprocess.run(
+            "lamin switch testcontrib",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=child_main,
+        )
+        assert result.returncode != 0
+        assert "To switch, run: cd ../testcontrib" in (result.stderr + result.stdout)
+    finally:
+        if child_main.exists():
+            shutil.rmtree(child_main)
+        if child_target.exists():
+            shutil.rmtree(child_target)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_worktree_branch_switch_from_child_requires_mkdir_for_missing_sibling(
+    tmp_path: Path,
+):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    child_main = worktree_parent / "main"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        child_main.mkdir(parents=True, exist_ok=True)
+
+        result = subprocess.run(
+            "lamin switch testcontrib",
+            capture_output=True,
+            text=True,
+            shell=True,
+            cwd=child_main,
+        )
+        assert result.returncode != 0
+        assert "To switch, run: mkdir ../testcontrib && cd ../testcontrib" in (
+            result.stderr + result.stdout
+        )
+    finally:
+        if child_main.exists():
+            shutil.rmtree(child_main)
+        ln_setup.settings.worktree = previous_worktree
         ln_setup.settings.dev_dir = previous_dev_dir
 
 
