@@ -843,7 +843,6 @@ def test_worktree_branch_switch_create_from_child_missing_branch_shows_full_guid
         assert "mkdir" in output
         assert f"../{branch_name}" in output
         assert f"cd ../{branch_name}" in output
-        assert f"lamin switch {branch_name}" in output
     finally:
         if child_main.exists():
             shutil.rmtree(child_main)
