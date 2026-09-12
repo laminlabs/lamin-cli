@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -84,7 +85,22 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        assert ln.Transform.filter(key=expected_key).count() >= 1
+        # Query in a subprocess from the same child cwd so transform lookup uses
+        # the same active worktree context as `lamin save`.
+        query_result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import lamindb as ln; "
+                f"assert ln.Transform.filter(key={expected_key!r}).count() >= 1",
+            ],
+            cwd=child,
+            capture_output=True,
+            text=True,
+        )
+        assert query_result.returncode == 0, (
+            f"stdout: {query_result.stdout}\nstderr: {query_result.stderr}"
+        )
     finally:
         os.chdir(previous_cwd)
         if child.exists():
