@@ -353,6 +353,13 @@ def create(
         )
 
     if registry == "branch":
+        branch_dir: Path | None = None
+        if ln_setup.settings.worktree and ln_setup.settings.dev_dir is not None:
+            branch_dir = ln_setup.settings.dev_dir.resolve() / resolved_name
+            if branch_dir.exists() and not branch_dir.is_dir():
+                raise click.ClickException(
+                    f"Cannot create worktree directory '{branch_dir}': path exists and is not a directory."
+                )
         if ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import create_branch
 
@@ -362,6 +369,8 @@ def create(
             from lamindb import Branch
 
             created_name = Branch(name=resolved_name).save().name
+        if branch_dir is not None:
+            branch_dir.mkdir(parents=True, exist_ok=True)
     elif registry == "project":
         from lamindb import Project
 
@@ -461,38 +470,26 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
-    def _validate_worktree_branch_name(target_name: str | None) -> None:
-        if target_name is not None and "/" in target_name:
-            raise click.ClickException(
-                "Branch names containing '/' are not supported in worktree mode."
-            )
-
-    def _switch_in_directory(
-        target_name: str | None, *, switch_space: bool, cwd: Path
-    ) -> None:
-        original_cwd = Path.cwd()
-        try:
-            os.chdir(cwd)
-            _switch_target(target_name, switch_space=switch_space)
-        finally:
-            os.chdir(original_cwd)
-
     def _switch_target(target_name: str | None, *, switch_space: bool) -> None:
-        if not switch_space and ln_setup.settings.worktree:
-            _validate_worktree_branch_name(target_name)
         if not switch_space and ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import switch_branch
 
             switch_branch(target_name, create=create)
             return
 
-        from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
-        from lamindb.setup import switch as switch_
+        from lamindb_setup import switch as switch_
 
         try:
             switch_(target_name, space=switch_space, create=create)
-        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
-            raise click.ClickException(str(e)) from e
+        except Exception as e:
+            if e.__class__.__name__ in {
+                "ObjectDoesNotExist",
+                "DoesNotExist",
+                "BranchAlreadyExists",
+                "ValueError",
+            }:
+                raise click.ClickException(str(e)) from e
+            raise
 
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
@@ -507,31 +504,6 @@ def switch(
     if len(target) > 1:
         raise click.ClickException("Too many arguments. Use 'lamin switch <target>' or 'lamin switch --space <space>'.")
     target_str = target[0] if len(target) == 1 else None
-    if not space and create and ln_setup.settings.worktree:
-        _validate_worktree_branch_name(target_str)
-        if target_str is None:
-            raise click.ClickException(
-                "Please pass a branch name. Example: lamin switch -c my_branch"
-            )
-        dev_dir = ln_setup.settings.dev_dir
-        if dev_dir is None:
-            raise click.ClickException(
-                "worktree mode requires a configured dev-dir. "
-                "Run: lamin settings dev-dir set <path>"
-            )
-        dev_dir = dev_dir.resolve()
-        cwd = Path.cwd().resolve()
-        if cwd == dev_dir:
-            child_dir = dev_dir / target_str
-            if child_dir.exists() and not child_dir.is_dir():
-                raise click.ClickException(
-                    f"Cannot create worktree directory '{child_dir}': path exists and is not a directory."
-                )
-            child_dir.mkdir(parents=True, exist_ok=True)
-            _switch_in_directory(target_str, switch_space=False, cwd=child_dir)
-            return
-    if not space and ln_setup.settings.worktree:
-        ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
     _switch_target(target_str, switch_space=space)
 
 
@@ -559,13 +531,14 @@ def merge(branch: str):
     if ln_setup.settings.worktree:
         ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
 
-    from lamindb.errors import ObjectDoesNotExist
-    from lamindb.setup import merge as merge_
+    from lamindb_setup import merge as merge_
 
     try:
         merge_(branch)
-    except ObjectDoesNotExist as e:
-        raise click.ClickException(str(e)) from e
+    except Exception as e:
+        if e.__class__.__name__ in {"ObjectDoesNotExist", "DoesNotExist"}:
+            raise click.ClickException(str(e)) from e
+        raise
 
 
 @main.command()
