@@ -466,7 +466,18 @@ def test_switch_nonexistent_branch():
         or "not found" in err_output
         or "nonexistent" in err_output
     )
-    assert "lamin switch -c nonexistent_branch_xyz" in (result.stderr + result.stdout)
+    plain_output = click.unstyle(result.stderr + result.stdout)
+    normalized = " ".join(plain_output.split())
+    expected = "lamin switch -c nonexistent_branch_xyz"
+    assert expected in normalized, (
+        "Missing missing-branch switch guidance.\n"
+        f"expected={expected!r}\n"
+        f"returncode={result.returncode}\n"
+        f"stdout={result.stdout!r}\n"
+        f"stderr={result.stderr!r}\n"
+        f"plain_output={plain_output!r}\n"
+        f"normalized={normalized!r}"
+    )
 
 
 def test_switch_create_existing_branch_raises():
