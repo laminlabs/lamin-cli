@@ -463,7 +463,7 @@ def switch(
     """
     def _switch_target(target_name: str | None, *, switch_space: bool) -> None:
         if not switch_space and target_name is not None and ln_setup.settings.worktree:
-            from lamindb.setup._switch import worktree_switch_instruction
+            from lamindb_setup._switch import worktree_switch_instruction
 
             instruction = worktree_switch_instruction(target_name, create=create)
             if instruction is not None:
