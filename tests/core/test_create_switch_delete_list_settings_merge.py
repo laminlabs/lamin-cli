@@ -154,7 +154,7 @@ def _setup_switch_no_write_access(monkeypatch, message: str) -> list[str]:
     def raise_no_write_access(target, **kwargs):
         raise NoWriteAccess(message)
 
-    monkeypatch.setattr("lamindb.setup.switch", raise_no_write_access)
+    monkeypatch.setattr("lamindb_setup.switch", raise_no_write_access)
     return ["switch", "-c", "blocked_branch"]
 
 
@@ -275,11 +275,11 @@ def test_switch_branch_managed_uses_hub(monkeypatch):
 
     def should_not_be_called(*args, **kwargs):
         raise AssertionError(
-            "lamindb.setup.switch should not be called for managed branch switch"
+            "lamindb_setup.switch should not be called for managed branch switch"
         )
 
     monkeypatch.setattr("lamin_cli.hub.switch_branch", fake_switch_branch)
-    monkeypatch.setattr("lamindb.setup.switch", should_not_be_called)
+    monkeypatch.setattr("lamindb_setup.switch", should_not_be_called)
     instance = ln_setup.settings.instance
     original_api_url = instance._api_url
     instance._api_url = "https://lamin.ai/api"

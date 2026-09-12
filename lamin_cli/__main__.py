@@ -477,13 +477,19 @@ def switch(
             switch_branch(target_name, create=create)
             return
 
-        from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
-        from lamindb.setup import switch as switch_
+        from lamindb_setup import switch as switch_
 
         try:
             switch_(target_name, space=switch_space, create=create)
-        except (ObjectDoesNotExist, BranchAlreadyExists, ValueError) as e:
-            raise click.ClickException(str(e)) from e
+        except Exception as e:
+            if e.__class__.__name__ in {
+                "ObjectDoesNotExist",
+                "DoesNotExist",
+                "BranchAlreadyExists",
+                "ValueError",
+            }:
+                raise click.ClickException(str(e)) from e
+            raise
 
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
@@ -525,13 +531,14 @@ def merge(branch: str):
     if ln_setup.settings.worktree:
         ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
 
-    from lamindb.errors import ObjectDoesNotExist
-    from lamindb.setup import merge as merge_
+    from lamindb_setup import merge as merge_
 
     try:
         merge_(branch)
-    except ObjectDoesNotExist as e:
-        raise click.ClickException(str(e)) from e
+    except Exception as e:
+        if e.__class__.__name__ in {"ObjectDoesNotExist", "DoesNotExist"}:
+            raise click.ClickException(str(e)) from e
+        raise
 
 
 @main.command()
