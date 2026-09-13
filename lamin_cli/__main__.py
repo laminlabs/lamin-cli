@@ -56,8 +56,8 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Manage settings and schema & data migrations",
-            "commands": ["settings", "migrate", "io"],
+            "name": "Settings & migrations",
+            "commands": ["settings", "migrate", "io", "integrations"],
         },
         {
             "name": "Auth",
@@ -1425,9 +1425,62 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     runner.run(filepath_in_mount_dir)
 
 
+@main.group()
+def integrations():
+    """Run integration helpers."""
+
+
+@integrations.group()
+def notion():
+    """Notion integration commands."""
+
+
+@notion.command("sync")
+@click.option(
+    "--parents",
+    multiple=True,
+    required=True,
+    help="Notion parent IDs (page or database). Repeat the option for multiple IDs.",
+)
+@click.option(
+    "--token",
+    type=str,
+    default=None,
+    help="Notion API token. Defaults to the NOTION_TOKEN environment variable.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Validate and report without writing changes to LaminDB.",
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(1),
+    default=None,
+    help="Maximum rows to read per discovered Notion database.",
+)
+def notion_sync(
+    parents: tuple[str, ...],
+    token: str | None,
+    dry_run: bool,
+    limit: int | None,
+) -> None:
+    """Sync Notion page/database trees into LaminDB records."""
+    from lamindb.integrations.notion import sync_from_notion
+
+    sync_from_notion(
+        token=token,
+        parents=list(parents),
+        dry_run=dry_run,
+        limit=limit,
+    )
+
+
 main.add_command(settings)
 main.add_command(migrate)
 main.add_command(io)
+main.add_command(integrations)
 
 
 def _deprecated_cache_set(cache_dir: str) -> None:
