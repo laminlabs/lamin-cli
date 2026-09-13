@@ -11,10 +11,10 @@ def test_notion_sync_forwards_args(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_from_notion(*, parents, token=None, dry_run=False, limit=None):
+    def fake_sync_from_notion(*, parents, token=None, apply=False, limit=None):
         calls["token"] = token
         calls["parents"] = parents
-        calls["dry_run"] = dry_run
+        calls["apply"] = apply
         calls["limit"] = limit
         return DummyReport()
 
@@ -31,7 +31,7 @@ def test_notion_sync_forwards_args(monkeypatch):
             "db-b",
             "--token",
             "token-123",
-            "--dry-run",
+            "--apply",
             "--limit",
             "5",
         ],
@@ -41,10 +41,33 @@ def test_notion_sync_forwards_args(monkeypatch):
     assert calls == {
         "token": "token-123",
         "parents": ["page-a", "db-b"],
-        "dry_run": True,
+        "apply": True,
         "limit": 5,
     }
     assert result.output == ""
+
+
+def test_notion_sync_defaults_to_dry_run(monkeypatch):
+    calls: dict[str, object] = {}
+
+    class DummyReport:
+        def as_dict(self):
+            return {"created": 1, "updated": 2}
+
+    def fake_sync_from_notion(*, parents, token=None, apply=False, limit=None):
+        calls["token"] = token
+        calls["parents"] = parents
+        calls["apply"] = apply
+        calls["limit"] = limit
+        return DummyReport()
+
+    monkeypatch.setattr(
+        "lamindb.integrations.notion.sync_from_notion", fake_sync_from_notion
+    )
+    result = CliRunner().invoke(main, ["integrations", "notion", "sync", "page-a"])
+
+    assert result.exit_code == 0, result.output
+    assert calls["apply"] is False
 
 
 def test_notion_sync_requires_parents():
@@ -55,7 +78,7 @@ def test_notion_sync_requires_parents():
 
 
 def test_notion_sync_reraises_as_click_exception(monkeypatch):
-    def fake_sync_from_notion(*, parents, token=None, dry_run=False, limit=None):
+    def fake_sync_from_notion(*, parents, token=None, apply=False, limit=None):
         raise ValueError("No LaminDB record type named 'Website analytics'.")
 
     monkeypatch.setattr(

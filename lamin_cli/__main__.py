@@ -1444,10 +1444,10 @@ def notion():
     help="Notion API token. Defaults to the NOTION_TOKEN environment variable.",
 )
 @click.option(
-    "--dry-run",
+    "--apply",
     is_flag=True,
     default=False,
-    help="Validate and report without writing changes to LaminDB.",
+    help="Apply writes to LaminDB. By default, runs as dry run.",
 )
 @click.option(
     "--limit",
@@ -1458,7 +1458,7 @@ def notion():
 def notion_sync(
     parents: tuple[str, ...],
     token: str | None,
-    dry_run: bool,
+    apply: bool,
     limit: int | None,
 ) -> None:
     """Sync Notion page/database trees into LaminDB records."""
@@ -1470,7 +1470,7 @@ def notion_sync(
         sync_from_notion(
             token=token,
             parents=list(parents),
-            dry_run=dry_run,
+            apply=apply,
             limit=limit,
         )
     except Exception as error:
