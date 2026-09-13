@@ -56,8 +56,8 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Manage settings and schema & data migrations",
-            "commands": ["settings", "migrate", "io"],
+            "name": "Settings & migrations",
+            "commands": ["settings", "migrate", "io", "integrations"],
         },
         {
             "name": "Auth",
@@ -1425,9 +1425,62 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     runner.run(filepath_in_mount_dir)
 
 
+@main.group()
+def integrations():
+    """Run integration helpers."""
+
+
+@integrations.group()
+def notion():
+    """Sync from Notion."""
+
+
+@notion.command("sync")
+@click.argument("parents", type=str, nargs=-1)
+@click.option(
+    "--token",
+    type=str,
+    default=None,
+    help="Notion API token. Defaults to the NOTION_TOKEN environment variable.",
+)
+@click.option(
+    "--apply",
+    is_flag=True,
+    default=False,
+    help="Apply writes to LaminDB. By default, runs as dry run.",
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(0),
+    default=None,
+    help="Maximum rows to read per discovered Notion database. Use 0 to skip child traversal.",
+)
+def notion_sync(
+    parents: tuple[str, ...],
+    token: str | None,
+    apply: bool,
+    limit: int | None,
+) -> None:
+    """Sync Notion page/database trees into LaminDB records."""
+    if not parents:
+        raise click.UsageError("Missing argument 'PARENTS...'.")
+    from lamindb.integrations.notion import sync_from_notion
+
+    try:
+        sync_from_notion(
+            token=token,
+            parents=list(parents),
+            apply=apply,
+            limit=limit,
+        )
+    except Exception as error:
+        raise click.ClickException(str(error)) from error
+
+
 main.add_command(settings)
 main.add_command(migrate)
 main.add_command(io)
+main.add_command(integrations)
 
 
 def _deprecated_cache_set(cache_dir: str) -> None:
