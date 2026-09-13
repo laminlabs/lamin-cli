@@ -27,9 +27,7 @@ def test_notion_sync_forwards_args(monkeypatch):
             "integrations",
             "notion",
             "sync",
-            "--parents",
             "page-a",
-            "--parents",
             "db-b",
             "--token",
             "token-123",
@@ -53,4 +51,4 @@ def test_notion_sync_requires_parents():
     result = CliRunner().invoke(main, ["integrations", "notion", "sync"])
 
     assert result.exit_code != 0
-    assert "--parents" in result.output
+    assert "PARENTS" in result.output

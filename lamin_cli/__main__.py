@@ -1436,12 +1436,7 @@ def notion():
 
 
 @notion.command("sync")
-@click.option(
-    "--parents",
-    multiple=True,
-    required=True,
-    help="Notion parent IDs (page or database). Repeat the option for multiple IDs.",
-)
+@click.argument("parents", type=str, nargs=-1)
 @click.option(
     "--token",
     type=str,
@@ -1467,6 +1462,8 @@ def notion_sync(
     limit: int | None,
 ) -> None:
     """Sync Notion page/database trees into LaminDB records."""
+    if not parents:
+        raise click.UsageError("Missing argument 'PARENTS...'.")
     from lamindb.integrations.notion import sync_from_notion
 
     sync_from_notion(
