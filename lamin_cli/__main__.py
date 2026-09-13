@@ -1432,7 +1432,7 @@ def integrations():
 
 @integrations.group()
 def notion():
-    """Notion integration commands."""
+    """Sync from Notion."""
 
 
 @notion.command("sync")
