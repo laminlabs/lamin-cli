@@ -172,11 +172,9 @@ def test_load_errors_outside_branch_dir_in_worktree_mode(tmp_path: Path):
         for char in ("│", "╭", "╮", "╰", "╯", "─"):
             output = output.replace(char, " ")
         normalized = " ".join(output.lower().split())
-        assert (
-            "in worktree mode, branch is only defined inside a branch directory in"
-            " your dev-dir" in normalized
-        )
-        assert "to run `lamin load`, please cd into a branch directory" in normalized
+        assert "worktree mode is enabled" in normalized
+        assert "branch is only defined inside a child branch directory" in normalized
+        assert "cd into a branch directory in the worktree" in normalized
     finally:
         ln_setup.settings.worktree = previous_worktree
         ln_setup.settings.dev_dir = previous_dev_dir
