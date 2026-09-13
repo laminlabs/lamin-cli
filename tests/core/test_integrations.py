@@ -70,6 +70,29 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
     assert calls["apply"] is False
 
 
+def test_notion_sync_accepts_zero_limit(monkeypatch):
+    calls: dict[str, object] = {}
+
+    class DummyReport:
+        def as_dict(self):
+            return {"created": 0, "updated": 0}
+
+    def fake_sync_from_notion(*, parents, token=None, apply=False, limit=None):
+        calls["parents"] = parents
+        calls["limit"] = limit
+        return DummyReport()
+
+    monkeypatch.setattr(
+        "lamindb.integrations.notion.sync_from_notion", fake_sync_from_notion
+    )
+    result = CliRunner().invoke(
+        main, ["integrations", "notion", "sync", "page-a", "--limit", "0"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == {"parents": ["page-a"], "limit": 0}
+
+
 def test_notion_sync_requires_parents():
     result = CliRunner().invoke(main, ["integrations", "notion", "sync"])
 

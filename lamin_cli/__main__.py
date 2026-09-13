@@ -1451,9 +1451,9 @@ def notion():
 )
 @click.option(
     "--limit",
-    type=click.IntRange(1),
+    type=click.IntRange(0),
     default=None,
-    help="Maximum rows to read per discovered Notion database.",
+    help="Maximum rows to read per discovered Notion database. Use 0 to skip child traversal.",
 )
 def notion_sync(
     parents: tuple[str, ...],
