@@ -1,6 +1,11 @@
+import os
+import shutil
 import subprocess
+import time
 from pathlib import Path
 
+import click
+import lamindb as ln
 import lamindb_setup as ln_setup
 from lamin_cli._load import decompose_url
 
@@ -145,3 +150,81 @@ def test_load_collection():
         capture_output=True,
     )
     assert result.returncode == 0
+
+
+def test_load_errors_outside_branch_dir_in_worktree_mode(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    worktree_parent = tmp_path / "worktrees"
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        result = subprocess.run(
+            "lamin load README.md",
+            shell=True,
+            capture_output=True,
+            text=True,
+            cwd=worktree_parent,
+        )
+        assert result.returncode != 0
+        output = click.unstyle(result.stderr + result.stdout)
+        for char in ("│", "╭", "╮", "╰", "╯", "─"):
+            output = output.replace(char, " ")
+        normalized = " ".join(output.lower().split())
+        assert "worktree mode is enabled" in normalized
+        assert "branch is only defined inside a child branch directory" in normalized
+        assert "cd into a branch directory in the worktree" in normalized
+    finally:
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_load_transform_uses_effective_dev_dir_in_worktree_mode(tmp_path: Path):
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    previous_cwd = Path.cwd()
+    worktree_parent = tmp_path / "worktrees"
+    child_main = worktree_parent / "main"
+    unique = time.time_ns()
+    transform_key = f"imports/load-worktree-{unique}.py"
+    branch_file = child_main / transform_key
+    root_file = worktree_parent / transform_key
+    worktree_parent.mkdir(parents=True, exist_ok=True)
+    transform = None
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        child_main.mkdir(parents=True, exist_ok=True)
+        os.chdir(child_main)
+        transform = ln.Transform(
+            key=transform_key,
+            source_code="print('load worktree test')",
+            kind="pipeline",
+        ).save()
+        result = subprocess.run(
+            f"yes | lamin load transform --uid {transform.uid[:12]}",
+            shell=True,
+            capture_output=True,
+            text=True,
+            cwd=child_main,
+        )
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert branch_file.exists()
+        assert not root_file.exists()
+    finally:
+        os.chdir(previous_cwd)
+        if branch_file.exists():
+            branch_file.unlink()
+        if root_file.exists():
+            root_file.unlink()
+        if transform is not None:
+            transform.delete(permanent=True)
+        if child_main.exists():
+            shutil.rmtree(child_main)
+        if worktree_parent.exists():
+            shutil.rmtree(worktree_parent)
+        ln_setup.settings.worktree = previous_worktree
+        ln_setup.settings.dev_dir = previous_dev_dir

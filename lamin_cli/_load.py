@@ -72,6 +72,17 @@ def load(
     ln_setup.connect(instance)
     import lamindb as ln
 
+    # In worktree mode, load requires a concrete branch context from a child
+    # directory. This raises NotInBranchDir in dev-dir root/outside the worktree.
+    if ln_setup.settings.worktree:
+        _ = ln_setup.settings._branch_path
+
+    active_dev_dir = (
+        ln_setup.settings.effective_dev_dir
+        if ln_setup.settings.dev_dir is not None
+        else None
+    )
+
     current_run = None
     if get_current_run_file().exists():
         current_run = ln.Run.get(uid=get_current_run_file().read_text().strip())
@@ -168,13 +179,11 @@ def load(
                 )
 
             cwd = Path.cwd().resolve()
-            if ln_setup.settings.dev_dir is not None and is_path_within(
-                cwd, ln_setup.settings.dev_dir
-            ):
+            if active_dev_dir is not None and is_path_within(cwd, active_dev_dir):
                 target_path = (
-                    ln_setup.settings.dev_dir / Path(*type_chain) / f"{note_name}.md"
+                    active_dev_dir / Path(*type_chain) / f"{note_name}.md"
                     if type_chain
-                    else ln_setup.settings.dev_dir / f"{note_name}.md"
+                    else active_dev_dir / f"{note_name}.md"
                 )
             else:
                 target_path = cwd / f"{note_name}.md"
@@ -211,8 +220,8 @@ def load(
             transform = transforms.first()
 
             target_path = Path(transform.key)
-            if ln_setup.settings.dev_dir is not None:
-                target_path = ln_setup.settings.dev_dir / target_path
+            if active_dev_dir is not None:
+                target_path = active_dev_dir / target_path
             if len(target_path.parents) > 1:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
             if target_path.exists():
@@ -285,8 +294,8 @@ def load(
                     # TODO: switch to reading from README block in the future.
                     # Current behavior is transitional and reads from README artifact cache.
                     target_root = (
-                        ln_setup.settings.dev_dir
-                        if ln_setup.settings.dev_dir is not None
+                        active_dev_dir
+                        if active_dev_dir is not None
                         else Path.cwd().resolve()
                     )
                     target_path = target_root / "README.md"

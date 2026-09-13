@@ -81,6 +81,7 @@ if os.environ.get("NO_RICH"):
         ApiKeyExpired,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
+        NotInBranchDir,
         NoWriteAccess,
         WorktreePathError,
     )
@@ -104,6 +105,7 @@ if os.environ.get("NO_RICH"):
                 ApiKeyExpired,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
+                NotInBranchDir,
                 NoWriteAccess,
                 WorktreePathError,
             ) as e:
@@ -120,6 +122,7 @@ else:
         ApiKeyExpired,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
+        NotInBranchDir,
         NoWriteAccess,
         WorktreePathError,
     )
@@ -132,6 +135,7 @@ else:
                 ApiKeyExpired,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
+                NotInBranchDir,
                 NoWriteAccess,
                 WorktreePathError,
             ) as e:
