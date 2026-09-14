@@ -1107,6 +1107,7 @@ def track(ctx: click.Context):
 
     ```
     lamin track claude   # or: lamin track copilot
+    lamin track cursor
     # work with the agent
     lamin finish
     ```
@@ -1175,11 +1176,30 @@ def track_copilot_command(name: str | None) -> None:
     return track_copilot_session(name=name)
 
 
+@track.command("cursor")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_cursor_command(name: str | None) -> None:
+    """Start or resume tracking a Cursor IDE Agent session in LaminDB."""
+    from lamin_cli.agents.cursor import track_cursor_session
+
+    return track_cursor_session(name=name)
+
+
 def _finish_tracked_session() -> None:
     """Finish a tracked session.
 
-    This can be a shell script run, a Claude Code session, or a Copilot session.
+    This can be a shell script run, a Claude Code, Copilot, or Cursor session.
     """
+    from lamin_cli.agents.cursor import _run_uid_file as _cursor_run_uid_file
+    if os.environ.get("CURSOR_AGENT") and _cursor_run_uid_file().exists():
+        from lamin_cli.agents.cursor import finish_cursor_session
+        return finish_cursor_session()
+
     from lamin_cli.agents.claude import _run_uid_file as _claude_run_uid_file
     if _claude_run_uid_file().exists():
         from lamin_cli.agents.claude import finish_claudecode_session
@@ -1208,7 +1228,7 @@ def track_finish_command() -> None:
 def finish():
     """Finish a tracked session.
 
-    This can be a shell script run, a Claude Code session, or a Copilot session.
+    This can be a shell script run, a Claude Code, Copilot, or Cursor session.
 
     → Python/R alternative: {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
