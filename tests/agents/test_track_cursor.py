@@ -50,22 +50,22 @@ def _write_transcript(path: Path, commands: list[str]) -> None:
     path.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
 
 
-def test_marker_identifies_chat_and_report_includes_raw_output(tmp_path):
+def test_run_identifies_chat_and_report_includes_raw_output(tmp_path):
     db = tmp_path / "state.vscdb"
-    marker = "a" * 32
+    run_uid = "teaMwekHV0cDQB3H"
     with _make_db(db) as conn:
         _add_tool(
             conn,
             "chat-a",
             "1",
             "lamin track cursor --name test",
-            f"{cursor._MARKER_PREFIX}{marker}\n",
+            f"✓ started tracking Cursor session: {run_uid}\n",
             "2026-01-01T00:00:00Z",
         )
         _add_tool(conn, "chat-a", "2", "echo hi", "hi\n", "2026-01-01T00:00:01Z")
         _add_tool(conn, "chat-b", "3", "echo hi", "wrong\n", "2026-01-01T00:00:02Z")
 
-    assert cursor._conversation_id_for_marker(marker, db) == "chat-a"
+    assert cursor._conversation_id_for_run(run_uid, db) == "chat-a"
     transcript = tmp_path / "chat-a.jsonl"
     _write_transcript(transcript, ["lamin track cursor --name test", "echo hi"])
     entries = cursor._parse_transcript(transcript, cursor._shell_outputs("chat-a", db))
@@ -77,7 +77,7 @@ def test_marker_identifies_chat_and_report_includes_raw_output(tmp_path):
     )
     assert "hi" in html
     assert "wrong" not in html
-    assert cursor._MARKER_PREFIX + marker in html
+    assert run_uid in html
 
 
 def test_repeated_commands_keep_their_output_order(tmp_path):
@@ -98,28 +98,50 @@ def test_repeated_commands_keep_their_output_order(tmp_path):
     assert _common.contains_finish_invocation(entries, cursor._SHELL_TOOL_NAMES)
 
 
-def test_marker_lookup_refuses_missing_or_ambiguous_chats(tmp_path):
+def test_run_lookup_refuses_missing_or_ambiguous_chats(tmp_path):
     db = tmp_path / "state.vscdb"
-    marker = "b" * 32
+    run_uid = "teaMwekHV0cDQB3H"
     with _make_db(db) as conn:
         _add_tool(
             conn,
             "chat-a",
             "1",
             "lamin track cursor",
-            f"{cursor._MARKER_PREFIX}{marker}\n",
+            f"✓ started tracking Cursor session: {run_uid}\n",
             "2026-01-01T00:00:00Z",
         )
     with pytest.raises(ValueError, match="found 0"):
-        cursor._conversation_id_for_marker("missing", db)
+        cursor._conversation_id_for_run("missing", db)
     with sqlite3.connect(db) as conn:
         _add_tool(
             conn,
             "chat-b",
             "2",
-            "echo copied marker",
-            f"{cursor._MARKER_PREFIX}{marker}\n",
+            "lamin track cursor --name test",
+            f"✓ resumed tracking Cursor session: {run_uid}\n",
             "2026-01-01T00:00:01Z",
         )
     with pytest.raises(ValueError, match="found 2"):
-        cursor._conversation_id_for_marker(marker, db)
+        cursor._conversation_id_for_run(run_uid, db)
+
+
+def test_user_query_wrapper_is_removed(tmp_path):
+    transcript = tmp_path / "chat.jsonl"
+    transcript.write_text(
+        json.dumps(
+            {
+                "role": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "<timestamp>today</timestamp>\n<user_query>\nMake a FASTA file.\n</user_query>",
+                        }
+                    ]
+                },
+            }
+        )
+        + "\n"
+    )
+    entries = cursor._parse_transcript(transcript, {})
+    assert entries[0]["content"][0]["text"] == "Make a FASTA file."

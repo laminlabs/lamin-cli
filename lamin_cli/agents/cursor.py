@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import secrets
+import re
 import sqlite3
 import sys
 import tempfile
@@ -25,7 +25,6 @@ _SUFFIX_TO_KIND = {
     ".Rmd": "script",
     ".qmd": "script",
 }
-_MARKER_PREFIX = "LAMIN_CURSOR_RUN_MARKER="
 
 
 def _state_dir() -> Path:
@@ -34,10 +33,6 @@ def _state_dir() -> Path:
 
 def _run_uid_file() -> Path:
     return _state_dir() / ".lamindb_run_uid_cursor"
-
-
-def _marker_file() -> Path:
-    return _state_dir() / ".lamindb_cursor_marker"
 
 
 def _cursor_db_path() -> Path:
@@ -90,21 +85,21 @@ def _cursor_tool_rows(
     return parsed
 
 
-def _conversation_id_for_marker(marker: str, db_path: Path | None = None) -> str:
+def _conversation_id_for_run(run_uid: str, db_path: Path | None = None) -> str:
     matches = set()
-    for key, value in _cursor_tool_rows(db_path=db_path, marker=marker):
+    for key, value in _cursor_tool_rows(db_path=db_path, marker=run_uid):
         tool = value.get("toolFormerData")
         if not isinstance(tool, dict) or tool.get("name") != "run_terminal_command_v2":
             continue
         result = _read_tool_result(value)
         output = result.get("output") if result else None
-        if isinstance(output, str) and _MARKER_PREFIX + marker in output.splitlines():
+        if isinstance(output, str) and f"Cursor session: {run_uid}" in output:
             parts = key.split(":", 2)
             if len(parts) == 3:
                 matches.add(parts[1])
     if len(matches) != 1:
         raise ValueError(
-            f"expected one Cursor chat for the tracking marker, found {len(matches)}"
+            f"expected one Cursor chat for Run {run_uid}, found {len(matches)}"
         )
     return matches.pop()
 
@@ -168,6 +163,16 @@ def _parse_transcript(path: Path, outputs: dict[str, deque[str]]) -> list[dict]:
                 if not isinstance(block, dict):
                     continue
                 if block.get("type") != "tool_use":
+                    if role == "user" and block.get("type") == "text":
+                        text = block.get("text", "")
+                        if isinstance(text, str):
+                            match = re.fullmatch(
+                                r"<timestamp>.*?</timestamp>\s*<user_query>\s*(.*?)\s*</user_query>",
+                                text.strip(),
+                                re.DOTALL,
+                            )
+                            if match:
+                                block = {**block, "text": match.group(1)}
                     content.append(block)
                     continue
                 tool_number += 1
@@ -218,23 +223,14 @@ def track_cursor_session(name: str | None = None) -> None:
             if run is None:
                 run = ln.Run(transform, status="started", name=name).save()
                 mapping_file.write_text(run.uid)
-                marker = secrets.token_hex(16)
-                _marker_file().write_text(marker)
                 message = "started tracking"
             else:
                 run._status_code = -2
                 run.finished_at = None
                 run.save()
-                marker = (
-                    _marker_file().read_text().strip()
-                    if _marker_file().exists()
-                    else secrets.token_hex(16)
-                )
-                _marker_file().write_text(marker)
                 message = "resumed tracking"
             active_file.write_text(run.uid)
         _common.info(f"{message} Cursor session: {run.uid}")
-        click.echo(_MARKER_PREFIX + marker)
     except click.ClickException:
         raise
     except Exception as e:
@@ -258,9 +254,8 @@ def finish_cursor_session() -> None:
             _common.warn("no active Cursor session found, skipping session finish")
             return
         run = ln.Run.get(uid=active_file.read_text().strip())
-        marker = _marker_file().read_text().strip()
         try:
-            conversation_id = _conversation_id_for_marker(marker)
+            conversation_id = _conversation_id_for_run(run.uid)
             transcript_path = _transcript_path(conversation_id)
             outputs = _shell_outputs(conversation_id)
 
@@ -275,6 +270,7 @@ def finish_cursor_session() -> None:
                     value, _SHELL_TOOL_NAMES
                 ),
                 transcript_path=transcript_path,
+                budget_seconds=30,
             )
             html_doc = _common.render_transcript_html(
                 entries,
