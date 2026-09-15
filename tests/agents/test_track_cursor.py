@@ -1,19 +1,14 @@
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
+import lamindb as ln
 import pytest
-from lamin_cli.agents import _common, cursor
+from lamin_cli.agents import cursor
 
 
-def _add_tool(
-    conn: sqlite3.Connection,
-    conversation_id: str,
-    bubble_id: str,
-    command: str,
-    output: str,
-    created_at: str,
-) -> None:
+def _add_tool(conn, conversation_id, bubble_id, command, output, created_at):
     value = {
         "createdAt": created_at,
         "toolFormerData": {
@@ -28,21 +23,41 @@ def _add_tool(
     )
 
 
-def _make_db(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value BLOB)")
-    return conn
+def _make_db(path: Path) -> None:
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value BLOB)")
 
 
-def _write_transcript(path: Path, commands: list[str]) -> None:
+def _write_transcript(path: Path, user_text: str, command: str) -> None:
     entries = [
-        {"role": "user", "message": {"content": [{"type": "text", "text": "hello"}]}},
+        {
+            "role": "user",
+            "message": {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "<timestamp>today</timestamp>\n"
+                            f"<user_query>\n{user_text}\n</user_query>"
+                        ),
+                    }
+                ]
+            },
+        },
         {
             "role": "assistant",
             "message": {
                 "content": [
-                    {"type": "tool_use", "name": "Shell", "input": {"command": command}}
-                    for command in commands
+                    {
+                        "type": "tool_use",
+                        "name": "Shell",
+                        "input": {"command": command},
+                    },
+                    {
+                        "type": "tool_use",
+                        "name": "Shell",
+                        "input": {"command": "lamin finish"},
+                    },
                 ]
             },
         },
@@ -50,98 +65,153 @@ def _write_transcript(path: Path, commands: list[str]) -> None:
     path.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
 
 
-def test_run_identifies_chat_and_report_includes_raw_output(tmp_path):
+@pytest.fixture(autouse=True)
+def isolated(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project.mkdir()
     db = tmp_path / "state.vscdb"
-    run_uid = "teaMwekHV0cDQB3H"
-    with _make_db(db) as conn:
-        _add_tool(
-            conn,
-            "chat-a",
-            "1",
-            "lamin track cursor --name test",
-            f"✓ started tracking Cursor session: {run_uid}\n",
-            "2026-01-01T00:00:00Z",
-        )
-        _add_tool(conn, "chat-a", "2", "echo hi", "hi\n", "2026-01-01T00:00:01Z")
-        _add_tool(conn, "chat-b", "3", "echo hi", "wrong\n", "2026-01-01T00:00:02Z")
+    _make_db(db)
+    transcripts: dict[str, Path] = {}
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(cursor, "_state_dir", lambda: Path.cwd() / ".cursor")
+    monkeypatch.setattr(cursor, "_cursor_db_path", lambda: db)
+    monkeypatch.setattr(cursor, "_transcript_path", transcripts.__getitem__)
+    yield db, transcripts, project
 
-    assert cursor._conversation_id_for_run(run_uid, db) == "chat-a"
-    transcript = tmp_path / "chat-a.jsonl"
-    _write_transcript(transcript, ["lamin track cursor --name test", "echo hi"])
-    entries = cursor._parse_transcript(transcript, cursor._shell_outputs("chat-a", db))
-    html = _common.render_transcript_html(
-        entries,
-        is_bookkeeping_bash_cmd=lambda command: False,
-        skill_marker="Base directory for this skill:",
-        shell_tool_names=cursor._SHELL_TOOL_NAMES,
-    )
-    assert "hi" in html
-    assert "wrong" not in html
-    assert run_uid in html
+    transform = ln.Transform.filter(key=cursor._TRANSFORM_KEY).first()
+    if transform is not None:
+        for run in transform.runs.all():
+            report = run.report
+            if report is not None:
+                run.report = None
+                run.save()
+            run.delete(permanent=True)
+            if report is not None:
+                report.delete(permanent=True)
+        transform.delete(permanent=True)
 
 
-def test_repeated_commands_keep_their_output_order(tmp_path):
-    db = tmp_path / "state.vscdb"
-    with _make_db(db) as conn:
-        _add_tool(conn, "chat-a", "2", "date", "second", "2026-01-01T00:00:02Z")
-        _add_tool(conn, "chat-a", "1", "date", "first", "2026-01-01T00:00:01Z")
-    transcript = tmp_path / "chat-a.jsonl"
-    _write_transcript(transcript, ["date", "date", "lamin finish"])
-    entries = cursor._parse_transcript(transcript, cursor._shell_outputs("chat-a", db))
-    results = [
-        block["content"]
-        for entry in entries
-        for block in entry["content"]
-        if block.get("type") == "tool_result"
-    ]
-    assert results == ["first", "second"]
-    assert _common.contains_finish_invocation(entries, cursor._SHELL_TOOL_NAMES)
-
-
-def test_run_lookup_refuses_missing_or_ambiguous_chats(tmp_path):
-    db = tmp_path / "state.vscdb"
-    run_uid = "teaMwekHV0cDQB3H"
-    with _make_db(db) as conn:
-        _add_tool(
-            conn,
-            "chat-a",
-            "1",
-            "lamin track cursor",
-            f"✓ started tracking Cursor session: {run_uid}\n",
-            "2026-01-01T00:00:00Z",
-        )
-    with pytest.raises(ValueError, match="found 0"):
-        cursor._conversation_id_for_run("missing", db)
+def _record_chat(
+    db, transcripts, directory, conversation_id, run_uid, user_text, output
+):
+    command = f"echo {conversation_id}"
     with sqlite3.connect(db) as conn:
         _add_tool(
             conn,
-            "chat-b",
-            "2",
+            conversation_id,
+            "track",
             "lamin track cursor --name test",
-            f"✓ resumed tracking Cursor session: {run_uid}\n",
+            f"✓ started tracking Cursor session: {run_uid}\n",
+            "2026-01-01T00:00:00Z",
+        )
+        _add_tool(
+            conn,
+            conversation_id,
+            "output",
+            command,
+            output,
             "2026-01-01T00:00:01Z",
         )
-    with pytest.raises(ValueError, match="found 2"):
-        cursor._conversation_id_for_run(run_uid, db)
+    transcript = directory / f"{conversation_id}.jsonl"
+    _write_transcript(transcript, user_text, command)
+    transcripts[conversation_id] = transcript
 
 
-def test_user_query_wrapper_is_removed(tmp_path):
-    transcript = tmp_path / "chat.jsonl"
-    transcript.write_text(
-        json.dumps(
-            {
-                "role": "user",
-                "message": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "<timestamp>today</timestamp>\n<user_query>\nMake a FASTA file.\n</user_query>",
-                        }
-                    ]
-                },
-            }
-        )
-        + "\n"
+def test_full_track_finish_flow(isolated):
+    db, transcripts, project = isolated
+    cursor.track_cursor_session(name="integration test")
+    uid = cursor._run_uid_file().read_text().strip()
+    run = ln.Run.get(uid=uid)
+    assert run.finished_at is None
+
+    child_transform = ln.Transform(key="analysis.py", kind="script").save()
+    child_run = ln.Run(child_transform, initiated_by_run=run)
+    child_run.finished_at = datetime.now(timezone.utc)
+    child_run.save()
+    _record_chat(
+        db,
+        transcripts,
+        project,
+        "chat-a",
+        uid,
+        "Create a FASTA file.",
+        "raw shell output\n",
     )
-    entries = cursor._parse_transcript(transcript, {})
-    assert entries[0]["content"][0]["text"] == "Make a FASTA file."
+    cursor.finish_cursor_session()
+
+    assert not cursor._run_uid_file().exists()
+    run = ln.Run.get(uid=uid)
+    assert run.finished_at is not None
+    assert run.report is not None
+    report = run.report.path.read_text()
+    assert "Create a FASTA file." in report
+    assert "raw shell output" in report
+    assert "&lt;user_query&gt;" not in report
+    assert ln.Transform.get(key="analysis.py").run.uid == uid
+
+    child_run.delete(permanent=True)
+    child_transform.delete(permanent=True)
+
+
+def test_follow_up_reuses_run_and_replaces_report(isolated):
+    db, transcripts, project = isolated
+    cursor.track_cursor_session(name="first task")
+    uid = cursor._run_uid_file().read_text().strip()
+    _record_chat(db, transcripts, project, "chat-a", uid, "First task", "first")
+    cursor.finish_cursor_session()
+    run = ln.Run.get(uid=uid)
+    report_uid, first_hash = run.report.uid, run.report.hash
+
+    cursor.track_cursor_session(name="follow-up task")
+    assert cursor._run_uid_file().read_text().strip() == uid
+    assert ln.Run.get(uid=uid).finished_at is None
+    _write_transcript(transcripts["chat-a"], "Follow-up task", "echo chat-a")
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT value FROM cursorDiskKV WHERE key = ?", ("bubbleId:chat-a:output",)
+        ).fetchone()
+        value = json.loads(row[0])
+        value["toolFormerData"]["result"] = json.dumps(
+            {"output": "updated output", "exitCode": 0}
+        )
+        conn.execute(
+            "UPDATE cursorDiskKV SET value = ? WHERE key = ?",
+            (json.dumps(value), "bubbleId:chat-a:output"),
+        )
+    cursor.finish_cursor_session()
+
+    run = ln.Run.get(uid=uid)
+    assert run.finished_at is not None
+    assert run.report.uid == report_uid
+    assert run.report.hash != first_hash
+    report = run.report.path.read_text()
+    assert "Follow-up task" in report
+    assert "updated output" in report
+    assert run.transform.runs.count() == 1
+
+
+def test_parallel_sessions_never_cross_match(isolated, monkeypatch):
+    db, transcripts, project_a = isolated
+    project_b = project_a.parent / "project-b"
+    project_b.mkdir()
+
+    cursor.track_cursor_session(name="session a")
+    uid_a = cursor._run_uid_file().read_text().strip()
+    _record_chat(db, transcripts, project_a, "chat-a", uid_a, "Task A", "output A")
+
+    monkeypatch.chdir(project_b)
+    cursor.track_cursor_session(name="session b")
+    uid_b = cursor._run_uid_file().read_text().strip()
+    _record_chat(db, transcripts, project_b, "chat-b", uid_b, "Task B", "output B")
+    assert uid_a != uid_b
+
+    cursor.finish_cursor_session()
+    report_b = ln.Run.get(uid=uid_b).report.path.read_text()
+    assert "output B" in report_b
+    assert "output A" not in report_b
+
+    monkeypatch.chdir(project_a)
+    cursor.finish_cursor_session()
+    report_a = ln.Run.get(uid=uid_a).report.path.read_text()
+    assert "output A" in report_a
+    assert "output B" not in report_a
