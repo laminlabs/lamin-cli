@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-import re
+import shlex
 import sqlite3
 import sys
 import tempfile
+import time
 import traceback
-from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,6 +18,16 @@ from lamin_cli.agents import _common
 _TRANSFORM_KEY = "__cursor__"
 _TRANSFORM_UID = "QhKpVnRsTzWx0000"
 _SHELL_TOOL_NAMES = frozenset({"Shell"})
+_TOOL_NAMES = {
+    "ask_question": "AskQuestion",
+    "await": "AwaitShell",
+    "edit_file_v2": "Write",
+    "glob_file_search": "Glob",
+    "read_file_v2": "Read",
+    "ripgrep_raw_search": "Grep",
+    "run_terminal_command_v2": "Shell",
+}
+_INVOCATION_WINDOW_MS = 30_000
 _SUFFIX_TO_KIND = {
     ".ipynb": "notebook",
     ".py": "script",
@@ -31,8 +41,12 @@ def _state_dir() -> Path:
     return _common.resolve_state_dir(".cursor")
 
 
-def _run_uid_file() -> Path:
-    return _state_dir() / ".lamindb_run_uid_cursor"
+def _now_ms() -> int:
+    return int(time.time() * 1000)
+
+
+def _run_uid_file(conversation_id: str) -> Path:
+    return _state_dir() / f".lamindb_run_uid_cursor_{conversation_id}"
 
 
 def _cursor_db_path() -> Path:
@@ -61,7 +75,6 @@ def _read_tool_result(value: dict) -> dict | None:
 def _cursor_tool_rows(
     conversation_id: str | None = None,
     db_path: Path | None = None,
-    marker: str | None = None,
 ) -> list[tuple[str, dict]]:
     db_path = db_path or _cursor_db_path()
     if not db_path.is_file():
@@ -69,9 +82,6 @@ def _cursor_tool_rows(
     prefix = f"bubbleId:{conversation_id}:%" if conversation_id else "bubbleId:%"
     query = "SELECT key, value FROM cursorDiskKV WHERE key LIKE ?"
     params: tuple[str, ...] = (prefix,)
-    if marker is not None:
-        query += " AND instr(CAST(value AS TEXT), ?) > 0"
-        params += (marker,)
     with sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True) as conn:
         rows = conn.execute(query, params).fetchall()
     parsed = []
@@ -85,114 +95,128 @@ def _cursor_tool_rows(
     return parsed
 
 
-def _conversation_id_for_run(run_uid: str, db_path: Path | None = None) -> str:
-    matches = set()
-    for key, value in _cursor_tool_rows(db_path=db_path, marker=run_uid):
-        tool = value.get("toolFormerData")
-        if not isinstance(tool, dict) or tool.get("name") != "run_terminal_command_v2":
-            continue
-        result = _read_tool_result(value)
-        output = result.get("output") if result else None
-        if isinstance(output, str) and f"Cursor session: {run_uid}" in output:
-            parts = key.split(":", 2)
-            if len(parts) == 3:
-                matches.add(parts[1])
-    if len(matches) != 1:
-        raise ValueError(
-            f"expected one Cursor chat for Run {run_uid}, found {len(matches)}"
-        )
-    return matches.pop()
+def _tool_params(value: dict) -> dict:
+    tool = value.get("toolFormerData")
+    if not isinstance(tool, dict):
+        return {}
+    params = tool.get("params")
+    if isinstance(params, str):
+        try:
+            params = json.loads(params)
+        except json.JSONDecodeError:
+            return {}
+    return params if isinstance(params, dict) else {}
 
 
-def _transcript_path(conversation_id: str) -> Path:
-    projects = Path.home() / ".cursor" / "projects"
-    matches = list(
-        projects.glob(f"*/agent-transcripts/{conversation_id}/{conversation_id}.jsonl")
-    )
-    if len(matches) != 1:
-        raise FileNotFoundError(
-            f"expected one Cursor JSONL transcript for {conversation_id}, "
-            f"found {len(matches)}"
-        )
-    return matches[0]
+def _matches_lamin_command(value: dict, arguments: tuple[str, ...]) -> bool:
+    command = _tool_params(value).get("command")
+    if not isinstance(command, str):
+        return False
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False
+    for index, token in enumerate(tokens):
+        if Path(token).name == "lamin":
+            return tuple(tokens[index + 1 : index + 1 + len(arguments)]) == arguments
+    return False
 
 
-def _shell_outputs(
-    conversation_id: str, db_path: Path | None = None
-) -> dict[str, deque[str]]:
-    calls: list[tuple[str, str, str]] = []
-    for _, value in _cursor_tool_rows(conversation_id, db_path):
-        tool = value.get("toolFormerData")
-        if not isinstance(tool, dict) or tool.get("name") != "run_terminal_command_v2":
-            continue
-        params = tool.get("params")
-        result = _read_tool_result(value)
-        if isinstance(params, str):
-            try:
-                params = json.loads(params)
-            except json.JSONDecodeError:
+def _conversation_id_for_invocation(
+    arguments: tuple[str, ...],
+    started_at_ms: int,
+    db_path: Path | None = None,
+    timeout_seconds: float = 2.0,
+) -> str:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        matches: list[tuple[int, str]] = []
+        for key, value in _cursor_tool_rows(db_path=db_path):
+            tool = value.get("toolFormerData")
+            if not isinstance(tool, dict) or tool.get("status") != "loading":
                 continue
-        if not isinstance(params, dict) or result is None:
-            continue
-        command, output = params.get("command"), result.get("output")
-        if isinstance(command, str) and isinstance(output, str):
-            calls.append((str(value.get("createdAt", "")), command, output))
-    outputs: dict[str, deque[str]] = defaultdict(deque)
-    for _, command, output in sorted(calls):
-        outputs[command].append(output)
-    return outputs
+            if tool.get(
+                "name"
+            ) != "run_terminal_command_v2" or not _matches_lamin_command(
+                value, arguments
+            ):
+                continue
+            cwd = _tool_params(value).get("cwd")
+            if cwd and Path(cwd).resolve() != Path.cwd().resolve():
+                continue
+            additional_data = tool.get("additionalData")
+            tool_started_at_ms = (
+                additional_data.get("startedAtMs")
+                if isinstance(additional_data, dict)
+                else None
+            )
+            if not isinstance(tool_started_at_ms, (int, float)):
+                continue
+            distance = abs(int(tool_started_at_ms) - started_at_ms)
+            parts = key.split(":", 2)
+            if distance <= _INVOCATION_WINDOW_MS and len(parts) == 3:
+                matches.append((distance, parts[1]))
+        matches.sort()
+        if matches and (len(matches) == 1 or matches[0][0] < matches[1][0]):
+            return matches[0][1]
+        if time.monotonic() >= deadline:
+            raise ValueError(
+                f"could not uniquely identify this `lamin {' '.join(arguments)}` "
+                "invocation in Cursor's local chat database"
+            )
+        time.sleep(0.1)
 
 
-def _parse_transcript(path: Path, outputs: dict[str, deque[str]]) -> list[dict]:
+def _parse_sqlite_conversation(
+    conversation_id: str, db_path: Path | None = None
+) -> list[dict]:
+    rows = sorted(
+        _cursor_tool_rows(conversation_id=conversation_id, db_path=db_path),
+        key=lambda row: str(row[1].get("createdAt", "")),
+    )
     entries = []
     tool_number = 0
-    with path.open() as stream:
-        for line in stream:
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue  # Cursor may still be writing the last line.
-            role, message = entry.get("role"), entry.get("message")
-            if role not in ("user", "assistant") or not isinstance(message, dict):
-                continue
-            blocks = message.get("content")
-            if not isinstance(blocks, list):
-                continue
-            content = []
-            for block in blocks:
-                if not isinstance(block, dict):
-                    continue
-                if block.get("type") != "tool_use":
-                    if role == "user" and block.get("type") == "text":
-                        text = block.get("text", "")
-                        if isinstance(text, str):
-                            match = re.fullmatch(
-                                r"<timestamp>.*?</timestamp>\s*<user_query>\s*(.*?)\s*</user_query>",
-                                text.strip(),
-                                re.DOTALL,
-                            )
-                            if match:
-                                block = {**block, "text": match.group(1)}
-                    content.append(block)
-                    continue
-                tool_number += 1
-                tool_id = f"cursor-tool-{tool_number}"
-                content.append({**block, "id": tool_id})
-                if block.get("name") == "Shell":
-                    command = block.get("input", {}).get("command")
-                    if isinstance(command, str) and outputs.get(command):
-                        content.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": tool_id,
-                                "content": outputs[command].popleft(),
-                            }
-                        )
-            entries.append({"role": role, "content": content})
+    for _, value in rows:
+        content = []
+        text = value.get("text")
+        if isinstance(text, str) and text:
+            content.append({"type": "text", "text": text})
+        tool = value.get("toolFormerData")
+        if isinstance(tool, dict) and isinstance(tool.get("name"), str):
+            tool_number += 1
+            tool_id = f"cursor-tool-{tool_number}"
+            content.append(
+                {
+                    "type": "tool_use",
+                    "id": tool_id,
+                    "name": _TOOL_NAMES.get(tool["name"], tool["name"]),
+                    "input": _tool_params(value),
+                }
+            )
+            result = _read_tool_result(value)
+            if result is not None:
+                output = result.get("output")
+                if not isinstance(output, str):
+                    output = json.dumps(result, ensure_ascii=False)
+                content.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": output,
+                    }
+                )
+        if content:
+            entries.append(
+                {
+                    "role": "user" if value.get("type") == 1 else "assistant",
+                    "content": content,
+                }
+            )
     return entries
 
 
 def track_cursor_session(name: str | None = None) -> None:
+    started_at_ms = _now_ms()
     try:
         import lamindb as ln
     except Exception as e:
@@ -205,6 +229,9 @@ def track_cursor_session(name: str | None = None) -> None:
                 "No lamindb instance connected. Run `lamin connect <instance>` "
                 "(or `lamin init` for a new one) and try again."
             )
+        conversation_id = _conversation_id_for_invocation(
+            ("track", "cursor"), started_at_ms
+        )
         transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
         if transform is None:
             transform, _ = ln.Transform.objects.get_or_create(
@@ -216,7 +243,7 @@ def track_cursor_session(name: str | None = None) -> None:
                 },
             )
         _state_dir().mkdir(parents=True, exist_ok=True)
-        active_file = _run_uid_file()
+        active_file = _run_uid_file(conversation_id)
         mapping_file = _common.persistent_run_uid_file(active_file, ln)
         with _common.session_state_lock(mapping_file):
             run = _common.get_mapped_run(ln, mapping_file, _TRANSFORM_UID)
@@ -240,6 +267,7 @@ def track_cursor_session(name: str | None = None) -> None:
 
 
 def finish_cursor_session() -> None:
+    started_at_ms = _now_ms()
     try:
         import lamindb as ln
     except Exception as e:
@@ -249,29 +277,14 @@ def finish_cursor_session() -> None:
     try:
         if not _common.instance_connected(ln):
             _common.hard_error("No lamindb instance connected.")
-        active_file = _run_uid_file()
+        conversation_id = _conversation_id_for_invocation(("finish",), started_at_ms)
+        active_file = _run_uid_file(conversation_id)
         if not active_file.exists():
             _common.warn("no active Cursor session found, skipping session finish")
             return
         run = ln.Run.get(uid=active_file.read_text().strip())
         try:
-            conversation_id = _conversation_id_for_run(run.uid)
-            transcript_path = _transcript_path(conversation_id)
-            outputs = _shell_outputs(conversation_id)
-
-            def _read() -> list[dict]:
-                return _parse_transcript(
-                    transcript_path, {k: deque(v) for k, v in outputs.items()}
-                )
-
-            entries = _common.wait_for_finish_invocation(
-                read_fn=_read,
-                is_done_fn=lambda value: _common.contains_finish_invocation(
-                    value, _SHELL_TOOL_NAMES
-                ),
-                transcript_path=transcript_path,
-                budget_seconds=30,
-            )
+            entries = _parse_sqlite_conversation(conversation_id)
             html_doc = _common.render_transcript_html(
                 entries,
                 is_bookkeeping_bash_cmd=lambda cmd: False,
@@ -295,8 +308,8 @@ def finish_cursor_session() -> None:
                 run,
                 entries,
                 ln,
-                script_tool_names=frozenset({"Write", "StrReplace"}),
-                script_path_keys=("path",),
+                script_tool_names=frozenset({"Write"}),
+                script_path_keys=("relativeWorkspacePath", "targetFile", "path"),
                 suffix_to_kind=_SUFFIX_TO_KIND,
             )
             run.extra_data = {

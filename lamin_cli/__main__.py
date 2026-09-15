@@ -1195,8 +1195,7 @@ def _finish_tracked_session() -> None:
 
     This can be a shell script run, a Claude Code, Copilot, or Cursor session.
     """
-    from lamin_cli.agents.cursor import _run_uid_file as _cursor_run_uid_file
-    if os.environ.get("CURSOR_AGENT") and _cursor_run_uid_file().exists():
+    if os.environ.get("CURSOR_AGENT"):
         from lamin_cli.agents.cursor import finish_cursor_session
         return finish_cursor_session()
 
