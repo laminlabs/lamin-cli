@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import sqlite3
 import sys
 import tempfile
-import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,7 +25,7 @@ _TOOL_NAMES = {
     "ripgrep_raw_search": "Grep",
     "run_terminal_command_v2": "Shell",
 }
-_INVOCATION_WINDOW_MS = 30_000
+_SESSION_ID_ENV_VAR = "LAMIN_CURSOR_SESSION_ID"
 _SUFFIX_TO_KIND = {
     ".ipynb": "notebook",
     ".py": "script",
@@ -39,10 +37,6 @@ _SUFFIX_TO_KIND = {
 
 def _state_dir() -> Path:
     return _common.resolve_state_dir(".cursor")
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 def _run_uid_file(conversation_id: str) -> Path:
@@ -108,63 +102,27 @@ def _tool_params(value: dict) -> dict:
     return params if isinstance(params, dict) else {}
 
 
-def _matches_lamin_command(value: dict, arguments: tuple[str, ...]) -> bool:
-    command = _tool_params(value).get("command")
-    if not isinstance(command, str):
-        return False
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return False
-    for index, token in enumerate(tokens):
-        if Path(token).name == "lamin":
-            return tuple(tokens[index + 1 : index + 1 + len(arguments)]) == arguments
-    return False
+def _cursor_session_id() -> str:
+    session_id = os.environ.get(_SESSION_ID_ENV_VAR, "").strip()
+    if not session_id:
+        raise ValueError(f"{_SESSION_ID_ENV_VAR} is not set")
+    return session_id
 
 
-def _conversation_id_for_invocation(
-    arguments: tuple[str, ...],
-    started_at_ms: int,
-    db_path: Path | None = None,
-    timeout_seconds: float = 2.0,
-) -> str:
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        matches: list[tuple[int, str]] = []
-        for key, value in _cursor_tool_rows(db_path=db_path):
-            tool = value.get("toolFormerData")
-            if not isinstance(tool, dict) or tool.get("status") != "loading":
-                continue
-            if tool.get(
-                "name"
-            ) != "run_terminal_command_v2" or not _matches_lamin_command(
-                value, arguments
-            ):
-                continue
-            cwd = _tool_params(value).get("cwd")
-            if cwd and Path(cwd).resolve() != Path.cwd().resolve():
-                continue
-            additional_data = tool.get("additionalData")
-            tool_started_at_ms = (
-                additional_data.get("startedAtMs")
-                if isinstance(additional_data, dict)
-                else None
-            )
-            if not isinstance(tool_started_at_ms, (int, float)):
-                continue
-            distance = abs(int(tool_started_at_ms) - started_at_ms)
-            parts = key.split(":", 2)
-            if distance <= _INVOCATION_WINDOW_MS and len(parts) == 3:
-                matches.append((distance, parts[1]))
-        matches.sort()
-        if matches and (len(matches) == 1 or matches[0][0] < matches[1][0]):
-            return matches[0][1]
-        if time.monotonic() >= deadline:
-            raise ValueError(
-                f"could not uniquely identify this `lamin {' '.join(arguments)}` "
-                "invocation in Cursor's local chat database"
-            )
-        time.sleep(0.1)
+def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -> str:
+    marker = f"{_SESSION_ID_ENV_VAR}={session_id}"
+    conversation_ids = {
+        key.split(":", 2)[1]
+        for key, value in _cursor_tool_rows(db_path=db_path)
+        if len(key.split(":", 2)) == 3
+        and marker in json.dumps(value, ensure_ascii=False)
+    }
+    if len(conversation_ids) != 1:
+        raise ValueError(
+            f"could not uniquely identify Cursor session {_SESSION_ID_ENV_VAR} "
+            "in the local chat database"
+        )
+    return conversation_ids.pop()
 
 
 def _parse_sqlite_conversation(
@@ -216,7 +174,6 @@ def _parse_sqlite_conversation(
 
 
 def track_cursor_session(name: str | None = None) -> None:
-    started_at_ms = _now_ms()
     try:
         import lamindb as ln
     except Exception as e:
@@ -229,9 +186,7 @@ def track_cursor_session(name: str | None = None) -> None:
                 "No lamindb instance connected. Run `lamin connect <instance>` "
                 "(or `lamin init` for a new one) and try again."
             )
-        conversation_id = _conversation_id_for_invocation(
-            ("track", "cursor"), started_at_ms
-        )
+        conversation_id = _conversation_id_for_session(_cursor_session_id())
         transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
         if transform is None:
             transform, _ = ln.Transform.objects.get_or_create(
@@ -267,7 +222,6 @@ def track_cursor_session(name: str | None = None) -> None:
 
 
 def finish_cursor_session() -> None:
-    started_at_ms = _now_ms()
     try:
         import lamindb as ln
     except Exception as e:
@@ -277,7 +231,7 @@ def finish_cursor_session() -> None:
     try:
         if not _common.instance_connected(ln):
             _common.hard_error("No lamindb instance connected.")
-        conversation_id = _conversation_id_for_invocation(("finish",), started_at_ms)
+        conversation_id = _conversation_id_for_session(_cursor_session_id())
         active_file = _run_uid_file(conversation_id)
         if not active_file.exists():
             _common.warn("no active Cursor session found, skipping session finish")

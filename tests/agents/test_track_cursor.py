@@ -1,7 +1,6 @@
 import json
 import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 
 import lamindb as ln
 import pytest
@@ -37,16 +36,15 @@ def _add_bubble(
     )
 
 
-def _add_invocation(conn, conversation_id, bubble_id, arguments, started_at_ms):
-    command = "lamin " + " ".join(arguments)
+def _add_session_marker(conn, conversation_id, marker):
     _add_bubble(
         conn,
         conversation_id,
-        bubble_id,
-        f"2026-01-01T00:00:{started_at_ms // 1000:02d}Z",
+        f"marker-{conversation_id}",
+        "2026-01-01T00:00:00Z",
         tool_name="run_terminal_command_v2",
-        params={"command": command, "cwd": str(Path.cwd())},
-        started_at_ms=started_at_ms,
+        params={"command": f"echo LAMIN_CURSOR_SESSION_ID={marker}"},
+        result={"output": f"LAMIN_CURSOR_SESSION_ID={marker}\n"},
     )
 
 
@@ -85,12 +83,10 @@ def isolated(tmp_path, monkeypatch):
     db = tmp_path / "state.vscdb"
     with sqlite3.connect(db) as conn:
         conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value BLOB)")
-    clock = [1000]
     monkeypatch.chdir(project)
     monkeypatch.setattr(cursor, "_state_dir", lambda: project / ".cursor")
     monkeypatch.setattr(cursor, "_cursor_db_path", lambda: db)
-    monkeypatch.setattr(cursor, "_now_ms", lambda: clock[0])
-    yield db, project, clock
+    yield db, project
 
     transform = ln.Transform.filter(key=cursor._TRANSFORM_KEY).first()
     if transform is not None:
@@ -105,10 +101,11 @@ def isolated(tmp_path, monkeypatch):
         transform.delete(permanent=True)
 
 
-def test_full_track_finish_flow(isolated):
-    db, _, clock = isolated
+def test_full_track_finish_flow(isolated, monkeypatch):
+    db, _ = isolated
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
     with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "track", ("track", "cursor"), 1000)
+        _add_session_marker(conn, "chat-a", "marker-a")
     cursor.track_cursor_session(name="integration test")
     uid_file = cursor._run_uid_file("chat-a")
     uid = uid_file.read_text().strip()
@@ -124,8 +121,6 @@ def test_full_track_finish_flow(isolated):
         _add_conversation_content(
             conn, "chat-a", "1", "Create a FASTA file.", "raw shell output\n"
         )
-        _add_invocation(conn, "chat-a", "finish", ("finish",), 20000)
-    clock[0] = 20000
     cursor.finish_cursor_session()
 
     assert not uid_file.exists()
@@ -141,32 +136,25 @@ def test_full_track_finish_flow(isolated):
     child_transform.delete(permanent=True)
 
 
-def test_follow_up_reuses_run_and_replaces_report(isolated):
-    db, _, clock = isolated
+def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
+    db, _ = isolated
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
     with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "track-1", ("track", "cursor"), 1000)
+        _add_session_marker(conn, "chat-a", "marker-a")
         _add_conversation_content(conn, "chat-a", "1", "First task", "first")
     cursor.track_cursor_session(name="first task")
     uid = cursor._run_uid_file("chat-a").read_text().strip()
-    with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "finish-1", ("finish",), 20000)
-    clock[0] = 20000
     cursor.finish_cursor_session()
     run = ln.Run.get(uid=uid)
     report_uid, first_hash = run.report.uid, run.report.hash
 
     with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "track-2", ("track", "cursor"), 30000)
         _add_conversation_content(
             conn, "chat-a", "3", "Follow-up task", "updated output"
         )
-    clock[0] = 30000
     cursor.track_cursor_session(name="follow-up task")
     assert cursor._run_uid_file("chat-a").read_text().strip() == uid
     assert ln.Run.get(uid=uid).finished_at is None
-    with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "finish-2", ("finish",), 40000)
-    clock[0] = 40000
     cursor.finish_cursor_session()
 
     run = ln.Run.get(uid=uid)
@@ -179,32 +167,29 @@ def test_follow_up_reuses_run_and_replaces_report(isolated):
     assert run.transform.runs.count() == 1
 
 
-def test_parallel_sessions_never_cross_match(isolated):
-    db, _, clock = isolated
+def test_parallel_sessions_never_cross_match(isolated, monkeypatch):
+    db, _ = isolated
     with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "track", ("track", "cursor"), 1000)
+        _add_session_marker(conn, "chat-a", "marker-a")
         _add_conversation_content(conn, "chat-a", "1", "Task A", "output A")
-        _add_invocation(conn, "chat-b", "track", ("track", "cursor"), 20000)
+        _add_session_marker(conn, "chat-b", "marker-b")
         _add_conversation_content(conn, "chat-b", "2", "Task B", "output B")
 
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
     cursor.track_cursor_session(name="session a")
     uid_a = cursor._run_uid_file("chat-a").read_text().strip()
-    clock[0] = 20000
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-b")
     cursor.track_cursor_session(name="session b")
     uid_b = cursor._run_uid_file("chat-b").read_text().strip()
     assert uid_a != uid_b
 
-    with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-b", "finish", ("finish",), 30000)
-    clock[0] = 30000
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-b")
     cursor.finish_cursor_session()
     report_b = ln.Run.get(uid=uid_b).report.path.read_text()
     assert "output B" in report_b
     assert "output A" not in report_b
 
-    with sqlite3.connect(db) as conn:
-        _add_invocation(conn, "chat-a", "finish", ("finish",), 40000)
-    clock[0] = 40000
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
     cursor.finish_cursor_session()
     report_a = ln.Run.get(uid=uid_a).report.path.read_text()
     assert "output A" in report_a
