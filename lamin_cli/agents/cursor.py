@@ -172,14 +172,26 @@ def _uniquely_identify_error() -> ValueError:
     )
 
 
+def _shell_output_is_marker(value: dict, marker: str) -> bool:
+    tool = value.get("toolFormerData")
+    if not isinstance(tool, dict) or tool.get("name") != "run_terminal_command_v2":
+        return False
+    result = _read_tool_result(value)
+    if result is None:
+        return False
+    output = result.get("output")
+    if not isinstance(output, str):
+        return False
+    return any(line.strip() == marker for line in output.splitlines())
+
+
 def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -> str:
     db_path = db_path or _cursor_db_path()
     marker = f"{_SESSION_ID_ENV_VAR}={session_id}"
     conversation_ids = {
         key.split(":", 2)[1]
         for key, value in _cursor_tool_rows(db_path=db_path)
-        if len(key.split(":", 2)) == 3
-        and marker in json.dumps(value, ensure_ascii=False)
+        if len(key.split(":", 2)) == 3 and _shell_output_is_marker(value, marker)
     }
     if len(conversation_ids) == 1:
         return conversation_ids.pop()
@@ -218,16 +230,55 @@ def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -
     raise _uniquely_identify_error()
 
 
+def _composer_header_ids(conversation_id: str, db_path: Path) -> list[str] | None:
+    try:
+        with sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "SELECT value FROM cursorDiskKV WHERE key = ?",
+                (f"composerData:{conversation_id}",),
+            ).fetchone()
+    except sqlite3.Error:
+        return None
+    payload = _json_object(row[0]) if row else None
+    headers = payload.get("fullConversationHeadersOnly") if payload else None
+    if not isinstance(headers, list) or not headers:
+        return None
+    ids: list[str] = []
+    for item in headers:
+        if not isinstance(item, dict):
+            continue
+        bubble_id = item.get("bubbleId")
+        if isinstance(bubble_id, str) and bubble_id:
+            ids.append(bubble_id)
+    return ids or None
+
+
+def _ordered_conversation_values(conversation_id: str, db_path: Path) -> list[dict]:
+    rows = _cursor_tool_rows(conversation_id=conversation_id, db_path=db_path)
+    header_ids = _composer_header_ids(conversation_id, db_path)
+    if header_ids is None:
+        return [
+            value
+            for _, value in sorted(
+                rows, key=lambda row: str(row[1].get("createdAt", ""))
+            )
+        ]
+    by_id: dict[str, dict] = {}
+    for key, value in rows:
+        parts = key.split(":", 2)
+        if len(parts) == 3:
+            by_id[parts[2]] = value
+    return [by_id[bubble_id] for bubble_id in header_ids if bubble_id in by_id]
+
+
 def _parse_sqlite_conversation(
     conversation_id: str, db_path: Path | None = None
 ) -> list[dict]:
-    rows = sorted(
-        _cursor_tool_rows(conversation_id=conversation_id, db_path=db_path),
-        key=lambda row: str(row[1].get("createdAt", "")),
-    )
+    db_path = db_path or _cursor_db_path()
+    values = _ordered_conversation_values(conversation_id, db_path)
     entries = []
     tool_number = 0
-    for _, value in rows:
+    for value in values:
         content = []
         text = value.get("text")
         if isinstance(text, str) and text:
