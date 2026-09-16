@@ -240,13 +240,13 @@ def save_or_replace_report(
 
 
 # --- finish transcript wait ---
-# Claude Code / Copilot log the `lamin finish` invocation itself to the
-# transcript asynchronously, so a read immediately after issuing it can race
-# ahead of that write landing on disk -- worse on long/heavy sessions, where
-# the lag can run several seconds. Rather than inferring completeness from
-# timing (fragile: no reliable threshold, and quiescence checks can trigger
-# mid-buffer), wait for the actual finish command to become visible in the
-# transcript before rendering the report.
+# Claude Code / Copilot / Cursor log the `lamin finish` invocation itself to
+# the transcript asynchronously, so a read immediately after issuing it can
+# race ahead of that write landing on disk -- worse on long/heavy sessions,
+# where the lag can run several seconds. Rather than inferring completeness
+# from timing (fragile: no reliable threshold, and quiescence checks can
+# trigger mid-buffer), wait for the actual finish command to become visible
+# in the transcript before rendering the report.
 
 _T = TypeVar("_T")
 
@@ -560,6 +560,30 @@ def stamp_transforms(
     script_path_keys: tuple[str, ...] = (),
     suffix_to_kind: dict[str, str] | None = None,
 ) -> None:
+    # Failures here must not abort session finish: Claude / Copilot / Cursor
+    # all call this after the report is written and still need to close the run.
+    try:
+        _stamp_transforms(
+            run,
+            entries,
+            ln,
+            script_tool_names=script_tool_names,
+            script_path_keys=script_path_keys,
+            suffix_to_kind=suffix_to_kind,
+        )
+    except Exception as e:
+        warn(f"failed to stamp transforms: {e}")
+
+
+def _stamp_transforms(
+    run: object,
+    entries: list[dict],
+    ln: object,
+    *,
+    script_tool_names: frozenset[str],
+    script_path_keys: tuple[str, ...],
+    suffix_to_kind: dict[str, str] | None,
+) -> None:
     # Primary path: scripts run with LAMIN_INITIATED_BY_RUN_UID create child runs.
     already_stamped: set[str] = set()
     for child_run in run.initiated_runs.all():  # type: ignore[attr-defined]
@@ -582,7 +606,14 @@ def stamp_transforms(
         if not path.exists() or path.name in already_stamped:
             continue
         kind = suffix_to_kind[path.suffix]
-        transform = ln.Transform.filter(key=path.name).one_or_none()  # type: ignore[attr-defined]
+        # `is_latest` is per-branch; `.first()` rather than `.one_or_none()`
+        # so versioned scripts (and a key that is latest on more than one
+        # branch) cannot abort session finish.
+        transform = (
+            ln.Transform.filter(key=path.name, is_latest=True)  # type: ignore[attr-defined]
+            .order_by("-created_at")
+            .first()
+        )
         if transform is None:
             transform = ln.Transform(key=path.name, kind=kind)  # type: ignore[attr-defined]
             transform.save()

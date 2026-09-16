@@ -1,5 +1,7 @@
 import json
 import sqlite3
+import threading
+import time
 from datetime import datetime, timezone
 
 import lamindb as ln
@@ -128,6 +130,19 @@ def _add_conversation_content(conn, conversation_id, suffix, user_text, output):
     )
 
 
+def _add_finish_command(conn, conversation_id, bubble_id="finish"):
+    _add_bubble(
+        conn,
+        conversation_id,
+        bubble_id,
+        datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        tool_name="run_terminal_command_v2",
+        params={"command": "lamin finish"},
+        result={"output": "finished tracking\n", "exitCode": 0},
+        started_at_ms=9999,
+    )
+
+
 @pytest.fixture(autouse=True)
 def isolated(tmp_path, monkeypatch):
     project = tmp_path / "project"
@@ -173,6 +188,7 @@ def test_full_track_finish_flow(isolated, monkeypatch):
         _add_conversation_content(
             conn, "chat-a", "1", "Create a FASTA file.", "raw shell output\n"
         )
+        _add_finish_command(conn, "chat-a")
     cursor.finish_cursor_session()
 
     assert not uid_file.exists()
@@ -194,6 +210,7 @@ def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
     with sqlite3.connect(db) as conn:
         _add_session_marker(conn, "chat-a", "marker-a")
         _add_conversation_content(conn, "chat-a", "1", "First task", "first")
+        _add_finish_command(conn, "chat-a", "finish-1")
     cursor.track_cursor_session(name="first task")
     uid = cursor._run_uid_file("chat-a").read_text().strip()
     cursor.finish_cursor_session()
@@ -204,6 +221,7 @@ def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
         _add_conversation_content(
             conn, "chat-a", "3", "Follow-up task", "updated output"
         )
+        _add_finish_command(conn, "chat-a", "finish-3")
     cursor.track_cursor_session(name="follow-up task")
     assert cursor._run_uid_file("chat-a").read_text().strip() == uid
     assert ln.Run.get(uid=uid).finished_at is None
@@ -236,12 +254,16 @@ def test_parallel_sessions_never_cross_match(isolated, monkeypatch):
     assert uid_a != uid_b
 
     monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-b")
+    with sqlite3.connect(db) as conn:
+        _add_finish_command(conn, "chat-b", "finish-b")
     cursor.finish_cursor_session()
     report_b = ln.Run.get(uid=uid_b).report.path.read_text()
     assert "output B" in report_b
     assert "output A" not in report_b
 
     monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
+    with sqlite3.connect(db) as conn:
+        _add_finish_command(conn, "chat-a", "finish-a")
     cursor.finish_cursor_session()
     report_a = ln.Run.get(uid=uid_a).report.path.read_text()
     assert "output A" in report_a
@@ -354,3 +376,31 @@ def test_transcript_follows_conversation_header_order(isolated):
     ]
     assert texts[0] == "user prompt"
     assert "stale leftover" not in texts
+
+
+def test_finish_waits_for_delayed_finish_command_write(isolated, monkeypatch):
+    """If the chat DB is read before Cursor has flushed the closing
+    `lamin finish` command, finish must wait for it rather than rendering
+    an incomplete report."""
+    db, _ = isolated
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
+    with sqlite3.connect(db) as conn:
+        _add_session_marker(conn, "chat-a", "marker-a")
+        _add_conversation_content(conn, "chat-a", "1", "do something", "done\n")
+    cursor.track_cursor_session(name="delayed write test")
+    uid = cursor._run_uid_file("chat-a").read_text().strip()
+
+    def write_delayed_finish_command():
+        time.sleep(0.5)
+        with sqlite3.connect(db) as conn:
+            _add_finish_command(conn, "chat-a", "finish-late")
+
+    writer = threading.Thread(target=write_delayed_finish_command)
+    writer.start()
+    start = time.monotonic()
+    cursor.finish_cursor_session()
+    elapsed = time.monotonic() - start
+    writer.join()
+
+    assert 0.4 < elapsed < 3.0
+    assert ln.Run.get(uid=uid).finished_at is not None
