@@ -53,6 +53,22 @@ def _set_composer_headers(conn, composers: list[dict]) -> None:
     )
 
 
+def _set_composer_data(conn, conversation_id, bubble_ids: list[str]) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO cursorDiskKV (key, value) VALUES (?, ?)",
+        (
+            f"composerData:{conversation_id}",
+            json.dumps(
+                {
+                    "fullConversationHeadersOnly": [
+                        {"bubbleId": bubble_id} for bubble_id in bubble_ids
+                    ]
+                }
+            ),
+        ),
+    )
+
+
 def _composer_header(
     composer_id,
     *,
@@ -238,6 +254,25 @@ def test_worktree_copy_prefers_live_chat_over_archived(isolated, monkeypatch):
     with sqlite3.connect(db) as conn:
         _add_session_marker(conn, "chat-archived", "marker-a")
         _add_session_marker(conn, "chat-live", "marker-a")
+        _add_bubble(
+            conn,
+            "chat-new",
+            "track",
+            "2026-01-01T00:00:10Z",
+            tool_name="run_terminal_command_v2",
+            params={
+                "command": "LAMIN_CURSOR_SESSION_ID=marker-a lamin track cursor --name x"
+            },
+            result={"output": "started tracking\n"},
+        )
+        _add_bubble(
+            conn,
+            "chat-paste",
+            "user",
+            "2026-01-01T00:00:11Z",
+            text="LAMIN_CURSOR_SESSION_ID=marker-a lamin track cursor",
+            bubble_type=1,
+        )
         _set_composer_headers(
             conn,
             [
@@ -247,11 +282,9 @@ def test_worktree_copy_prefers_live_chat_over_archived(isolated, monkeypatch):
                     fs_path=str(project.parent),
                     created_at=1,
                 ),
-                _composer_header(
-                    "chat-live",
-                    fs_path=str(project),
-                    created_at=2,
-                ),
+                _composer_header("chat-live", fs_path=str(project), created_at=2),
+                _composer_header("chat-new", fs_path=str(project), created_at=3),
+                _composer_header("chat-paste", fs_path=str(project.parent)),
             ],
         )
     assert cursor._conversation_id_for_session("marker-a") == "chat-live"
@@ -277,17 +310,33 @@ def test_two_live_chats_prefer_workspace_matching_cwd(isolated):
     assert cursor._conversation_id_for_session("marker-a") == "chat-here"
 
 
-def test_two_live_chats_in_same_workspace_still_error(isolated):
-    db, project = isolated
+def test_transcript_follows_conversation_header_order(isolated):
+    db, _ = isolated
     with sqlite3.connect(db) as conn:
-        _add_session_marker(conn, "chat-a", "marker-a")
-        _add_session_marker(conn, "chat-b", "marker-a")
-        _set_composer_headers(
-            conn,
-            [
-                _composer_header("chat-a", fs_path=str(project)),
-                _composer_header("chat-b", fs_path=str(project)),
-            ],
+        _add_bubble(
+            conn, "chat-a", "stale", "2026-01-01T00:00:00Z", text="stale leftover"
         )
-    with pytest.raises(ValueError, match="could not uniquely identify Cursor session"):
-        cursor._conversation_id_for_session("marker-a")
+        _add_bubble(
+            conn,
+            "chat-a",
+            "asst",
+            "2026-01-01T00:00:01Z",
+            text="assistant first by time",
+        )
+        _add_bubble(
+            conn,
+            "chat-a",
+            "user",
+            "2026-01-01T00:00:09Z",
+            text="user prompt",
+            bubble_type=1,
+        )
+        _set_composer_data(conn, "chat-a", ["user", "asst"])
+    texts = [
+        block["text"]
+        for entry in cursor._parse_sqlite_conversation("chat-a")
+        for block in entry["content"]
+        if block.get("type") == "text"
+    ]
+    assert texts[0] == "user prompt"
+    assert "stale leftover" not in texts
