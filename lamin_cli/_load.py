@@ -3,13 +3,14 @@ from __future__ import annotations
 import re
 import shutil
 from pathlib import Path
+from typing import Any
 
 import click
 from lamin_utils import logger
 
 from ._context import get_current_run_file
 from ._notes import is_path_within, parse_note_target, resolve_note_record
-from ._save import infer_registry_from_path, parse_title_r_notebook
+from ._save import infer_registry_from_path, parse_store_kwargs, parse_title_r_notebook
 from .urls import decompose_url
 
 
@@ -18,6 +19,7 @@ def load(
     uid: str | None = None,
     key: str | None = None,
     with_env: bool = False,
+    store_kwargs: str | dict[str, Any] | None = None,
 ):
     """Load artifact, collection, or transform from LaminDB.
 
@@ -26,6 +28,7 @@ def load(
         uid: Unique identifier (prefix matching supported)
         key: Key identifier
         with_env: If True, also load environment requirements file for transforms
+        store_kwargs: Fine-grained settings forwarded to artifact/collection cache()
 
     Returns:
         Path to loaded transform, or None for artifacts/collections
@@ -71,6 +74,12 @@ def load(
 
     ln_setup.connect(instance)
     import lamindb as ln
+
+    store_kwargs = parse_store_kwargs(store_kwargs)
+    if store_kwargs is not None and entity not in {"artifact", "collection"}:
+        raise click.ClickException(
+            "--store-kwargs is only supported when loading artifacts or collections"
+        )
 
     # In worktree mode, load requires a concrete branch context from a child
     # directory. This raises NotInBranchDir in dev-dir root/outside the worktree.
@@ -279,7 +288,9 @@ def load(
                 entities = entities.order_by("-created_at")
 
             entity_obj = entities.first()
-            cache_path = entity_obj.cache(is_run_input=current_run)
+            cache_path = entity_obj.cache(
+                is_run_input=current_run, **(store_kwargs or {})
+            )
 
             # collection gives us a list of paths
             if isinstance(cache_path, list):

@@ -625,7 +625,13 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
+@click.option(
+    "--store-kwargs",
+    type=str,
+    default=None,
+    help='Fine-grained settings for artifact or collection downloads as a JSON object (normally not needed), e.g. \'{"batch_size": 20}\'.',
+)
+def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, store_kwargs: str | None = None):
     """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass an entity or a `--key`. For example:
@@ -645,21 +651,27 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load transform --uid Vul4JbfsEYAy5
     ```
 
+    Pass `--store-kwargs` as a JSON object for fine-grained artifact or collection download settings (normally not needed):
+
+    ```
+    lamin load --key mydatasets/mytable.parquet --store-kwargs '{"batch_size": 20}'
+    ```
+
     → Python/R alternative: {func}`~lamindb.Artifact.load`, no equivalent for transforms
     """
     from lamin_cli._load import load as load_
     from lamin_cli._notes import parse_note_target
     if entity is not None:
         if uid is None and key is None and entity == "README.md":
-            return load_(entity=None, uid=uid, key="README.md", with_env=with_env)
+            return load_(entity=None, uid=uid, key="README.md", with_env=with_env, store_kwargs=store_kwargs)
         if uid is None and key is None and parse_note_target(entity) is not None:
-            return load_(entity, uid=uid, key=key, with_env=with_env)
+            return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs)
         is_slug = entity.count("/") == 1
         if is_slug:
             from lamindb_setup._connect_instance import _connect_cli
             # for backward compat
             return _connect_cli(entity)
-    return load_(entity, uid=uid, key=key, with_env=with_env)
+    return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs)
 
 
 DESCRIBE_ENTITIES_KEY = {"artifact", "transform", "collection"}
