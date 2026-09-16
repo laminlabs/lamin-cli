@@ -629,7 +629,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     "--store-kwargs",
     type=str,
     default=None,
-    help='Fine-grained settings for downloads as a JSON object (normally not needed), e.g. \'{"chunksize": 1000000}\'.',
+    help='Fine-grained settings for artifact or collection downloads as a JSON object (normally not needed), e.g. \'{"batch_size": 20}\'.',
 )
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, store_kwargs: str | None = None):
     """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
@@ -651,10 +651,10 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load transform --uid Vul4JbfsEYAy5
     ```
 
-    Pass `--store-kwargs` as a JSON object for fine-grained download settings (normally not needed):
+    Pass `--store-kwargs` as a JSON object for fine-grained artifact or collection download settings (normally not needed):
 
     ```
-    lamin load --key mydatasets/mytable.parquet --store-kwargs '{"chunksize": 1000000}'
+    lamin load --key mydatasets/mytable.parquet --store-kwargs '{"batch_size": 20}'
     ```
 
     → Python/R alternative: {func}`~lamindb.Artifact.load`, no equivalent for transforms
