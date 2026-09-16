@@ -310,6 +310,20 @@ def test_two_live_chats_prefer_workspace_matching_cwd(isolated):
     assert cursor._conversation_id_for_session("marker-a") == "chat-here"
 
 
+def test_echo_command_identifies_session_before_result(isolated):
+    db, _ = isolated
+    with sqlite3.connect(db) as conn:
+        _add_bubble(
+            conn,
+            "chat-a",
+            "echo",
+            "2026-01-01T00:00:00Z",
+            tool_name="run_terminal_command_v2",
+            params={"command": "echo LAMIN_CURSOR_SESSION_ID=marker-a"},
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-a"
+
+
 def test_transcript_follows_conversation_header_order(isolated):
     db, _ = isolated
     with sqlite3.connect(db) as conn:

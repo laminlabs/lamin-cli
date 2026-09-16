@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sqlite3
 import sys
 import tempfile
@@ -54,6 +55,12 @@ def _cursor_db_path() -> Path:
     return base / "Cursor" / "User" / "globalStorage" / "state.vscdb"
 
 
+def _connect_db(db_path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA query_only=ON")
+    return conn
+
+
 def _read_tool_result(value: dict) -> dict | None:
     tool = value.get("toolFormerData")
     if not isinstance(tool, dict):
@@ -77,7 +84,7 @@ def _cursor_tool_rows(
     prefix = f"bubbleId:{conversation_id}:%" if conversation_id else "bubbleId:%"
     query = "SELECT key, value FROM cursorDiskKV WHERE key LIKE ?"
     params: tuple[str, ...] = (prefix,)
-    with sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True) as conn:
+    with _connect_db(db_path) as conn:
         rows = conn.execute(query, params).fetchall()
     parsed = []
     for key, raw in rows:
@@ -124,7 +131,7 @@ def _json_object(raw: object) -> dict | None:
 def _composer_headers(db_path: Path) -> dict[str, dict]:
     # isArchived / workspaceIdentifier live on ItemTable, not cursorDiskKV.
     try:
-        with sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True) as conn:
+        with _connect_db(db_path) as conn:
             row = conn.execute(
                 "SELECT value FROM ItemTable WHERE key = ?",
                 (_COMPOSER_HEADERS_KEY,),
@@ -172,17 +179,31 @@ def _uniquely_identify_error() -> ValueError:
     )
 
 
+def _is_echo_marker_command(cmd: str, marker: str) -> bool:
+    try:
+        tokens = shlex.split(cmd)
+    except ValueError:
+        tokens = cmd.split()
+    if not tokens:
+        return False
+    if Path(tokens[0]).name != "echo":
+        return False
+    return any(token.strip("'\"") == marker for token in tokens[1:])
+
+
 def _shell_output_is_marker(value: dict, marker: str) -> bool:
     tool = value.get("toolFormerData")
     if not isinstance(tool, dict) or tool.get("name") != "run_terminal_command_v2":
         return False
     result = _read_tool_result(value)
-    if result is None:
-        return False
-    output = result.get("output")
-    if not isinstance(output, str):
-        return False
-    return any(line.strip() == marker for line in output.splitlines())
+    if result is not None:
+        output = result.get("output")
+        if isinstance(output, str) and any(
+            line.strip() == marker for line in output.splitlines()
+        ):
+            return True
+    cmd = _tool_params(value).get("command", "")
+    return isinstance(cmd, str) and _is_echo_marker_command(cmd, marker)
 
 
 def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -> str:
@@ -232,7 +253,7 @@ def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -
 
 def _composer_header_ids(conversation_id: str, db_path: Path) -> list[str] | None:
     try:
-        with sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True) as conn:
+        with _connect_db(db_path) as conn:
             row = conn.execute(
                 "SELECT value FROM cursorDiskKV WHERE key = ?",
                 (f"composerData:{conversation_id}",),
