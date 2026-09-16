@@ -26,6 +26,7 @@ _TOOL_NAMES = {
     "run_terminal_command_v2": "Shell",
 }
 _SESSION_ID_ENV_VAR = "LAMIN_CURSOR_SESSION_ID"
+_COMPOSER_HEADERS_KEY = "composer.composerHeaders"
 _SUFFIX_TO_KIND = {
     ".ipynb": "notebook",
     ".py": "script",
@@ -109,7 +110,70 @@ def _cursor_session_id() -> str:
     return session_id
 
 
+def _json_object(raw: object) -> dict | None:
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _composer_headers(db_path: Path) -> dict[str, dict]:
+    # isArchived / workspaceIdentifier live on ItemTable, not cursorDiskKV.
+    try:
+        with sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "SELECT value FROM ItemTable WHERE key = ?",
+                (_COMPOSER_HEADERS_KEY,),
+            ).fetchone()
+    except sqlite3.Error:
+        return {}
+    payload = _json_object(row[0]) if row else None
+    composers = payload.get("allComposers") if payload else None
+    if not isinstance(composers, list):
+        return {}
+    headers: dict[str, dict] = {}
+    for composer in composers:
+        if not isinstance(composer, dict):
+            continue
+        composer_id = composer.get("composerId")
+        if isinstance(composer_id, str) and composer_id:
+            headers[composer_id] = composer
+    return headers
+
+
+def _header_workspace_path(header: dict) -> Path | None:
+    workspace = header.get("workspaceIdentifier")
+    if not isinstance(workspace, dict):
+        return None
+    uri = workspace.get("uri")
+    path = uri.get("fsPath") if isinstance(uri, dict) else None
+    if isinstance(path, str) and path:
+        return Path(path)
+    return None
+
+
+def _workspace_contains_cwd(workspace: Path, cwd: Path) -> bool:
+    try:
+        workspace = workspace.resolve()
+        cwd = cwd.resolve()
+    except OSError:
+        return False
+    return cwd == workspace or workspace in cwd.parents
+
+
+def _uniquely_identify_error() -> ValueError:
+    return ValueError(
+        f"could not uniquely identify Cursor session {_SESSION_ID_ENV_VAR} "
+        "in the local chat database"
+    )
+
+
 def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -> str:
+    db_path = db_path or _cursor_db_path()
     marker = f"{_SESSION_ID_ENV_VAR}={session_id}"
     conversation_ids = {
         key.split(":", 2)[1]
@@ -117,12 +181,41 @@ def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -
         if len(key.split(":", 2)) == 3
         and marker in json.dumps(value, ensure_ascii=False)
     }
-    if len(conversation_ids) != 1:
-        raise ValueError(
-            f"could not uniquely identify Cursor session {_SESSION_ID_ENV_VAR} "
-            "in the local chat database"
-        )
-    return conversation_ids.pop()
+    if len(conversation_ids) == 1:
+        return conversation_ids.pop()
+    if not conversation_ids:
+        raise _uniquely_identify_error()
+
+    headers = _composer_headers(db_path)
+    live_ids = {
+        conversation_id
+        for conversation_id in conversation_ids
+        if not headers.get(conversation_id, {}).get("isArchived")
+        and not headers.get(conversation_id, {}).get("isDraft")
+    }
+    if len(live_ids) == 1:
+        return live_ids.pop()
+    if not live_ids:
+        raise _uniquely_identify_error()
+
+    cwd = Path.cwd()
+    scored: list[tuple[int, str]] = []
+    for conversation_id in live_ids:
+        workspace = _header_workspace_path(headers.get(conversation_id, {}))
+        if workspace is None or not _workspace_contains_cwd(workspace, cwd):
+            continue
+        try:
+            path_len = len(str(workspace.resolve()))
+        except OSError:
+            path_len = len(str(workspace))
+        scored.append((path_len, conversation_id))
+    if scored:
+        longest = max(path_len for path_len, _ in scored)
+        tied = [cid for path_len, cid in scored if path_len == longest]
+        if len(tied) == 1:
+            return tied[0]
+
+    raise _uniquely_identify_error()
 
 
 def _parse_sqlite_conversation(

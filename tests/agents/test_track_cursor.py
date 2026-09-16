@@ -36,6 +36,42 @@ def _add_bubble(
     )
 
 
+def _workspace(fs_path: str, workspace_id: str = "ws") -> dict:
+    return {"id": workspace_id, "uri": {"fsPath": fs_path}}
+
+
+def _set_composer_headers(conn, composers: list[dict]) -> None:
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value BLOB)"
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
+        (
+            "composer.composerHeaders",
+            json.dumps({"allComposers": composers}),
+        ),
+    )
+
+
+def _composer_header(
+    composer_id,
+    *,
+    archived=False,
+    draft=False,
+    fs_path=None,
+    created_at=1,
+):
+    header = {
+        "composerId": composer_id,
+        "isArchived": archived,
+        "isDraft": draft,
+        "createdAt": created_at,
+    }
+    if fs_path is not None:
+        header["workspaceIdentifier"] = _workspace(fs_path, composer_id)
+    return header
+
+
 def _add_session_marker(conn, conversation_id, marker):
     _add_bubble(
         conn,
@@ -194,3 +230,64 @@ def test_parallel_sessions_never_cross_match(isolated, monkeypatch):
     report_a = ln.Run.get(uid=uid_a).report.path.read_text()
     assert "output A" in report_a
     assert "output B" not in report_a
+
+
+def test_worktree_copy_prefers_live_chat_over_archived(isolated, monkeypatch):
+    db, project = isolated
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
+    with sqlite3.connect(db) as conn:
+        _add_session_marker(conn, "chat-archived", "marker-a")
+        _add_session_marker(conn, "chat-live", "marker-a")
+        _set_composer_headers(
+            conn,
+            [
+                _composer_header(
+                    "chat-archived",
+                    archived=True,
+                    fs_path=str(project.parent),
+                    created_at=1,
+                ),
+                _composer_header(
+                    "chat-live",
+                    fs_path=str(project),
+                    created_at=2,
+                ),
+            ],
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-live"
+    cursor.track_cursor_session(name="worktree copy")
+    assert cursor._run_uid_file("chat-live").exists()
+    assert not cursor._run_uid_file("chat-archived").exists()
+
+
+def test_two_live_chats_prefer_workspace_matching_cwd(isolated):
+    db, project = isolated
+    sibling = project.parent / "other-workspace"
+    sibling.mkdir()
+    with sqlite3.connect(db) as conn:
+        _add_session_marker(conn, "chat-here", "marker-a")
+        _add_session_marker(conn, "chat-elsewhere", "marker-a")
+        _set_composer_headers(
+            conn,
+            [
+                _composer_header("chat-here", fs_path=str(project)),
+                _composer_header("chat-elsewhere", fs_path=str(sibling)),
+            ],
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-here"
+
+
+def test_two_live_chats_in_same_workspace_still_error(isolated):
+    db, project = isolated
+    with sqlite3.connect(db) as conn:
+        _add_session_marker(conn, "chat-a", "marker-a")
+        _add_session_marker(conn, "chat-b", "marker-a")
+        _set_composer_headers(
+            conn,
+            [
+                _composer_header("chat-a", fs_path=str(project)),
+                _composer_header("chat-b", fs_path=str(project)),
+            ],
+        )
+    with pytest.raises(ValueError, match="could not uniquely identify Cursor session"):
+        cursor._conversation_id_for_session("marker-a")
