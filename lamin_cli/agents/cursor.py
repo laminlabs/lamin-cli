@@ -404,7 +404,13 @@ def finish_cursor_session() -> None:
             return
         run = ln.Run.get(uid=active_file.read_text().strip())
         try:
-            entries = _parse_sqlite_conversation(conversation_id)
+            entries = _common.wait_for_finish_invocation(
+                read_fn=lambda: _parse_sqlite_conversation(conversation_id),
+                is_done_fn=lambda parsed: _common.contains_finish_invocation(
+                    parsed, _SHELL_TOOL_NAMES
+                ),
+                transcript_path=_cursor_db_path(),
+            )
             html_doc = _common.render_transcript_html(
                 entries,
                 is_bookkeeping_bash_cmd=lambda cmd: False,

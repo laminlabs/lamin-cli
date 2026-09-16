@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import lamindb as ln
 from lamin_cli.agents import _common
 
 _SHELL_TOOL_NAMES = frozenset({"Bash"})
@@ -268,3 +269,46 @@ def test_wait_for_finish_invocation_missing_transcript_file_does_not_wait(tmp_pa
 
     assert calls["n"] == 1
     assert elapsed < 0.5
+
+
+def test_stamp_transforms_uses_latest_version(tmp_path):
+    script = tmp_path / "stamp_latest.py"
+    script.write_text("print(1)\n")
+    v1 = ln.Transform(key=script.name, kind="script").save()
+    v2 = ln.Transform(key=script.name, kind="script").save()
+    session = ln.Transform(key="__stamp_transforms_test__", kind="function").save()
+    run = ln.Run(session).save()
+    entries = [
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "Write",
+                    "input": {"path": str(script)},
+                }
+            ],
+        }
+    ]
+    try:
+        _common.stamp_transforms(
+            run,
+            entries,
+            ln,
+            script_tool_names=frozenset({"Write"}),
+            script_path_keys=("path",),
+            suffix_to_kind={".py": "script"},
+        )
+        assert ln.Transform.get(uid=v2.uid).run.uid == run.uid
+        assert ln.Transform.get(uid=v1.uid).run_id is None
+    finally:
+        for transform in (v2, v1, session):
+            transform = ln.Transform.filter(uid=transform.uid).one_or_none()
+            if transform is None:
+                continue
+            for child in list(transform.runs.all()):
+                child.delete(permanent=True)
+            if transform.run_id is not None:
+                transform.run = None
+                transform.save()
+            transform.delete(permanent=True)
