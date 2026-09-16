@@ -274,8 +274,12 @@ def test_wait_for_finish_invocation_missing_transcript_file_does_not_wait(tmp_pa
 def test_stamp_transforms_uses_latest_version(tmp_path):
     script = tmp_path / "stamp_latest.py"
     script.write_text("print(1)\n")
-    v1 = ln.Transform(key=script.name, kind="script").save()
-    v2 = ln.Transform(key=script.name, kind="script").save()
+    # Distinct source_code is required: without it, Transform() returns the
+    # existing record instead of creating a new version.
+    v1 = ln.Transform(key=script.name, kind="script", source_code="print(1)\n").save()
+    v2 = ln.Transform(key=script.name, kind="script", source_code="print(2)\n").save()
+    assert v1.uid != v2.uid
+    assert ln.Transform.filter(key=script.name).count() == 2
     session = ln.Transform(key="__stamp_transforms_test__", kind="function").save()
     run = ln.Run(session).save()
     entries = [
