@@ -297,10 +297,10 @@ def _parse_sqlite_conversation(
 ) -> list[dict]:
     db_path = db_path or _cursor_db_path()
     values = _ordered_conversation_values(conversation_id, db_path)
-    entries = []
+    entries: list[dict] = []
     tool_number = 0
     for value in values:
-        content = []
+        content: list[dict] = []
         text = value.get("text")
         if isinstance(text, str) and text:
             content.append({"type": "text", "text": text})
@@ -308,11 +308,12 @@ def _parse_sqlite_conversation(
         if isinstance(tool, dict) and isinstance(tool.get("name"), str):
             tool_number += 1
             tool_id = f"cursor-tool-{tool_number}"
+            tool_name = tool["name"]
             content.append(
                 {
                     "type": "tool_use",
                     "id": tool_id,
-                    "name": _TOOL_NAMES.get(tool["name"], tool["name"]),
+                    "name": _TOOL_NAMES.get(tool_name, tool_name),
                     "input": _tool_params(value),
                 }
             )
