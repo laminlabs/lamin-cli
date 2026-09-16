@@ -19,6 +19,7 @@ from lamindb_setup.core._settings_store import (
 )
 from lamindb_setup.errors import (
     CurrentInstanceNotConfigured,
+    NotInBranchDir,
     NoWriteAccess,
 )
 
@@ -381,6 +382,38 @@ def test_hub_switch_branch_writes_branch_file_in_worktree_child_without_instance
         if child.exists():
             shutil.rmtree(child)
         ln_setup.settings.worktree = False
+        ln_setup.settings.dev_dir = previous_dev_dir
+
+
+def test_hub_switch_branch_create_from_worktree_root_does_not_create(
+    monkeypatch, tmp_path: Path
+):
+    from lamin_cli.hub.switch import switch_branch
+
+    previous_dev_dir = ln_setup.settings.dev_dir
+    previous_worktree = ln_setup.settings.worktree
+    previous_cwd = Path.cwd()
+
+    worktree_parent = tmp_path / "worktrees"
+    worktree_parent.mkdir()
+
+    created = []
+
+    def fake_create_branch(name, description=None):
+        created.append(name)
+        return {"uid": "createduid1234567", "name": name}
+
+    monkeypatch.setattr("lamin_cli.hub.switch.create_branch", fake_create_branch)
+    try:
+        ln_setup.settings.dev_dir = worktree_parent
+        ln_setup.settings.worktree = True
+        os.chdir(worktree_parent)
+        with pytest.raises(NotInBranchDir, match="only defined inside a child"):
+            switch_branch("try", create=True)
+        assert created == []
+    finally:
+        os.chdir(previous_cwd)
+        ln_setup.settings.worktree = previous_worktree
         ln_setup.settings.dev_dir = previous_dev_dir
 
 
