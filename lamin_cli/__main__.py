@@ -1498,16 +1498,12 @@ def notion_sync(
         raise click.UsageError("Missing argument 'PARENTS...'.")
     from lamindb.integrations.notion import sync_from_notion
 
-    try:
-        sync_from_notion(
-            token=token,
-            parents=list(parents),
-            apply=apply,
-            limit=limit,
-        )
-    except Exception as error:
-        raise click.ClickException(str(error)) from error
-
+    sync_from_notion(
+        token=token,
+        parents=list(parents),
+        apply=apply,
+        limit=limit,
+    )
 
 main.add_command(settings)
 main.add_command(migrate)
