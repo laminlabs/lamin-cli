@@ -42,6 +42,7 @@ details summary::-webkit-details-marker{{display:none}}
 details summary::before{{content:'▶ ';font-size:.7em}}
 details[open] summary::before{{content:'▼ '}}
 .thk{{margin-top:4px;color:#666;font-size:.85rem;white-space:pre-wrap;word-wrap:break-word;padding-left:8px;border-left:2px solid #e5e5e5}}
+.thk strong{{font-weight:600;color:#444}}
 .todos{{margin-top:4px}}
 .todo{{display:flex;gap:6px;color:#333;font-size:.88rem;padding:1px 0}}
 .done{{color:#aaa;text-decoration:line-through}}
@@ -345,11 +346,19 @@ def wait_for_finish_invocation(
 # rather than hardcoded, so the same renderer works for Claude, Copilot, etc.
 
 
+_THINKING_BOLD = re.compile(r"\*\*([^*\n]+)\*\*")
+
+
+def _format_thinking_html(thinking: str) -> str:
+    escaped = html.escape(thinking[:BLOCK_TRUNCATE])
+    return _THINKING_BOLD.sub(r"<strong>\1</strong>", escaped)
+
+
 def render_thinking(thinking: str) -> str:
     return (
         '<li class="step"><div class="dot dy"></div><div class="bd">'
         f"<details><summary>Thinking</summary>"
-        f'<div class="thk">{html.escape(thinking[:BLOCK_TRUNCATE])}</div>'
+        f'<div class="thk">{_format_thinking_html(thinking)}</div>'
         "</details></div></li>"
     )
 
