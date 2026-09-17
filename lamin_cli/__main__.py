@@ -1123,6 +1123,8 @@ def track(ctx: click.Context):
     lamin finish
     ```
 
+    The report includes thinking when the agent stored it as readable text; encoded thoughts are omitted.
+
     :::{dropdown} `lamin track copilot` says it can't find the active session?
 
     In VS Code, make sure **"Copilot"** is selected — not **"Local"** — in the mode picker below the chat input box. `lamin track copilot` can only see sessions that go through the "Copilot"; sessions run via "Local" aren't visible to it.
