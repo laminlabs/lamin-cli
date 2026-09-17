@@ -301,6 +301,14 @@ def _parse_sqlite_conversation(
     tool_number = 0
     for value in values:
         content: list[dict] = []
+        thinking = value.get("thinking")
+        thinking_text = ""
+        if isinstance(thinking, dict):
+            raw_thinking = thinking.get("text")
+            if isinstance(raw_thinking, str):
+                thinking_text = raw_thinking.strip()
+        if thinking_text and value.get("type") != 1:
+            content.append({"type": "thinking", "thinking": thinking_text})
         text = value.get("text")
         if isinstance(text, str) and text:
             content.append({"type": "text", "text": text})

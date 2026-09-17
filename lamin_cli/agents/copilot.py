@@ -167,6 +167,9 @@ def _build_entries(raw_events: list[dict]) -> list[dict]:
 
         elif etype == "assistant.message":
             content_blocks: list[dict] = []
+            reasoning = data.get("reasoningText")
+            if isinstance(reasoning, str) and reasoning.strip():
+                content_blocks.append({"type": "thinking", "thinking": reasoning})
             text = data.get("content", "")
             if isinstance(text, str) and text.strip():
                 content_blocks.append({"type": "text", "text": text})
