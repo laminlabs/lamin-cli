@@ -78,7 +78,7 @@ COMMAND_GROUPS = {
 if os.environ.get("NO_RICH"):
     import click as click
     from lamindb_setup.errors import (
-        ApiKeyExpired,
+        ApiKeyError,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
         NotInBranchDir,
@@ -102,7 +102,7 @@ if os.environ.get("NO_RICH"):
             try:
                 return super().invoke(ctx)
             except (
-                ApiKeyExpired,
+                ApiKeyError,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
                 NotInBranchDir,
@@ -119,7 +119,7 @@ if os.environ.get("NO_RICH"):
 else:
     import rich_click as click
     from lamindb_setup.errors import (
-        ApiKeyExpired,
+        ApiKeyError,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
         NotInBranchDir,
@@ -132,7 +132,7 @@ else:
             try:
                 return super().invoke(ctx)
             except (
-                ApiKeyExpired,
+                ApiKeyError,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
                 NotInBranchDir,

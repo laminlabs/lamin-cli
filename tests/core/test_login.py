@@ -7,7 +7,7 @@ from lamin_cli.__main__ import main
 from lamindb_setup import settings
 from lamindb_setup.core._hub_client import connect_hub_with_auth
 from lamindb_setup.core._hub_core import create_api_key
-from lamindb_setup.errors import ApiKeyExpired
+from lamindb_setup.errors import ApiKeyExpired, ApiKeyNotFound
 
 
 def test_entrypoint():
@@ -21,16 +21,19 @@ def test_cli_login():
     assert settings.user.handle == "testuser1"
 
 
-def test_login_maps_api_key_expired_to_click_exception(monkeypatch):
-    message = "Your API key is expired."
+@pytest.mark.parametrize(
+    "error",
+    [ApiKeyExpired(), ApiKeyNotFound()],
+)
+def test_login_maps_api_key_error_to_click_exception(monkeypatch, error):
     monkeypatch.setattr(
         "lamin_cli.__main__.login_",
-        lambda *args, **kwargs: (_ for _ in ()).throw(ApiKeyExpired()),
+        lambda *args, **kwargs: (_ for _ in ()).throw(error),
     )
     result = CliRunner().invoke(main, ["login", "testuser1"])
 
     assert result.exit_code == 1
-    assert message in result.output
+    assert str(error) in result.output
     assert "Error" in result.output
     assert "Traceback" not in result.output
 
