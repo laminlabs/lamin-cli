@@ -83,6 +83,9 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
                         missing_branch_create_and_navigate_message(target, instruction)
                     )
                 raise click.ClickException(instruction)
+            # `_branch_path` raises NotInBranchDir at the worktree parent.
+            # Resolve it before create so a hub branch is not left behind.
+            _ = _branch_settings_path()
         is_worktree_bootstrap = (
             ln_setup.settings.worktree
             and target is not None
