@@ -173,8 +173,8 @@ def test_load_errors_outside_branch_dir_in_worktree_mode(tmp_path: Path):
             output = output.replace(char, " ")
         normalized = " ".join(output.lower().split())
         assert "worktree mode is enabled" in normalized
-        assert "branch is only defined inside a child branch directory" in normalized
-        assert "cd into a branch directory in the worktree" in normalized
+        assert "branch is only defined inside a" in normalized
+        assert "switch to the branch there" in normalized
     finally:
         ln_setup.settings.worktree = previous_worktree
         ln_setup.settings.dev_dir = previous_dev_dir
