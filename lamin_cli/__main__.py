@@ -1115,7 +1115,7 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the `lamindb` package at `.agents/skills/`. Ask your coding agent to copy it to wherever it reads skills from — `.claude/skills/` for Claude Code, `.agents/skills/` for GitHub Copilot — so that it automatically tracks agent sessions. It will call:
+    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the package. After installing `lamindb`, run `uvx library-skills --all` so your agent can read it (add `--claude` for Claude Code). It will call:
 
     ```
     lamin track claude   # or: lamin track copilot, or: lamin track cursor
