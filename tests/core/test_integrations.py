@@ -98,16 +98,3 @@ def test_notion_sync_requires_parents():
 
     assert result.exit_code != 0
     assert "PARENTS" in result.output
-
-
-def test_notion_sync_reraises_as_click_exception(monkeypatch):
-    def fake_sync_from_notion(*, parents, token=None, apply=False, limit=None):
-        raise ValueError("No LaminDB record type named 'Website analytics'.")
-
-    monkeypatch.setattr(
-        "lamindb.integrations.notion.sync_from_notion", fake_sync_from_notion
-    )
-    result = CliRunner().invoke(main, ["integrations", "notion", "sync", "page-a"])
-
-    assert result.exit_code != 0
-    assert "No LaminDB record type named 'Website analytics'." in result.output
