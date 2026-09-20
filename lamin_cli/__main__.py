@@ -1036,7 +1036,7 @@ def save(
     Save a **markdown note** as {class}`~lamindb.Record`:
 
     ```
-    lamin save my-topic/my-note.md  # resolves `my-topic` as a record type
+    lamin save my-topic/my-note.md  # resolves `my-topic` as a record page
     ```
 
     Save a **README** for the entire database:
