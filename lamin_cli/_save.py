@@ -35,6 +35,19 @@ def parse_store_kwargs(
     return parsed
 
 
+def resolve_store_kwargs(
+    store_kwargs: str | dict[str, Any] | None,
+    batch_size: int | None = None,
+) -> dict[str, Any] | None:
+    """Parse store_kwargs and merge `--batch-size` into the result."""
+    parsed = parse_store_kwargs(store_kwargs)
+    if batch_size is None:
+        return parsed
+    merged = dict(parsed) if parsed else {}
+    merged["batch_size"] = batch_size
+    return merged
+
+
 def infer_registry_from_path(path: Path | str) -> str:
     suffixes_transform = {
         "py": {".py", ".ipynb"},
@@ -236,6 +249,7 @@ def save(
     branch: str | None = None,
     registry: str | None = None,
     store_kwargs: str | dict[str, Any] | None = None,
+    batch_size: int | None = None,
 ) -> str | None:
     import lamindb as ln
     from lamindb.core._finish import save_context_core
@@ -254,7 +268,7 @@ def save(
     if not ppath.exists():
         raise click.BadParameter(f"Path {ppath} does not exist", param_hint="path")
 
-    store_kwargs = parse_store_kwargs(store_kwargs)
+    store_kwargs = resolve_store_kwargs(store_kwargs, batch_size)
 
     user_passed_registry = registry is not None
     if registry is None:
@@ -327,7 +341,7 @@ def save(
 
     if store_kwargs is not None and registry != "artifact":
         raise click.ClickException(
-            "--store-kwargs is only supported when saving artifacts"
+            "--store-kwargs and --batch-size are only supported when saving artifacts"
         )
 
     if registry == "record":
