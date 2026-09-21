@@ -629,7 +629,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     "--batch-size",
     type=int,
     default=None,
-    help="Number of files transferred in parallel when loading folders (default 128). Reducing to 20 or lower can help with network errors.",
+    help="Number of files transferred in parallel when loading artifact or collection folders (default 128). Reducing to 20 or lower can help with network errors.",
 )
 @click.option(
     "--store-kwargs",
@@ -657,7 +657,7 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load transform --uid Vul4JbfsEYAy5
     ```
 
-    Pass `--batch-size` to control parallel file transfers when loading folders (default 128). Reducing to 20 or lower can help with network errors:
+    Pass `--batch-size` to control parallel file transfers when loading artifact or collection folders (default 128). Reducing to 20 or lower can help with network errors:
 
     ```
     lamin load --key mydatasets/myfolder --batch-size 20
@@ -1011,7 +1011,7 @@ def update(
     "--batch-size",
     type=int,
     default=None,
-    help="Number of files transferred in parallel when saving folders (default 128). Reducing to 20 or lower can help with network errors.",
+    help="Number of files transferred in parallel when saving artifact folders (default 128). Reducing to 20 or lower can help with network errors.",
 )
 @click.option(
     "--store-kwargs",
@@ -1040,7 +1040,7 @@ def save(
     lamin save my_table.csv --key my_tables/my_table.csv
     ```
 
-    Pass `--batch-size` to control parallel file transfers when saving folders (default 128). Reducing to 20 or lower can help with network errors:
+    Pass `--batch-size` to control parallel file transfers when saving artifact folders (default 128). Reducing to 20 or lower can help with network errors:
 
     ```
     lamin save my_folder --key my_tables --batch-size 20
