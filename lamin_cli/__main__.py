@@ -626,12 +626,18 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
 @click.option(
+    "--batch-size",
+    type=int,
+    default=None,
+    help="Number of files transferred in parallel when loading artifact or collection folders (default 128). Reducing to 20 or lower can help with network errors.",
+)
+@click.option(
     "--store-kwargs",
     type=str,
     default=None,
     help='Fine-grained settings for artifact or collection downloads as a JSON object (normally not needed), e.g. \'{"batch_size": 20}\'.',
 )
-def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, store_kwargs: str | None = None):
+def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, batch_size: int | None = None, store_kwargs: str | None = None):
     """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass an entity or a `--key`. For example:
@@ -651,6 +657,12 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load transform --uid Vul4JbfsEYAy5
     ```
 
+    Pass `--batch-size` to control parallel file transfers when loading artifact or collection folders (default 128). Reducing to 20 or lower can help with network errors:
+
+    ```
+    lamin load --key mydatasets/myfolder --batch-size 20
+    ```
+
     Pass `--store-kwargs` as a JSON object for fine-grained artifact or collection download settings (normally not needed):
 
     ```
@@ -663,15 +675,15 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     from lamin_cli._notes import parse_note_target
     if entity is not None:
         if uid is None and key is None and entity == "README.md":
-            return load_(entity=None, uid=uid, key="README.md", with_env=with_env, store_kwargs=store_kwargs)
+            return load_(entity=None, uid=uid, key="README.md", with_env=with_env, store_kwargs=store_kwargs, batch_size=batch_size)
         if uid is None and key is None and parse_note_target(entity) is not None:
-            return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs)
+            return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs, batch_size=batch_size)
         is_slug = entity.count("/") == 1
         if is_slug:
             from lamindb_setup._connect_instance import _connect_cli
             # for backward compat
             return _connect_cli(entity)
-    return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs)
+    return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs, batch_size=batch_size)
 
 
 DESCRIBE_ENTITIES_KEY = {"artifact", "transform", "collection"}
@@ -996,6 +1008,12 @@ def update(
     help="Either 'artifact', 'transform', or 'record'. If not passed, chooses based on path suffix.",
 )
 @click.option(
+    "--batch-size",
+    type=int,
+    default=None,
+    help="Number of files transferred in parallel when saving artifact folders (default 128). Reducing to 20 or lower can help with network errors.",
+)
+@click.option(
     "--store-kwargs",
     type=str,
     default=None,
@@ -1011,6 +1029,7 @@ def save(
     space: str,
     branch: str,
     registry: Literal["artifact", "transform", "record"] | None,
+    batch_size: int | None,
     store_kwargs: str | None,
 ):
     """Save a file or folder as an `artifact`, `transform`, or `record`.
@@ -1019,6 +1038,12 @@ def save(
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv
+    ```
+
+    Pass `--batch-size` to control parallel file transfers when saving artifact folders (default 128). Reducing to 20 or lower can help with network errors:
+
+    ```
+    lamin save my_folder --key my_tables --batch-size 20
     ```
 
     Pass `--store-kwargs` as a JSON object for fine-grained upload settings (normally not needed):
@@ -1090,6 +1115,7 @@ def save(
         branch=branch,
         registry=registry,
         store_kwargs=store_kwargs,
+        batch_size=batch_size,
     ) is not None:
         sys.exit(1)
 
