@@ -238,7 +238,7 @@ def save(
     store_kwargs: str | dict[str, Any] | None = None,
 ) -> str | None:
     import lamindb as ln
-    from lamindb._finish import save_context_core
+    from lamindb.core._finish import save_context_core
     from lamindb_setup.core._settings_store import settings_dir
     from lamindb_setup.core.upath import LocalPathClasses, UPath, create_path
 
