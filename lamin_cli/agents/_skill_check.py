@@ -13,19 +13,19 @@ _VERSION_RE = re.compile(r"^\s*version:\s*[\"']?([^\"'\s#]+)", re.MULTILINE)
 def warn_skill_freshness(*, claude: bool = False) -> None:
     """Warn when the project LaminDB skill is missing, broken, or a stale copy.
 
-    Only runs when cwd is the configured dest-dir or a folder under it.
+    Only runs when cwd is the configured dev-dir or a folder under it.
     """
     try:
         from lamindb_setup import settings as ln_setup_settings
     except Exception:
         return
 
-    dest_dir = ln_setup_settings.dev_dir
-    if dest_dir is None:
+    dev_dir = ln_setup_settings.dev_dir
+    if dev_dir is None:
         return
-    dest_dir = dest_dir.resolve()
+    dev_dir = dev_dir.resolve()
     cwd = Path.cwd().resolve()
-    if cwd != dest_dir and not cwd.is_relative_to(dest_dir):
+    if cwd != dev_dir and not cwd.is_relative_to(dev_dir):
         return
 
     rel = _CLAUDE_SKILL if claude else _AGENTS_SKILL
@@ -48,7 +48,7 @@ def warn_skill_freshness(*, claude: bool = False) -> None:
         )
         return
     _common.warn(
-        f"LaminDB skill not found in dest-dir. Run: {_install_cmd(claude)}"
+        f"LaminDB skill not found in dev-dir. Run: {_install_cmd(claude)}"
     )
 
 
