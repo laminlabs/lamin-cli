@@ -52,16 +52,134 @@ def _state_dir() -> Path:
     return _common.resolve_state_dir(".copilot")
 
 
+def _run_uid_filename(session_id: str) -> str:
+    return f".lamindb_run_uid_copilot_{session_id}"
+
+
 def _run_uid_file(session_id: str) -> Path:
-    return _state_dir() / f".lamindb_run_uid_copilot_{session_id}"
+    return _state_dir() / _run_uid_filename(session_id)
 
 
 def _persistent_run_uid_file(session_id: str, ln: object) -> Path:
     return _common.persistent_run_uid_file(_run_uid_file(session_id), ln)
 
 
+def _configured_dest_state_dir() -> Path | None:
+    """Configured dest-dir `.copilot/`, not the worktree branch folder."""
+    try:
+        from lamindb_setup import settings as ln_setup_settings
+
+        dest_dir = ln_setup_settings.dev_dir
+    except Exception:
+        dest_dir = None
+    return Path(dest_dir) / ".copilot" if dest_dir is not None else None
+
+
+def _uid_search_dirs() -> list[Path]:
+    dirs: list[Path] = []
+    for path in (_state_dir(), _configured_dest_state_dir()):
+        if path is not None and path not in dirs:
+            dirs.append(path)
+    return dirs
+
+
+def _existing_active_file(session_id: str) -> Path | None:
+    for directory in _uid_search_dirs():
+        path = directory / _run_uid_filename(session_id)
+        if path.exists():
+            return path
+    return None
+
+
+def _write_shared_run_uid(session_id: str, run_uid: str, ln: object) -> None:
+    for directory in _uid_search_dirs():
+        directory.mkdir(parents=True, exist_ok=True)
+        active = directory / _run_uid_filename(session_id)
+        mapping = _common.persistent_run_uid_file(active, ln)
+        with _common.session_state_lock(mapping):
+            mapping.write_text(run_uid)
+            active.write_text(run_uid)
+
+
+def _unlink_active_files(session_id: str) -> None:
+    for directory in _uid_search_dirs():
+        (directory / _run_uid_filename(session_id)).unlink(missing_ok=True)
+
+
 def _transcript_path(session_id: str) -> Path:
     return _copilot_session_state_dir() / session_id / "events.jsonl"
+
+
+def _other_sessions_containing(session_id: str) -> list[str]:
+    """Session ids whose events.jsonl mention `session_id` (not this session)."""
+    if not session_id:
+        return []
+    root = _copilot_session_state_dir()
+    hits: list[str] = []
+    for events in root.glob("*/events.jsonl"):
+        other_id = events.parent.name
+        if other_id == session_id:
+            continue
+        try:
+            if session_id in events.read_text(errors="replace"):
+                hits.append(other_id)
+        except OSError:
+            continue
+    return sorted(hits)
+
+
+def _sessions_mentioned_in(session_id: str) -> list[str]:
+    """Other session-state folders whose id appears in this session's transcript."""
+    transcript = _transcript_path(session_id)
+    root = _copilot_session_state_dir()
+    if not session_id or not transcript.exists() or not root.exists():
+        return []
+    try:
+        text = transcript.read_text(errors="replace")
+    except OSError:
+        return []
+    hits: list[str] = []
+    for child_dir in root.iterdir():
+        other_id = child_dir.name
+        if other_id == session_id or not (child_dir / "events.jsonl").exists():
+            continue
+        if other_id in text:
+            hits.append(other_id)
+    return sorted(hits)
+
+
+def _report_session_ids(session_id: str) -> tuple[list[str], list[str]]:
+    """Return (transcript order, other session ids that should share this run)."""
+    parents = _other_sessions_containing(session_id)
+    if parents:
+        return [*parents, session_id], parents
+    children = _sessions_mentioned_in(session_id)
+    if children:
+        return [session_id, *children], []
+    return [session_id], []
+
+
+def _load_joined_transcript(
+    session_ids: list[str],
+    *,
+    this_session_id: str,
+    this_raw: list[dict],
+    this_entries: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    raw_events: list[dict] = []
+    entries: list[dict] = []
+    for sid in session_ids:
+        if sid == this_session_id:
+            raw_events.extend(this_raw)
+            entries.extend(this_entries)
+            continue
+        path = _transcript_path(sid)
+        if not path.exists():
+            continue
+        raw = _load_raw_events(path)
+        raw_events.extend(raw)
+        entries.extend(_build_entries(raw))
+    return raw_events, entries
 
 
 # --- session start ---
@@ -250,8 +368,8 @@ def finish_copilot_session() -> None:
         if not session_id:
             _hard_error_no_session_id()
 
-        run_uid_file = _run_uid_file(session_id)
-        if not run_uid_file.exists():
+        run_uid_file = _existing_active_file(session_id)
+        if run_uid_file is None:
             _common.warn("no active Copilot session found, skipping session finish")
             return
 
@@ -266,7 +384,7 @@ def finish_copilot_session() -> None:
             run._status_code = 0  # completed
             run.finished_at = datetime.now(timezone.utc)
             run.save()
-            run_uid_file.unlink()
+            _unlink_active_files(session_id)
             return
 
         def _read() -> tuple[list[dict], list[dict]]:
@@ -279,6 +397,13 @@ def finish_copilot_session() -> None:
                 result[1], _SHELL_TOOL_NAMES
             ),
             transcript_path=transcript_path,
+        )
+        report_ids, share_ids = _report_session_ids(session_id)
+        raw_events, entries = _load_joined_transcript(
+            report_ids,
+            this_session_id=session_id,
+            this_raw=raw_events,
+            this_entries=entries,
         )
         html_doc = _common.render_transcript_html(
             entries,
@@ -317,7 +442,9 @@ def finish_copilot_session() -> None:
         run.finished_at = datetime.now(timezone.utc)
         run.save()
 
-        run_uid_file.unlink()
+        for other_id in share_ids:
+            _write_shared_run_uid(other_id, run.uid, ln)
+        _unlink_active_files(session_id)
         _common.info(f"finished tracking Copilot session: {run.uid}")
     except click.ClickException:
         raise

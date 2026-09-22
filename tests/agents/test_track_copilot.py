@@ -432,3 +432,100 @@ def test_finish_waits_for_delayed_finish_command_write(isolated, monkeypatch):
     )  # picked up shortly after the write, not the full 8s budget
     session_run = ln.Run.get(uid=uid)
     assert session_run.finished_at is not None
+
+
+def _write_user_and_finish(
+    state_dir: Path, session_id: str, user_text: str, assistant_text: str = "done"
+) -> None:
+    now = _next_timestamp()
+    _write_transcript(
+        state_dir,
+        session_id,
+        [
+            {
+                "type": "user.message",
+                "data": {"content": user_text},
+                "id": f"u-{session_id}",
+                "timestamp": now,
+                "parentId": None,
+            },
+            {
+                "type": "assistant.message",
+                "data": {
+                    "content": assistant_text,
+                    "toolRequests": [
+                        {
+                            "toolCallId": f"t-{session_id}",
+                            "name": "bash",
+                            "arguments": {"command": "lamin finish"},
+                        }
+                    ],
+                    "outputTokens": 5,
+                },
+                "id": f"a-{session_id}",
+                "timestamp": now,
+                "parentId": f"u-{session_id}",
+            },
+        ],
+    )
+
+
+def test_child_finish_joins_parent_chat_and_parent_updates_same_run(
+    isolated, monkeypatch
+):
+    """Child finish joins the parent transcript when the parent jsonl
+    mentions the child session id. Parent finish later updates that same
+    run and keeps both chats in the report."""
+    state_dir, _ = isolated
+    parent_id = "parent-session"
+    child_id = "child-session"
+    other_id = "other-session"
+
+    _write_user_and_finish(
+        state_dir, parent_id, "PARENT TASK UNIQUE", f"spawned {child_id}"
+    )
+    _write_user_and_finish(state_dir, other_id, "UNRELATED TASK UNIQUE")
+
+    monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", child_id)
+    track_copilot_session(name="child task")
+    uid = _run_uid_file(child_id).read_text().strip()
+    _write_user_and_finish(state_dir, child_id, "CHILD TASK UNIQUE")
+    finish_copilot_session()
+
+    run = ln.Run.get(uid=uid)
+    first_report = run.report.path.read_text()
+    assert "PARENT TASK UNIQUE" in first_report
+    assert "CHILD TASK UNIQUE" in first_report
+    assert "UNRELATED TASK UNIQUE" not in first_report
+    assert not _run_uid_file(child_id).exists()
+    assert _run_uid_file(parent_id).read_text().strip() == uid
+    assert _persistent_run_uid_file(parent_id, ln).read_text().strip() == uid
+    first_hash = run.report.hash
+
+    events_path = state_dir / parent_id / "events.jsonl"
+    with events_path.open("a") as f:
+        f.write(
+            json.dumps(
+                {
+                    "type": "user.message",
+                    "data": {"content": "PARENT FOLLOW UP UNIQUE"},
+                    "id": "u-parent-2",
+                    "timestamp": _next_timestamp(),
+                    "parentId": f"a-{parent_id}",
+                }
+            )
+            + "\n"
+        )
+
+    monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", parent_id)
+    finish_copilot_session()
+
+    run = ln.Run.get(uid=uid)
+    later_report = run.report.path.read_text()
+    assert run.report.hash != first_hash
+    assert "PARENT TASK UNIQUE" in later_report
+    assert "PARENT FOLLOW UP UNIQUE" in later_report
+    assert "CHILD TASK UNIQUE" in later_report
+    assert "UNRELATED TASK UNIQUE" not in later_report
+    assert not _run_uid_file(parent_id).exists()
+    assert ln.Run.filter(uid=uid).count() == 1
