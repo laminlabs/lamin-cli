@@ -110,52 +110,123 @@ def _transcript_path(session_id: str) -> Path:
     return _copilot_session_state_dir() / session_id / "events.jsonl"
 
 
-def _other_sessions_containing(session_id: str) -> list[str]:
-    """Session ids whose events.jsonl mention `session_id` (not this session)."""
-    if not session_id:
-        return []
+def _known_session_ids() -> set[str]:
     root = _copilot_session_state_dir()
-    hits: list[str] = []
-    for events in root.glob("*/events.jsonl"):
-        other_id = events.parent.name
-        if other_id == session_id:
-            continue
-        try:
-            if session_id in events.read_text(errors="replace"):
-                hits.append(other_id)
-        except OSError:
-            continue
+    if not root.exists():
+        return set()
+    return {
+        path.parent.name
+        for path in root.glob("*/events.jsonl")
+        if path.parent.name
+    }
+
+
+def _foreign_session_ids_in_text(
+    text: str, session_id: str, known: set[str]
+) -> list[str]:
+    return sorted(
+        other_id
+        for other_id in known
+        if other_id != session_id and other_id in text
+    )
+
+
+def _single_link_ids(transcript: Path, session_id: str, known: set[str]) -> list[str]:
+    """Other session ids that appear alone in one jsonl event.
+
+    A create/get on one child has a single id. A list of many sessions has
+    several ids in one event and is ignored.
+    """
+    hits: set[str] = set()
+    try:
+        lines = transcript.read_text(errors="replace").splitlines()
+    except OSError:
+        return []
+    for line in lines:
+        foreign = _foreign_session_ids_in_text(line, session_id, known)
+        if len(foreign) == 1:
+            hits.add(foreign[0])
     return sorted(hits)
 
 
-def _sessions_mentioned_in(session_id: str) -> list[str]:
-    """Other session-state folders whose id appears in this session's transcript."""
-    transcript = _transcript_path(session_id)
-    root = _copilot_session_state_dir()
-    if not session_id or not transcript.exists() or not root.exists():
-        return []
-    try:
-        text = transcript.read_text(errors="replace")
-    except OSError:
+def _parents_of(session_id: str, known: set[str]) -> list[str]:
+    """Other sessions with a single-id event pointing at this session."""
+    if not session_id:
         return []
     hits: list[str] = []
-    for child_dir in root.iterdir():
-        other_id = child_dir.name
-        if other_id == session_id or not (child_dir / "events.jsonl").exists():
+    for events in _copilot_session_state_dir().glob("*/events.jsonl"):
+        other_id = events.parent.name
+        if other_id == session_id:
             continue
-        if other_id in text:
+        if session_id in _single_link_ids(events, other_id, known):
             hits.append(other_id)
     return sorted(hits)
 
 
-def _report_session_ids(session_id: str) -> tuple[list[str], list[str]]:
+def _children_of(session_id: str, known: set[str]) -> list[str]:
+    """Children named by a single-id event in this session's own transcript."""
+    transcript = _transcript_path(session_id)
+    if not session_id or not transcript.exists():
+        return []
+    return _single_link_ids(transcript, session_id, known)
+
+
+def _session_id_from_uid_filename(name: str) -> str | None:
+    prefix = ".lamindb_run_uid_copilot_"
+    if not name.startswith(prefix):
+        return None
+    rest = name[len(prefix) :]
+    if not rest or rest.endswith(".lock"):
+        return None
+    maybe_key = rest.rsplit("_", 1)[-1]
+    if len(maybe_key) == 12 and maybe_key.isalnum() and "_" in rest:
+        try:
+            int(maybe_key, 16)
+        except ValueError:
+            return rest
+        return rest[: -(len(maybe_key) + 1)]
+    return rest
+
+
+def _sessions_mapped_to_run(run_uid: str) -> list[str]:
+    if not run_uid:
+        return []
+    hits: set[str] = set()
+    for directory in _uid_search_dirs():
+        if not directory.exists():
+            continue
+        for path in directory.iterdir():
+            if not path.is_file():
+                continue
+            session_id = _session_id_from_uid_filename(path.name)
+            if session_id is None:
+                continue
+            try:
+                if path.read_text().strip() == run_uid:
+                    hits.add(session_id)
+            except OSError:
+                continue
+    return sorted(hits)
+
+
+def _report_session_ids(
+    session_id: str, run_uid: str | None = None
+) -> tuple[list[str], list[str]]:
     """Return (transcript order, other session ids that should share this run)."""
-    parents = _other_sessions_containing(session_id)
+    known = _known_session_ids()
+    parents = _parents_of(session_id, known)
+    children = _children_of(session_id, known)
+    mapped = [
+        other_id
+        for other_id in _sessions_mapped_to_run(run_uid or "")
+        if other_id != session_id
+    ]
     if parents:
-        return [*parents, session_id], parents
-    children = _sessions_mentioned_in(session_id)
-    if children:
-        return [session_id, *children], []
+        extras = sorted((set(children) | set(mapped)) - set(parents) - {session_id})
+        return [*parents, session_id, *extras], parents
+    others = sorted(set(children) | set(mapped))
+    if others:
+        return [session_id, *others], []
     return [session_id], []
 
 
@@ -398,7 +469,7 @@ def finish_copilot_session() -> None:
             ),
             transcript_path=transcript_path,
         )
-        report_ids, share_ids = _report_session_ids(session_id)
+        report_ids, share_ids = _report_session_ids(session_id, run.uid)
         raw_events, entries = _load_joined_transcript(
             report_ids,
             this_session_id=session_id,

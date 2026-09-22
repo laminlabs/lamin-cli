@@ -484,6 +484,27 @@ def test_child_finish_joins_parent_chat_and_parent_updates_same_run(
     _write_user_and_finish(
         state_dir, parent_id, "PARENT TASK UNIQUE", f"spawned {child_id}"
     )
+    # A list of many session ids in one event must not count as a child link.
+    events_path = state_dir / parent_id / "events.jsonl"
+    with events_path.open("a") as f:
+        f.write(
+            json.dumps(
+                {
+                    "type": "tool.execution_complete",
+                    "data": {
+                        "toolCallId": "list-1",
+                        "success": True,
+                        "result": {
+                            "content": f"sessions: {child_id} {other_id}",
+                        },
+                    },
+                    "id": "list-1",
+                    "timestamp": _next_timestamp(),
+                    "parentId": f"a-{parent_id}",
+                }
+            )
+            + "\n"
+        )
     _write_user_and_finish(state_dir, other_id, "UNRELATED TASK UNIQUE")
 
     monkeypatch.setenv("COPILOT_AGENT_SESSION_ID", child_id)
