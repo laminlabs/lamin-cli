@@ -172,8 +172,32 @@ except PackageNotFoundError:
     lamindb_version = "lamindb-core installation not found"
 
 
+def _print_skill_version(ctx: Context, param: click.Parameter, value: bool) -> None:
+    if not value or ctx.resilient_parsing:
+        return
+    try:
+        import lamindb
+    except Exception as error:
+        raise click.ClickException("lamindb is not installed") from error
+    skill_version = getattr(lamindb, "__skill_version__", None)
+    if skill_version is None or not str(skill_version).strip():
+        raise click.ClickException(
+            "This LaminDB installation does not export a skill version."
+        )
+    click.echo(str(skill_version).strip())
+    ctx.exit()
+
+
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb-core")
+@click.option(
+    "--skill-version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_print_skill_version,
+    help="Print the packaged LaminDB skill version and exit.",
+)
 def main():
     """Manage data with LaminDB instances.
 
@@ -1187,10 +1211,8 @@ def track_claude_command(name: str | None) -> None:
     On `lamin finish`, records `n_tokens` (full billed total: input +
     output + cache tokens), `n_steps`, and `n_tool_calls` on `run.extra_data`.
     """
-    from lamin_cli.agents._skill_check import warn_skill_freshness
     from lamin_cli.agents.claude import track_claudecode_session
 
-    warn_skill_freshness(claude=True)
     return track_claudecode_session(name=name)
 
 
@@ -1214,10 +1236,8 @@ def track_copilot_command(name: str | None) -> None:
     the CLI process exits, which is after `lamin finish` already ran —
     so it is *not* directly comparable to Claude Code's `n_tokens`.
     """
-    from lamin_cli.agents._skill_check import warn_skill_freshness
     from lamin_cli.agents.copilot import track_copilot_session
 
-    warn_skill_freshness()
     return track_copilot_session(name=name)
 
 
@@ -1230,10 +1250,8 @@ def track_copilot_command(name: str | None) -> None:
 )
 def track_cursor_command(name: str | None) -> None:
     """Start or resume tracking a Cursor IDE Agent session in LaminDB."""
-    from lamin_cli.agents._skill_check import warn_skill_freshness
     from lamin_cli.agents.cursor import track_cursor_session
 
-    warn_skill_freshness()
     return track_cursor_session(name=name)
 
 
