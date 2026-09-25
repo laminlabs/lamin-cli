@@ -96,7 +96,7 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
     assert calls == {"parents": ["page-a"], "depth": 0}
 
 
-def test_transfer_artifact_forwards_args(monkeypatch):
+def test_transfer_url_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
     def fake_sync_objects_from_database(
@@ -110,17 +110,14 @@ def test_transfer_artifact_forwards_args(monkeypatch):
         return []
 
     monkeypatch.setattr(
-        "lamindb.models._transfer.sync_objects_from_database",
+        "lamindb.models.sync_objects_from_database",
         fake_sync_objects_from_database,
     )
     result = CliRunner().invoke(
         main,
         [
             "transfer",
-            "artifact",
-            "abc123",
-            "--from",
-            "laminlabs/lamindata",
+            "https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE",
             "--depth",
             "1",
             "--transfer",
@@ -130,12 +127,47 @@ def test_transfer_artifact_forwards_args(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls == {
-        "registry": "artifact",
-        "uids": "abc123",
+        "registry": "record",
+        "uids": "UrcIKR8v0ywim0pE",
         "source": "laminlabs/lamindata",
         "depth": 1,
         "transfer": "annotations",
     }
+
+
+def test_transfer_entity_uid_forwards_args(monkeypatch):
+    calls: dict[str, object] = {}
+
+    def fake_sync_objects_from_database(
+        registry, uids, *, source, depth=None, transfer=None
+    ):
+        calls["registry"] = registry
+        calls["uids"] = uids
+        calls["source"] = source
+        calls["depth"] = depth
+        calls["transfer"] = transfer
+        return []
+
+    monkeypatch.setattr(
+        "lamindb.models.sync_objects_from_database",
+        fake_sync_objects_from_database,
+    )
+    result = CliRunner().invoke(
+        main,
+        [
+            "transfer",
+            "artifact",
+            "--uid",
+            "e2G7k9EVul4JbfsE",
+            "--from",
+            "laminlabs/lamindata",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls["registry"] == "artifact"
+    assert calls["uids"] == "e2G7k9EVul4JbfsE"
+    assert calls["source"] == "laminlabs/lamindata"
 
 
 def test_notion_sync_requires_parents():

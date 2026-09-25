@@ -1,5 +1,5 @@
 def decompose_url(url: str) -> tuple[str, str, str]:
-    # transform before run (run is substring of transform)
+    # transform before run (run is a substring of transform)
     entities = [
         "transform",
         "artifact",
@@ -8,6 +8,10 @@ def decompose_url(url: str) -> tuple[str, str, str]:
         "project",
         "ulabel",
         "branch",
+        "feature",
+        "schema",
+        "reference",
+        "space",
         "run",
     ]
     assert any(keyword in url for keyword in entities)
