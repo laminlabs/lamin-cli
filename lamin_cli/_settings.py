@@ -1,45 +1,37 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 if os.environ.get("NO_RICH"):
     import click as click
 else:
     import rich_click as click
 
-
-def mount_storage_config_path() -> Path:
-    from lamindb_setup import settings as settings_
-
-    return settings_.settings_dir / "exec-mount-storage.txt"
+from lamindb_setup.errors import DevDirNonEmpty, NoDevDirConfigured
 
 
-def read_mount_storage_config() -> tuple[str, ...]:
-    path = mount_storage_config_path()
-    if not path.exists():
-        return ()
-    return tuple(line.strip() for line in path.read_text().splitlines() if line.strip())
+def _set_worktree(settings_, value: bool) -> None:
+    try:
+        settings_.worktree = value
+    except (NoDevDirConfigured, DevDirNonEmpty) as error:
+        raise click.ClickException(str(error)) from error
 
 
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage development, cache, modules, branch, space, and exec mount-storage settings.
+    """Manage development, cache, modules, branch, space, and mount settings.
 
-    Get or set a setting by name:
+    Get or set the following settings:
 
     - `dev-dir` → development directory {attr}`~lamindb.setup.core.SetupSettings.dev_dir`
     - `cache-dir` → cache directory {attr}`~lamindb.setup.core.SetupSettings.cache_dir`
     - `modules` → environment schema modules {attr}`~lamindb.setup.core.SetupSettings.modules`
-    - `branch` → branch {attr}`~lamindb.setup.core.SetupSettings.branch`
-    - `space` → space {attr}`~lamindb.setup.core.SetupSettings.space`
-    - `mount-storage` → machine-local exec mount mappings for `lamin exec`
+    - `branch` → current {attr}`~lamindb.setup.core.SetupSettings.branch`
+    - `space` → current {attr}`~lamindb.setup.core.SetupSettings.space`
+    - `worktree` → toggle {attr}`~lamindb.setup.core.SetupSettings.worktree` mode (dev-dir is a worktree parent where each child directory maps on a branch)
 
-    Display via [lamin info](https://docs.lamin.ai/cli#info)
+    You can display your current settings by running: `lamin info`
 
     Examples:
 
@@ -63,10 +55,13 @@ def settings(ctx):
     # space
     lamin settings space get
     lamin settings space set all
-    # exec mount-storage
-    lamin settings mount-storage get
-    lamin settings mount-storage set s3://bucket/prefix=/mount/root
-    lamin settings mount-storage unset
+    # worktree
+    lamin settings worktree get
+    lamin settings worktree set true
+    lamin settings worktree unset
+    # mount
+    lamin settings mount storage ./mnt
+    lamin settings mount unset ./mnt
     ```
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.modules`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
@@ -120,6 +115,51 @@ settings.add_command(dev_dir_group)
 
 
 # -----------------------------------------------------------------------------
+# worktree group (pattern: lamin settings worktree get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("worktree")
+def worktree_group():
+    """Get or set whether dev-dir is interpreted as a worktree parent."""
+
+
+@worktree_group.command("get")
+def worktree_get():
+    """Show whether worktree mode is enabled."""
+    from lamindb_setup import settings as settings_
+
+    click.echo("true" if settings_.worktree else "false")
+
+
+@worktree_group.command("set")
+@click.argument("value", type=str)
+def worktree_set(value: str):
+    """Enable or disable worktree mode."""
+    from lamindb_setup import settings as settings_
+
+    value_normalized = value.strip().lower()
+    if value_normalized in {"1", "true", "yes"}:
+        _set_worktree(settings_, True)
+        return
+    if value_normalized in {"0", "false", "no"}:
+        _set_worktree(settings_, False)
+        return
+    raise click.ClickException("Invalid value for worktree. Pass one of: true, false.")
+
+
+@worktree_group.command("unset")
+def worktree_unset():
+    """Unset worktree mode (equivalent to false)."""
+    from lamindb_setup import settings as settings_
+
+    _set_worktree(settings_, False)
+
+
+settings.add_command(worktree_group)
+
+
+# -----------------------------------------------------------------------------
 # modules group (pattern: lamin settings modules get/set)
 # -----------------------------------------------------------------------------
 
@@ -162,46 +202,6 @@ settings.add_command(modules_group)
 
 
 # -----------------------------------------------------------------------------
-# mount-storage group (pattern: lamin settings mount-storage get/set)
-# -----------------------------------------------------------------------------
-
-
-@click.group("mount-storage")
-def mount_storage_group():
-    """Get or set machine-local exec mount-storage mappings."""
-
-
-@mount_storage_group.command("get")
-def mount_storage_get():
-    """Show current machine-local exec mount-storage mappings."""
-    mappings = read_mount_storage_config()
-    click.echo("\n".join(mappings) if mappings else "None")
-
-
-@mount_storage_group.command("set")
-@click.argument("values", nargs=-1, type=str)
-def mount_storage_set(values: tuple[str, ...]):
-    """Set machine-local exec mount-storage mappings."""
-    from lamin_cli.__main__ import parse_mount_storage_mappings
-
-    if not values:
-        raise click.UsageError(
-            "Provide at least one <storage-root>=<mount-root> mapping."
-        )
-    parse_mount_storage_mappings(values)
-    mount_storage_config_path().write_text("\n".join(values) + "\n")
-
-
-@mount_storage_group.command("unset")
-def mount_storage_unset():
-    """Unset machine-local exec mount-storage mappings."""
-    mount_storage_config_path().unlink(missing_ok=True)
-
-
-settings.add_command(mount_storage_group)
-
-
-# -----------------------------------------------------------------------------
 # Legacy get/set (hidden, backward compatibility)
 # -----------------------------------------------------------------------------
 
@@ -210,7 +210,8 @@ settings.add_command(mount_storage_group)
 @click.argument(
     "setting",
     type=click.Choice(
-        ["auto-connect", "private-django-api", "dev-dir"], case_sensitive=False
+        ["auto-connect", "private-django-api", "dev-dir", "worktree"],
+        case_sensitive=False,
     ),
 )
 @click.argument("value")  # No explicit type - let Click handle it
@@ -226,13 +227,22 @@ def set_legacy(setting: str, value: str):
         if value.lower() == "none":
             value = None  # type: ignore[assignment]
         settings_.dev_dir = value
+    if setting == "worktree":
+        _set_worktree(settings_, click.BOOL(value))
 
 
 @settings.command("get", hidden=True)
 @click.argument(
     "setting",
     type=click.Choice(
-        ["auto-connect", "private-django-api", "space", "branch", "dev-dir"],
+        [
+            "auto-connect",
+            "private-django-api",
+            "space",
+            "branch",
+            "dev-dir",
+            "worktree",
+        ],
         case_sensitive=False,
     ),
 )
@@ -248,6 +258,8 @@ def get_legacy(setting: str):
         value = settings_.dev_dir
         if value is None:
             value = "None"
+    elif setting == "worktree":
+        value = "true" if settings_.worktree else "false"
     else:
         value = getattr(settings_, setting.replace("-", "_"))
     click.echo(value)
@@ -258,5 +270,7 @@ def get_legacy(setting: str):
 # -----------------------------------------------------------------------------
 
 from lamin_cli._cache import cache
+from lamin_cli.mount import mount
 
 settings.add_command(cache, "cache-dir")
+settings.add_command(mount)

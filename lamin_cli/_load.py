@@ -3,13 +3,18 @@ from __future__ import annotations
 import re
 import shutil
 from pathlib import Path
+from typing import Any
 
 import click
 from lamin_utils import logger
 
 from ._context import get_current_run_file
 from ._notes import is_path_within, parse_note_target, resolve_note_record
-from ._save import infer_registry_from_path, parse_title_r_notebook
+from ._save import (
+    infer_registry_from_path,
+    parse_title_r_notebook,
+    resolve_store_kwargs,
+)
 from .urls import decompose_url
 
 
@@ -18,6 +23,8 @@ def load(
     uid: str | None = None,
     key: str | None = None,
     with_env: bool = False,
+    store_kwargs: str | dict[str, Any] | None = None,
+    batch_size: int | None = None,
 ):
     """Load artifact, collection, or transform from LaminDB.
 
@@ -26,11 +33,28 @@ def load(
         uid: Unique identifier (prefix matching supported)
         key: Key identifier
         with_env: If True, also load environment requirements file for transforms
+        store_kwargs: Fine-grained settings forwarded to artifact/collection cache()
+        batch_size: Parallel file transfer batch size forwarded to cache()
 
     Returns:
         Path to loaded transform, or None for artifacts/collections
     """
     import lamindb_setup as ln_setup
+
+    def _note_type_chain_from_record(note_record) -> list[str]:
+        chain: list[str] = []
+        parent = note_record.type
+        visited: set[str] = set()
+        while parent is not None:
+            parent_uid = getattr(parent, "uid", None)
+            if parent_uid is not None:
+                if parent_uid in visited:
+                    break
+                visited.add(parent_uid)
+            if parent.name is not None:
+                chain.append(parent.name)
+            parent = parent.type
+        return list(reversed(chain))
 
     note_target: tuple[list[str], str] | None = None
     if entity is not None and uid is None and key is None:
@@ -56,6 +80,23 @@ def load(
 
     ln_setup.connect(instance)
     import lamindb as ln
+
+    store_kwargs = resolve_store_kwargs(store_kwargs, batch_size)
+    if store_kwargs is not None and entity not in {"artifact", "collection"}:
+        raise click.ClickException(
+            "--store-kwargs and --batch-size are only supported when loading artifacts or collections"
+        )
+
+    # In worktree mode, load requires a concrete branch context from a child
+    # directory. This raises NotInBranchDir in dev-dir root/outside the worktree.
+    if ln_setup.settings.worktree:
+        _ = ln_setup.settings._branch_path
+
+    active_dev_dir = (
+        ln_setup.settings.effective_dev_dir
+        if ln_setup.settings.dev_dir is not None
+        else None
+    )
 
     current_run = None
     if get_current_run_file().exists():
@@ -114,23 +155,33 @@ def load(
 
     match entity:
         case "record":
-            if note_target is None:
+            if note_target is not None:
+                type_chain, note_name = note_target
+                note_record = resolve_note_record(
+                    ln=ln,
+                    type_chain=type_chain,
+                    note_name=note_name,
+                    create_if_missing=False,
+                )
+                if note_record is None:
+                    note_path = (
+                        "/".join([*type_chain, note_name]) if type_chain else note_name
+                    )
+                    raise click.ClickException(
+                        f"Record note '{note_path}' does not exist. Save it first with `lamin save`."
+                    )
+            elif uid is not None:
+                records = ln.Record.objects.filter(uid__startswith=uid)
+                if (n_records := len(records)) == 0:
+                    raise click.ClickException(f"Record with uid={uid} does not exist.")
+                if n_records > 1:
+                    records = records.order_by("-created_at")
+                note_record = records.first()
+                type_chain = _note_type_chain_from_record(note_record)
+                note_name = note_record.name
+            else:
                 raise click.ClickException(
                     "For record note loads, pass a note target like <topic>/<note> or <topic>/<note>.md."
-                )
-            type_chain, note_name = note_target
-            note_record = resolve_note_record(
-                ln=ln,
-                type_chain=type_chain,
-                note_name=note_name,
-                create_if_missing=False,
-            )
-            if note_record is None:
-                note_path = (
-                    "/".join([*type_chain, note_name]) if type_chain else note_name
-                )
-                raise click.ClickException(
-                    f"Record note '{note_path}' does not exist. Save it first with `lamin save`."
                 )
             readme_block = (
                 note_record.ablocks.filter(kind="readme")
@@ -143,13 +194,11 @@ def load(
                 )
 
             cwd = Path.cwd().resolve()
-            if ln_setup.settings.dev_dir is not None and is_path_within(
-                cwd, ln_setup.settings.dev_dir
-            ):
+            if active_dev_dir is not None and is_path_within(cwd, active_dev_dir):
                 target_path = (
-                    ln_setup.settings.dev_dir / Path(*type_chain) / f"{note_name}.md"
+                    active_dev_dir / Path(*type_chain) / f"{note_name}.md"
                     if type_chain
-                    else ln_setup.settings.dev_dir / f"{note_name}.md"
+                    else active_dev_dir / f"{note_name}.md"
                 )
             else:
                 target_path = cwd / f"{note_name}.md"
@@ -186,8 +235,8 @@ def load(
             transform = transforms.first()
 
             target_path = Path(transform.key)
-            if ln_setup.settings.dev_dir is not None:
-                target_path = ln_setup.settings.dev_dir / target_path
+            if active_dev_dir is not None:
+                target_path = active_dev_dir / target_path
             if len(target_path.parents) > 1:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
             if target_path.exists():
@@ -245,7 +294,9 @@ def load(
                 entities = entities.order_by("-created_at")
 
             entity_obj = entities.first()
-            cache_path = entity_obj.cache(is_run_input=current_run)
+            cache_path = entity_obj.cache(
+                is_run_input=current_run, **(store_kwargs or {})
+            )
 
             # collection gives us a list of paths
             if isinstance(cache_path, list):
@@ -260,8 +311,8 @@ def load(
                     # TODO: switch to reading from README block in the future.
                     # Current behavior is transitional and reads from README artifact cache.
                     target_root = (
-                        ln_setup.settings.dev_dir
-                        if ln_setup.settings.dev_dir is not None
+                        active_dev_dir
+                        if active_dev_dir is not None
                         else Path.cwd().resolve()
                     )
                     target_path = target_root / "README.md"

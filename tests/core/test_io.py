@@ -38,7 +38,7 @@ def test_snapshot():
     finally:
         import lamindb_setup as ln_setup
 
-        ln_setup.disconnect()
+        ln_setup.disconnect(here=True)
         _ = subprocess.run(
             "lamin login testuser1",
             shell=True,

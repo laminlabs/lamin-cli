@@ -692,6 +692,62 @@ def test_load_markdown_note_outside_dev_dir_flattens_output():
         branch.delete(permanent=True)
 
 
+def test_load_markdown_note_via_record_url_inside_dev_dir():
+    unique = time.time_ns()
+    branch = ln.Branch(name=f"cli_load_note_url_branch_{unique}").save()
+    notes_root = Path(__file__).parent / f"load_notes_url_{unique}"
+
+    topic_type = ln.Record(name=f"topic-url-{unique}", is_type=True).save()
+    subtopic_type = ln.Record(
+        name=f"subtopic-url-{unique}",
+        type=topic_type,
+        is_type=True,
+    ).save()
+    source_path = notes_root / topic_type.name / subtopic_type.name / "my-note.md"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text("# URL load\n\nfrom record url")
+    note_record = None
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        save_result = run_lamin("save", str(source_path))
+        assert save_result.returncode == 0, (
+            f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
+        )
+        note_record = (
+            ln.Record.filter(name="my-note", type=subtopic_type, branch=branch)
+            .order_by("-created_at")
+            .first()
+        )
+        assert note_record is not None
+
+        source_path.unlink()
+        record_url = f"https://lamin.ai/{ln.setup.settings.instance.slug}/record/{note_record.uid}"
+        load_result = run_lamin("load", record_url, cwd=notes_root)
+        assert load_result.returncode == 0, (
+            f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
+        )
+        assert source_path.exists()
+        assert "from record url" in source_path.read_text()
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset")
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        if note_record is not None:
+            note_record.delete(permanent=True)
+        subtopic_lookup = ln.Record.filter(uid=subtopic_type.uid).one_or_none()
+        if subtopic_lookup is not None:
+            subtopic_type.refresh_from_db()
+            subtopic_type.delete(permanent=True)
+        topic_lookup = ln.Record.filter(uid=topic_type.uid).one_or_none()
+        if topic_lookup is not None:
+            topic_type.refresh_from_db()
+            topic_type.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
 def test_load_markdown_note_resolves_hierarchy_by_parent_chain():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_load_note_parent_chain_branch_{unique}").save()

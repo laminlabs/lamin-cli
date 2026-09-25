@@ -35,6 +35,7 @@ def test_connect_here_sets_local_marker_and_dev_dir(tmp_path: Path):
 
     result = _run(f"lamin connect {instance_slug} --here", cwd=project_dir)
     assert result.returncode == 0, result.stderr
+    assert (result.stdout + result.stderr).count("connected lamindb:") == 1
     assert marker_path.exists()
     assert marker_path.read_text().strip() == instance_slug
     assert current_instance_settings_file().read_text() == global_before

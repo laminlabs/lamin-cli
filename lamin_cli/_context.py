@@ -37,7 +37,7 @@ def get_script_filename() -> Path:
 def track():
     import lamindb as ln
 
-    if not ln.setup.settings._instance_exists:
+    if not ln.setup.settings.is_configured:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )
@@ -58,7 +58,7 @@ def finish():
 
     import lamindb as ln
 
-    if not ln.setup.settings._instance_exists:
+    if not ln.setup.settings.is_configured:
         raise click.ClickException(
             "Not connected to an instance. Please run: lamin connect account/name"
         )

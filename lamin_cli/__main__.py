@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import inspect
 import os
-import shlex
 import shutil
-import subprocess
 import sys
 import warnings
 from collections import OrderedDict
-from datetime import datetime, timezone
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -16,15 +13,16 @@ from typing import TYPE_CHECKING, Literal
 
 import lamindb_setup as ln_setup
 from lamin_utils import logger
+from lamindb_setup import disconnect as disconnect_
+from lamindb_setup._connect_instance import _connect_cli as connect_
 from lamindb_setup._init_instance import (
+    DEFAULT_STORAGE_PATH,
     DOC_DB,
     DOC_INSTANCE_NAME,
     DOC_MODULES,
     DOC_STORAGE_ARG,
 )
 
-from lamin_cli import connect as connect_
-from lamin_cli import disconnect as disconnect_
 from lamin_cli import init as init_
 from lamin_cli import login as login_
 from lamin_cli import logout as logout_
@@ -42,10 +40,6 @@ COMMAND_GROUPS = {
             "commands": ["connect", "info", "init", "disconnect"],
         },
         {
-            "name": "Execute programs",
-            "commands": ["exec"],
-        },
-        {
             "name": "Save, load, create & delete",
             "commands": ["save", "load", "create", "delete"],
         },
@@ -58,12 +52,12 @@ COMMAND_GROUPS = {
             "commands": ["switch", "merge"],
         },
         {
-            "name": "Track within shell scripts",
+            "name": "Track agents & shell scripts",
             "commands": ["track", "finish"],
         },
         {
-            "name": "Manage settings and migrations",
-            "commands": ["settings", "migrate"],
+            "name": "Settings & migrations",
+            "commands": ["settings", "migrate", "io", "integrations"],
         },
         {
             "name": "Auth",
@@ -72,6 +66,10 @@ COMMAND_GROUPS = {
                 "logout",
             ],
         },
+        {
+            "name": "Experimental",
+            "commands": ["run", "hub"],
+        },
     ]
 }
 
@@ -79,8 +77,16 @@ COMMAND_GROUPS = {
 # Otherwise rich-click takes over the formatting.
 if os.environ.get("NO_RICH"):
     import click as click
+    from lamindb_setup.errors import (
+        ApiKeyError,
+        ConnectWithinDevDirError,
+        CurrentInstanceNotConfigured,
+        NotInBranchDir,
+        NoWriteAccess,
+        WorktreePathError,
+    )
 
-    class OrderedGroup(click.Group):
+    class OrderedExceptionHandlingGroup(click.Group):
         """Overwrites list_commands to return commands in order of definition."""
 
         def __init__(
@@ -92,13 +98,48 @@ if os.environ.get("NO_RICH"):
             super().__init__(name, commands, **kwargs)
             self.commands = commands or OrderedDict()
 
+        def invoke(self, ctx: click.Context):
+            try:
+                return super().invoke(ctx)
+            except (
+                ApiKeyError,
+                ConnectWithinDevDirError,
+                CurrentInstanceNotConfigured,
+                NotInBranchDir,
+                NoWriteAccess,
+                WorktreePathError,
+            ) as e:
+                raise click.ClickException(str(e)) from None
+
         def list_commands(self, ctx: click.Context) -> Mapping[str, click.Command]:
             return self.commands
 
-    lamin_group_decorator = click.group(cls=OrderedGroup)
+    lamin_group_decorator = click.group(cls=OrderedExceptionHandlingGroup)
 
 else:
     import rich_click as click
+    from lamindb_setup.errors import (
+        ApiKeyError,
+        ConnectWithinDevDirError,
+        CurrentInstanceNotConfigured,
+        NotInBranchDir,
+        NoWriteAccess,
+        WorktreePathError,
+    )
+
+    class OrderedRichExceptionHandlingGroup(click.RichGroup):
+        def invoke(self, ctx: click.Context):
+            try:
+                return super().invoke(ctx)
+            except (
+                ApiKeyError,
+                ConnectWithinDevDirError,
+                CurrentInstanceNotConfigured,
+                NotInBranchDir,
+                NoWriteAccess,
+                WorktreePathError,
+            ) as e:
+                raise click.ClickException(str(e)) from None
 
     def lamin_group_decorator(f):
         @click.rich_config(
@@ -107,7 +148,7 @@ else:
                 style_commands_table_column_width_ratio=(1, 10),
             )
         )
-        @click.group()
+        @click.group(cls=OrderedRichExceptionHandlingGroup)
         @wraps(f)
         def wrapper(*args, **kwargs):
             return f(*args, **kwargs)
@@ -120,6 +161,7 @@ from lamindb_setup._silence_loggers import silence_loggers
 from lamin_cli._io import io
 from lamin_cli._migration import migrate
 from lamin_cli._settings import settings
+from lamin_cli.hub import hub
 
 if TYPE_CHECKING:
     from click import Command, Context
@@ -130,234 +172,46 @@ except PackageNotFoundError:
     lamindb_version = "lamindb-core installation not found"
 
 
-def classify_exec_target(target: str) -> Literal["script", "executable"]:
-    """Classify an exec target as a local script or an opaque executable."""
-    return (
-        "script"
-        if Path(target).suffix
-        in {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"}
-        else "executable"
-    )
-
-
-def _probe_exec_version(executable: str) -> str | None:
+def _print_skill_version(ctx: Context, param: click.Parameter, value: bool) -> None:
+    if not value or ctx.resilient_parsing:
+        return
     try:
-        result = subprocess.run(
-            [executable, "--version"],
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=5,
+        import lamindb
+    except Exception as error:
+        raise click.ClickException("lamindb is not installed") from error
+    skill_version = getattr(lamindb, "__skill_version__", None)
+    if skill_version is None or not str(skill_version).strip():
+        raise click.ClickException(
+            "This LaminDB installation does not export a skill version."
         )
-    except subprocess.TimeoutExpired:
-        return None
-    except OSError:
-        return None
-
-    if result.returncode != 0:
-        return None
-
-    version_output = (result.stdout or result.stderr).strip()
-    if not version_output:
-        return None
-    return version_output.splitlines()[0]
-
-
-def _prepare_exec_transform(target: str, target_kind: Literal["script", "executable"]):
-    import lamindb as ln
-
-    target_path = Path(target)
-    key = target_path.name
-    if target_kind == "script":
-        transform = ln.Transform(
-            key=key,
-            source_code=target_path.read_text(),
-            kind="script",
-        )
-        transform.branch = ln_setup.settings.branch
-        transform.space = ln_setup.settings.space
-        return transform.save()
-
-    description = key
-    version_output = _probe_exec_version(target)
-    if version_output is not None:
-        description = f"{key} ({version_output})"
-    transform = ln.Transform(
-        key=key,
-        kind="pipeline",
-        description=description,
-    )
-    transform.branch = ln_setup.settings.branch
-    transform.space = ln_setup.settings.space
-    return transform.save()
-
-
-def parse_lamin_exec_uri(uri: str) -> tuple[str, str, Path | None]:
-    if not uri.startswith("lamin://"):
-        raise click.BadParameter("Expected a lamin:// URI.")
-
-    parts = uri.removeprefix("lamin://").split("/")
-    if len(parts) < 4:
-        raise click.BadParameter(
-            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
-        )
-
-    owner, instance, entity, uid, *subpath_parts = parts
-    if not owner or not instance or entity != "artifact":
-        raise click.BadParameter(
-            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
-        )
-
-    if len(uid) not in {16, 20}:
-        raise click.BadParameter(
-            f"Artifact uid must be 16 or 20 characters, got {len(uid)}."
-        )
-
-    if not uid.isalnum():
-        raise click.BadParameter("Artifact uid must be alphanumeric.")
-
-    if any(part == "" for part in subpath_parts):
-        raise click.BadParameter(
-            "Expected lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]."
-        )
-
-    subpath = Path(*subpath_parts) if subpath_parts else None
-    return f"{owner}/{instance}", uid, subpath
-
-
-def _load_exec_artifact(instance_slug: str, uid: str):
-    ln_setup.connect(instance_slug)
-    import lamindb as ln
-
-    return ln.Artifact.get(uid)
-
-
-def parse_mount_storage_mappings(
-    mappings: tuple[str, ...],
-) -> tuple[tuple[str, Path], ...]:
-    from lamindb_setup.core.upath import UPath
-
-    parsed_mappings: list[tuple[str, Path]] = []
-    seen_storage_roots: set[str] = set()
-    for mapping in mappings:
-        storage_root, separator, mount_root = mapping.partition("=")
-        if not separator or not storage_root or not mount_root:
-            raise click.BadParameter(
-                "Expected --mount-storage <storage-root>=<mount-root>."
-            )
-        normalized_storage_root = str(UPath(storage_root).resolve())
-        if normalized_storage_root in seen_storage_roots:
-            raise click.BadParameter(
-                "Duplicate --mount-storage storage root after normalization."
-            )
-        seen_storage_roots.add(normalized_storage_root)
-        parsed_mappings.append((normalized_storage_root, Path(mount_root)))
-    return tuple(parsed_mappings)
-
-
-def _resolve_mounted_exec_path(
-    artifact,
-    subpath: Path | None,
-    mount_storage_mappings: tuple[tuple[str, Path], ...],
-) -> Path | None:
-    if not mount_storage_mappings:
-        return None
-
-    from lamindb.core.storage.paths import check_path_is_child_of_root
-    from lamindb_setup.core.upath import UPath
-
-    artifact_storage = getattr(artifact, "storage", None)
-    artifact_raw_path = getattr(artifact, "path", None)
-    if artifact_raw_path is None or artifact_storage is None:
-        return None
-
-    artifact_path = UPath(str(artifact_raw_path))
-
-    for candidate_storage_root, mount_root in sorted(
-        mount_storage_mappings,
-        key=lambda item: len(item[0]),
-        reverse=True,
-    ):
-        if not check_path_is_child_of_root(artifact_path, candidate_storage_root):
-            continue
-
-        resolved_artifact_path = str(artifact_path.resolve())
-        resolved_storage_root = str(UPath(candidate_storage_root).resolve())
-        relative_path = resolved_artifact_path.removeprefix(
-            resolved_storage_root
-        ).lstrip("/")
-
-        mounted_path = mount_root / Path(relative_path)
-        if subpath is not None:
-            mounted_path = mounted_path / subpath
-        if mounted_path.exists():
-            return mounted_path
-
-    return None
-
-
-def resolve_lamin_exec_arg(
-    arg: str, mount_storage_mappings: tuple[tuple[str, Path], ...] = ()
-) -> str:
-    if not arg.startswith("lamin://"):
-        return arg
-
-    instance_slug, uid, subpath = parse_lamin_exec_uri(arg)
-    artifact = _load_exec_artifact(instance_slug, uid)
-    mounted_path = _resolve_mounted_exec_path(artifact, subpath, mount_storage_mappings)
-    if mounted_path is not None:
-        return str(mounted_path)
-
-    cache_path = artifact.cache()
-    if subpath is not None:
-        cache_path = cache_path / subpath
-    return str(cache_path)
-
-
-def rewrite_exec_argv(
-    argv: list[str], mount_storage_mappings: tuple[tuple[str, Path], ...] = ()
-) -> list[str]:
-    return [resolve_lamin_exec_arg(arg, mount_storage_mappings) for arg in argv]
-
-
-def _collect_exec_output_paths(
-    argv: list[str], register_outputs: tuple[str, ...]
-) -> list[Path]:
-    output_paths = [Path(output) for output in register_outputs]
-    passthrough_argv = argv[1:]
-    i = 0
-    while i < len(passthrough_argv):
-        arg = passthrough_argv[i]
-        if arg in {"--out", "--output"}:
-            if i + 1 < len(passthrough_argv):
-                value = passthrough_argv[i + 1]
-                if not value.startswith("-"):
-                    output_paths.append(Path(value))
-                    i += 2
-                    continue
-        elif arg.startswith("--out="):
-            output_paths.append(Path(arg.partition("=")[2]))
-        elif arg.startswith("--output="):
-            output_paths.append(Path(arg.partition("=")[2]))
-        i += 1
-    return output_paths
-
-
-def _register_exec_outputs(run, output_paths: list[Path]) -> None:
-    import lamindb as ln
-
-    seen_paths: set[Path] = set()
-    for output_path in output_paths:
-        if output_path in seen_paths or not output_path.exists():
-            continue
-        seen_paths.add(output_path)
-        ln.Artifact(output_path, key=output_path.name, run=run).save()
+    click.echo(str(skill_version).strip())
+    ctx.exit()
 
 
 @lamin_group_decorator
 @click.version_option(version=lamindb_version, prog_name="lamindb-core")
+@click.option(
+    "--skill-version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_print_skill_version,
+    help="Print the packaged LaminDB skill version and exit.",
+)
 def main():
-    """Manage data with LaminDB instances."""
+    """Manage data with LaminDB instances.
+
+    :::{dropdown} How do I enable shell autocompletion?
+
+    On MacOS, enable shell autocompletion by adding the following to your `~/.zshrc`:
+
+    ```bash
+    autoload -Uz compinit && compinit
+    eval "$(_LAMIN_COMPLETE=zsh_source lamin)"
+    ```
+
+    :::
+    """
     silence_loggers()
 
 
@@ -398,7 +252,7 @@ def schema_to_modules_callback(ctx, param, value):
 
 # fmt: off
 @main.command()
-@click.option("--storage", type=str, default = ".", help=DOC_STORAGE_ARG)
+@click.option("--storage", type=str, default=DEFAULT_STORAGE_PATH, help=DOC_STORAGE_ARG)
 @click.option("--name", type=str, default=None, help=DOC_INSTANCE_NAME)
 @click.option("--db", type=str, default=None, help=DOC_DB)
 @click.option("--modules", type=str, default=None, help=DOC_MODULES)
@@ -409,16 +263,33 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Initialize a database instance.
+    """Initialize a LaminDB instance.
 
-    Examples:
+    Create a new development directory for your source code and `cd` into it:
 
     ```
-    lamin init --storage ./mydata
+    mkdir mydata && cd mydata
+    ```
+
+    Initialize a local SQLite database in that directory:
+
+    ```
+    lamin init
+    lamin init --modules bionty
+    lamin init --modules bionty,pertdb
+    ```
+
+    Initialize a SQLite database that's hosted on S3 along with all files managed by the LaminDB instance:
+
+    ```
     lamin init --storage s3://my-bucket
     lamin init --storage gs://my-bucket
-    lamin init --storage ./mydata --modules bionty
-    lamin init --storage ./mydata --modules bionty,pertdb
+    ```
+
+    Initialize a PostgresSQL database with a storage location on S3:
+
+    ```
+    lamin init --storage s3://my-bucket --db "postgresql://user:password@host:port/database"
     ```
 
     → Python/R alternative: {func}`~lamindb.setup.init`
@@ -432,7 +303,7 @@ def init(
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
 def connect(instance: str, here: bool):
-    """Set the default database instance for this environment or directory.
+    """Set the default database for this environment or directory.
 
     This command updates your local configuration to target the specified instance:
     all subsequent CLI commands and Python/R sessions will auto-connect to this instance.
@@ -456,7 +327,7 @@ def connect(instance: str, here: bool):
 @main.command()
 @click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
 def disconnect(here: bool):
-    """Unset the default database instance for this environment or directory.
+    """Unset the default database for this environment or directory.
 
     - Without `--here`, it clears the global default instance.
     - With `--here`, it removes the nearest local marker from the current
@@ -472,85 +343,6 @@ def disconnect(here: bool):
     → Python/R alternative: {func}`~lamindb.setup.disconnect`
     """
     return disconnect_(here=here)
-
-
-@main.command("exec", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
-@click.argument("target", type=str)
-@click.option(
-    "--register-output",
-    "register_outputs",
-    multiple=True,
-    type=str,
-    help="Register an output artifact path after execution.",
-)
-@click.option(
-    "--mount-storage",
-    "mount_storage",
-    multiple=True,
-    type=str,
-    help="Map a storage root to a mounted local root for exec artifact resolution.",
-)
-@click.pass_context
-def exec_(
-    ctx: click.Context,
-    target: str,
-    register_outputs: tuple[str, ...],
-    mount_storage: tuple[str, ...],
-):
-    """Execute a local script or opaque executable.
-
-    The target is launched directly and all remaining argv tokens are passed to the
-    child process unchanged.
-    """
-    import lamindb as ln
-    from lamindb._finish import save_run_logs
-
-    from lamin_cli._settings import read_mount_storage_config
-
-    configured_mount_storage = read_mount_storage_config() if not mount_storage else ()
-    try:
-        mount_storage_mappings = parse_mount_storage_mappings(
-            mount_storage or configured_mount_storage
-        )
-    except click.BadParameter as error:
-        if configured_mount_storage:
-            raise click.BadParameter(
-                "Invalid machine-local mount-storage mapping. Fix it with `lamin settings mount-storage set ...` or `lamin settings mount-storage unset`."
-            ) from error
-        raise
-    resolved_target = resolve_lamin_exec_arg(target, mount_storage_mappings)
-    target_kind = classify_exec_target(resolved_target)
-    transform = _prepare_exec_transform(resolved_target, target_kind)
-    run = ln.Run(transform=transform)
-    run.started_at = datetime.now(timezone.utc)
-    run._status_code = -1
-    run.save()
-
-    previous_run = ln.context.run
-    ln.context._run = run
-    ln.context._stream_tracker.start(run)
-    returncode = 1
-    try:
-        child_argv = rewrite_exec_argv(
-            [resolved_target, *ctx.args], mount_storage_mappings
-        )
-        run.cli_args = shlex.join(child_argv)
-        run.save()
-        result = subprocess.run(child_argv, check=False)
-        returncode = result.returncode
-        _register_exec_outputs(
-            run, _collect_exec_output_paths(child_argv, register_outputs)
-        )
-    except FileNotFoundError:
-        returncode = 127
-    finally:
-        run._status_code = returncode
-        run.finished_at = datetime.now(timezone.utc)
-        run.save()
-        ln.context._stream_tracker.finish()
-        ln.context._run = previous_run
-        save_run_logs(run, save_run=True)
-    raise SystemExit(returncode)
 
 
 # fmt: off
@@ -588,22 +380,47 @@ def create(
             stacklevel=2,
         )
 
-    from lamindb.models import Branch, Project
-
     if registry == "branch":
-        record = Branch(name=resolved_name).save()
+        branch_dir: Path | None = None
+        if ln_setup.settings.worktree and ln_setup.settings.dev_dir is not None:
+            branch_dir = ln_setup.settings.dev_dir.resolve() / resolved_name
+            if branch_dir.exists() and not branch_dir.is_dir():
+                raise click.ClickException(
+                    f"Cannot create worktree directory '{branch_dir}': path exists and is not a directory."
+                )
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import create_branch
+
+            branch_data = create_branch(name=resolved_name)
+            created_name = str(branch_data.get("name", resolved_name))
+        else:
+            from lamindb import Branch
+
+            created_name = Branch(name=resolved_name).save().name
+        if branch_dir is not None:
+            branch_dir.mkdir(parents=True, exist_ok=True)
     elif registry == "project":
-        record = Project(name=resolved_name).save()
+        from lamindb import Project
+
+        created_name = Project(name=resolved_name).save().name
     else:
         raise NotImplementedError(f"Creating {registry} object is not implemented.")
-    logger.important(f"created {registry}: {record.name}")
+
+    logger.important(f"created {registry}: {created_name}")
 
 
 # fmt: off
 @main.command(name="list")
 @click.argument("registry", type=str)
+@click.option(
+    "--limit",
+    type=click.IntRange(1),
+    default=20,
+    show_default=True,
+    help="Maximum number of rows to display.",
+)
 # fmt: on
-def list_(registry: Literal["branch", "space"]):
+def list_(registry: Literal["branch", "space"], limit: int):
     """List objects.
 
     For example:
@@ -617,12 +434,19 @@ def list_(registry: Literal["branch", "space"]):
     """
     assert registry in {"branch", "space"}, "Currently only supports listing branches and spaces."
 
-    from lamindb.models import Branch, Space
-
     if registry == "branch":
-        print(Branch.to_dataframe())
+        if ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import list_branches
+
+            list_branches(limit=limit)
+        else:
+            from lamindb import Branch
+
+            print(Branch.to_dataframe(limit=limit))
     else:
-        print(Space.to_dataframe())
+        from lamindb import Space
+
+        print(Space.to_dataframe(limit=limit))
 
 
 # fmt: off
@@ -674,8 +498,26 @@ def switch(
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.branch` and {attr}`~lamindb.setup.core.SetupSettings.space`
     """
-    from lamindb.errors import BranchAlreadyExists, ObjectDoesNotExist
-    from lamindb.setup import switch as switch_
+    def _switch_target(target_name: str | None, *, switch_space: bool) -> None:
+        if not switch_space and ln_setup.settings.instance.is_managed_by_hub:
+            from lamin_cli.hub import switch_branch
+
+            switch_branch(target_name, create=create)
+            return
+
+        from lamindb_setup import switch as switch_
+
+        try:
+            switch_(target_name, space=switch_space, create=create)
+        except Exception as e:
+            if e.__class__.__name__ in {
+                "ObjectDoesNotExist",
+                "DoesNotExist",
+                "BranchAlreadyExists",
+                "ValueError",
+            }:
+                raise click.ClickException(str(e)) from e
+            raise
 
     # Backward compatibility: lamin switch branch X / lamin switch space Y (deprecated, hidden from help)
     if len(target) == 2 and target[0] in ("branch", "space"):
@@ -683,20 +525,14 @@ def switch(
         logger.warn(
             f"'lamin switch {kind} <name>' is deprecated and will be removed in a future version. "
             f"Use 'lamin switch {name}' for branches or 'lamin switch --space {name}' for spaces instead.",        )
-        try:
-            switch_(name, space=(kind == "space"), create=create)
-        except (ObjectDoesNotExist, BranchAlreadyExists) as e:
-            raise click.ClickException(str(e)) from e
+        _switch_target(name, switch_space=(kind == "space"))
         return
 
     # Normal usage: single target (or none)
     if len(target) > 1:
         raise click.ClickException("Too many arguments. Use 'lamin switch <target>' or 'lamin switch --space <space>'.")
     target_str = target[0] if len(target) == 1 else None
-    try:
-        switch_(target_str, space=space, create=create)
-    except (ObjectDoesNotExist, BranchAlreadyExists) as e:
-        raise click.ClickException(str(e)) from e
+    _switch_target(target_str, switch_space=space)
 
 
 # fmt: off
@@ -720,13 +556,17 @@ def merge(branch: str):
 
     → Python/R alternative: {func}`~lamindb.setup.merge`
     """
-    from lamindb.errors import ObjectDoesNotExist
-    from lamindb.setup import merge as merge_
+    if ln_setup.settings.worktree:
+        ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
+
+    from lamindb_setup import merge as merge_
 
     try:
         merge_(branch)
-    except ObjectDoesNotExist as e:
-        raise click.ClickException(str(e)) from e
+    except Exception as e:
+        if e.__class__.__name__ in {"ObjectDoesNotExist", "DoesNotExist"}:
+            raise click.ClickException(str(e)) from e
+        raise
 
 
 @main.command()
@@ -755,6 +595,7 @@ def info(schema: bool):
 @click.argument("entity", type=str)
 @click.option("--name", type=str, default=None)
 @click.option("--uid", type=str, default=None)
+@click.option("--slug", type=str, default=None, hidden=True, help="Deprecated: instance slug. Pass slug as positional argument instead.")
 @click.option("--key", type=str, default=None, help="The key for the entity (artifact, transform).")
 @click.option("--permanent", is_flag=True, default=None, help="Permanently delete the entity where applicable, e.g., for artifact, transform, collection.")
 @click.option("--force", is_flag=True, default=False, help="Do not ask for confirmation (only relevant for instance).")
@@ -762,25 +603,40 @@ def info(schema: bool):
 def delete(entity: str, name: str | None = None, uid: str | None = None, key: str | None = None, slug: str | None = None, permanent: bool | None = None, force: bool = False):
     """Delete an object.
 
-    Currently supported: `branch`, `artifact`, `transform`, `collection`, and `instance`. For example:
-
     ```
     # via --key or --name
     lamin delete artifact --key mydatasets/mytable.parquet
     lamin delete transform --key myanalyses/analysis.ipynb
     lamin delete branch --name my_branch
-    lamin delete instance --slug account/name
-    # via registry and --uid
+    lamin delete project --name my_project
+    # via --uid
     lamin delete artifact --uid e2G7k9EVul4JbfsE
     lamin delete transform --uid Vul4JbfsEYAy5
     # via URL
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5
-    lamin delete https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsEYAy5 --permanent
+    lamin delete https://lamin.ai/account/db/artifact/e2G7k9EVul4JbfsE
     ```
 
-    → Python/R alternative: {meth}`~lamindb.SQLRecord.delete` and {func}`~lamindb.setup.delete`
+    To permanently delete an object, pass `--permanent`.
+
+    To delete the entire database (will ask for confirmation):
+
+    ```
+    lamin delete account/name
+    ```
+
+    → Python/R alternative: {meth}`~lamindb.models.SQLRecord.delete` and {func}`~lamindb.setup.delete`
     """
     from lamin_cli._delete import delete as delete_
+
+    if slug is not None:
+        logger.warning(
+            "'--slug' is deprecated and will be removed in a future release. "
+            "Pass the instance slug as the positional argument instead, "
+            "e.g. `lamin delete account/name`."
+        )
+        # Backward compatibility for: lamin delete instance --slug account/name
+        if entity == "instance":
+            entity = slug
 
     return delete_(entity=entity, name=name, uid=uid, key=key, permanent=permanent, force=force)
 
@@ -793,7 +649,19 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
 @click.option(
     "--with-env", is_flag=True, help="Also return the environment for a tranform."
 )
-def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False):
+@click.option(
+    "--batch-size",
+    type=int,
+    default=None,
+    help="Number of files transferred in parallel when loading artifact or collection folders (default 128). Reducing to 20 or lower can help with network errors.",
+)
+@click.option(
+    "--store-kwargs",
+    type=str,
+    default=None,
+    help='Fine-grained settings for artifact or collection downloads as a JSON object (normally not needed), e.g. \'{"batch_size": 20}\'.',
+)
+def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, batch_size: int | None = None, store_kwargs: str | None = None):
     """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
 
     Pass an entity or a `--key`. For example:
@@ -813,21 +681,33 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load transform --uid Vul4JbfsEYAy5
     ```
 
+    Pass `--batch-size` to control parallel file transfers when loading artifact or collection folders (default 128). Reducing to 20 or lower can help with network errors:
+
+    ```
+    lamin load --key mydatasets/myfolder --batch-size 20
+    ```
+
+    Pass `--store-kwargs` as a JSON object for fine-grained artifact or collection download settings (normally not needed):
+
+    ```
+    lamin load --key mydatasets/mytable.parquet --store-kwargs '{"batch_size": 20}'
+    ```
+
     → Python/R alternative: {func}`~lamindb.Artifact.load`, no equivalent for transforms
     """
     from lamin_cli._load import load as load_
     from lamin_cli._notes import parse_note_target
     if entity is not None:
         if uid is None and key is None and entity == "README.md":
-            return load_(entity=None, uid=uid, key="README.md", with_env=with_env)
+            return load_(entity=None, uid=uid, key="README.md", with_env=with_env, store_kwargs=store_kwargs, batch_size=batch_size)
         if uid is None and key is None and parse_note_target(entity) is not None:
-            return load_(entity, uid=uid, key=key, with_env=with_env)
+            return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs, batch_size=batch_size)
         is_slug = entity.count("/") == 1
         if is_slug:
             from lamindb_setup._connect_instance import _connect_cli
             # for backward compat
             return _connect_cli(entity)
-    return load_(entity, uid=uid, key=key, with_env=with_env)
+    return load_(entity, uid=uid, key=key, with_env=with_env, store_kwargs=store_kwargs, batch_size=batch_size)
 
 
 DESCRIBE_ENTITIES_KEY = {"artifact", "transform", "collection"}
@@ -858,6 +738,12 @@ def _resolve_entity_for_get_update(
         return _get_obj(entity, key=key, uid=uid, name=name)
     except ln.errors.InvalidArgument as e:
         raise click.ClickException(str(e)) from None
+
+
+def _complete_path_argument(ctx, param, incomplete: str):
+    # Keep `save path` typed as str (needed for cloud URIs) while exposing
+    # local filesystem completion metadata to Click shells.
+    return click.Path(path_type=Path).shell_complete(ctx, param, incomplete)
 
 
 def _describe(
@@ -1131,7 +1017,7 @@ def update(
 
 
 @main.command()
-@click.argument("path", type=str)
+@click.argument("path", type=str, shell_complete=_complete_path_argument)
 @click.option("--key", type=str, default=None, help="The key of the artifact or transform.")
 @click.option("--description", type=str, default=None, help="A description of the artifact or transform.")
 @click.option("--kind", type=str, default=None, help="Artifact kind (e.g. 'plan', 'dataset', 'model'). Overrides auto-inferred kind for plan files.")
@@ -1145,6 +1031,18 @@ def update(
     default=None,
     help="Either 'artifact', 'transform', or 'record'. If not passed, chooses based on path suffix.",
 )
+@click.option(
+    "--batch-size",
+    type=int,
+    default=None,
+    help="Number of files transferred in parallel when saving artifact folders (default 128). Reducing to 20 or lower can help with network errors.",
+)
+@click.option(
+    "--store-kwargs",
+    type=str,
+    default=None,
+    help='Fine-grained settings for uploads as a JSON object (normally not needed), e.g. \'{"chunksize": 1000000}\'.',
+)
 def save(
     path: str,
     key: str,
@@ -1155,6 +1053,8 @@ def save(
     space: str,
     branch: str,
     registry: Literal["artifact", "transform", "record"] | None,
+    batch_size: int | None,
+    store_kwargs: str | None,
 ):
     """Save a file or folder as an `artifact`, `transform`, or `record`.
 
@@ -1162,6 +1062,18 @@ def save(
 
     ```
     lamin save my_table.csv --key my_tables/my_table.csv
+    ```
+
+    Pass `--batch-size` to control parallel file transfers when saving artifact folders (default 128). Reducing to 20 or lower can help with network errors:
+
+    ```
+    lamin save my_folder --key my_tables --batch-size 20
+    ```
+
+    Pass `--store-kwargs` as a JSON object for fine-grained upload settings (normally not needed):
+
+    ```
+    lamin save my_table.csv --key my_tables/my_table.csv --store-kwargs '{"chunksize": 1000000}'
     ```
 
     Save **source code** as {class}`~lamindb.Transform`:
@@ -1173,10 +1085,10 @@ def save(
     Save a **markdown note** as {class}`~lamindb.Record`:
 
     ```
-    lamin save my-topic/my-note.md  # resolves `my-topic` as a record type
+    lamin save my-topic/my-note.md  # resolves `my-topic` as a record page
     ```
 
-    Save a **README** for the entire database instance:
+    Save a **README** for the entire database:
 
     ```
     lamin save README.md
@@ -1216,45 +1128,175 @@ def save(
 
     → Python/R alternative: {class}`~lamindb.Artifact` and {class}`~lamindb.Transform`
     """
-    if save_(path=path, key=key, description=description, kind=kind, stem_uid=stem_uid, project=project, space=space, branch=branch, registry=registry) is not None:
+    if save_(
+        path=path,
+        key=key,
+        description=description,
+        kind=kind,
+        stem_uid=stem_uid,
+        project=project,
+        space=space,
+        branch=branch,
+        registry=registry,
+        store_kwargs=store_kwargs,
+        batch_size=batch_size,
+    ) is not None:
         sys.exit(1)
 
-@main.command()
-def track():
-    """Start tracking a run of a shell script.
+@main.group(invoke_without_command=True)
+@click.pass_context
+def track(ctx: click.Context):
+    """Track shell script runs and agent sessions.
 
-    This command works like {func}`~lamindb.track()` in a Python session. Here is an example script:
+    To track a **shell script**, add `lamin track` at the beginning of the script:
 
     ```
     # my_script.sh
-    set -e         # exit on error
     lamin track    # initiate a tracked shell script run
     lamin load --key raw/file1.txt
     # do something
     lamin save processed_file1.txt --key processed/file1.txt
-    lamin finish   # mark the shell script run as finished
+    lamin finish   # mark the tracked run as finished
     ```
 
-    If you run that script, it will track the run of the script, and save the input and output artifacts:
+    If you run the script, input and output artifacts will be linked:
 
     ```
     sh my_script.sh
     ```
 
+    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the package. After installing `lamindb`, run `uvx library-skills --all` so your agent can read it (add `--claude` for Claude Code). It will call:
+
+    ```
+    lamin track claude   # or: lamin track copilot, or: lamin track cursor
+    # work with the agent
+    lamin finish
+    ```
+
+    The report includes thinking when the agent stored it as readable text; encoded thoughts are omitted.
+
+    :::{dropdown} `lamin track copilot` says it can't find the active session?
+
+    In VS Code, make sure **"Copilot"** is selected — not **"Local"** — in the mode picker below the chat input box. `lamin track copilot` can only see sessions that go through the "Copilot"; sessions run via "Local" aren't visible to it.
+
+    ```{image} https://lamin-site-assets.s3.amazonaws.com/.lamindb/f7Nw4RNYkvlw966d0000.png
+    :alt: Copilot mode picker
+    :width: 500px
+    ```
+
+    :::
+
     → Python/R alternative: {func}`~lamindb.track` and {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
+    if ctx.invoked_subcommand is not None:
+        return None
     from lamin_cli._context import track as track_
     return track_()
 
 
-@main.command()
-def finish():
-    """Finish a currently tracked run of a shell script.
+@track.command("claude")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_claude_command(name: str | None) -> None:
+    """Start tracking a Claude Code session in LaminDB.
 
-    → Python/R alternative: {func}`~lamindb.finish()`
+    Creates a Claude Code run, or resumes the existing run for a follow-up in
+    the same conversation. Writes the active run UID and trace path to
+    `.claude/` so that `lamin finish` can close the active tracking cycle.
+
+    On `lamin finish`, records `n_tokens` (full billed total: input +
+    output + cache tokens), `n_steps`, and `n_tool_calls` on `run.extra_data`.
     """
+    from lamin_cli.agents.claude import track_claudecode_session
+
+    return track_claudecode_session(name=name)
+
+
+@track.command("copilot")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_copilot_command(name: str | None) -> None:
+    """Start tracking a GitHub Copilot session in LaminDB.
+
+    Creates a Copilot run, or resumes the existing run for a follow-up in the
+    same conversation. Writes the active run UID to `.copilot/` so that
+    `lamin finish` can close the active tracking cycle.
+
+    On `lamin finish`, records `n_steps` and `n_tool_calls` on
+    `run.extra_data`. `n_tokens` is also recorded, but as an output-tokens-only
+    lower bound: Copilot only persists full input/cache token accounting once
+    the CLI process exits, which is after `lamin finish` already ran —
+    so it is *not* directly comparable to Claude Code's `n_tokens`.
+    """
+    from lamin_cli.agents.copilot import track_copilot_session
+
+    return track_copilot_session(name=name)
+
+
+@track.command("cursor")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_cursor_command(name: str | None) -> None:
+    """Start or resume tracking a Cursor IDE Agent session in LaminDB."""
+    from lamin_cli.agents.cursor import track_cursor_session
+
+    return track_cursor_session(name=name)
+
+
+def _finish_tracked_session() -> None:
+    """Finish a tracked session.
+
+    This can be a shell script run, a Claude Code, Copilot, or Cursor session.
+    """
+    if os.environ.get("CURSOR_AGENT"):
+        from lamin_cli.agents.cursor import finish_cursor_session
+        return finish_cursor_session()
+
+    from lamin_cli.agents.claude import _run_uid_file as _claude_run_uid_file
+    if _claude_run_uid_file().exists():
+        from lamin_cli.agents.claude import finish_claudecode_session
+        return finish_claudecode_session()
+
+    from lamin_cli.agents.copilot import _session_id_from_env
+    if _session_id_from_env():
+        from lamin_cli.agents.copilot import finish_copilot_session
+        return finish_copilot_session()
+
     from lamin_cli._context import finish as finish_
     return finish_()
+
+
+@track.command("finish", hidden=True)
+def track_finish_command() -> None:
+    """Deprecated alias for `lamin finish`."""
+    logger.warning(
+        "`lamin track finish` is deprecated and will be removed in a future release; "
+        "use `lamin finish` instead."
+    )
+    return _finish_tracked_session()
+
+
+@main.command()
+def finish():
+    """Finish a tracked session.
+
+    This can be a shell script run, a Claude Code, Copilot, or Cursor session.
+
+    → Python/R alternative: {func}`~lamindb.finish` for (non-shell) scripts or notebooks
+    """
+    return _finish_tracked_session()
 
 
 @main.command()
@@ -1330,7 +1372,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
             )
         ln_setup.connect(instance)
     else:
-        if not ln_setup.settings._instance_exists:
+        if not ln_setup.settings.is_configured:
             raise click.ClickException(
                 "Not connected to an instance. Please run: lamin connect account/name"
             )
@@ -1388,7 +1430,7 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
             obj.__class__.filter(uid=obj.uid).update(version_tag=version)
             obj.refresh_from_db()
 
-        # Handle feature annotations (artifact and transform only)
+        # Handle feature annotations (artifact, run, record only)
         if features and registry in REGISTRIES_WITH_FEATURES:
             feature_dict = _parse_features_list(features)
             obj.features.add_values(feature_dict)
@@ -1467,9 +1509,58 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
     runner.run(filepath_in_mount_dir)
 
 
+@main.group()
+def integrations():
+    """Run integration helpers."""
+
+
+@integrations.group()
+def notion():
+    """Sync from Notion."""
+
+
+@notion.command("sync")
+@click.argument("parents", type=str, nargs=-1)
+@click.option(
+    "--token",
+    type=str,
+    default=None,
+    help="Notion API token. Defaults to the NOTION_TOKEN environment variable.",
+)
+@click.option(
+    "--apply",
+    is_flag=True,
+    default=False,
+    help="Apply writes to LaminDB. By default, runs as dry run.",
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(0),
+    default=None,
+    help="Maximum rows to read per discovered Notion database. Use 0 to skip child traversal.",
+)
+def notion_sync(
+    parents: tuple[str, ...],
+    token: str | None,
+    apply: bool,
+    limit: int | None,
+) -> None:
+    """Sync Notion page/database trees into LaminDB records."""
+    if not parents:
+        raise click.UsageError("Missing argument 'PARENTS...'.")
+    from lamindb.integrations.notion import sync_from_notion
+
+    sync_from_notion(
+        token=token,
+        parents=list(parents),
+        apply=apply,
+        limit=limit,
+    )
+
 main.add_command(settings)
 main.add_command(migrate)
 main.add_command(io)
+main.add_command(integrations)
 
 
 def _deprecated_cache_set(cache_dir: str) -> None:
@@ -1516,14 +1607,16 @@ def _deprecated_cache_clear_cmd() -> None:
 def _deprecated_cache_get_cmd() -> None:
     _deprecated_cache_get()
 
+main.add_command(hub)
+
 # https://stackoverflow.com/questions/57810659/automatically-generate-all-help-documentation-for-click-commands
 # https://claude.ai/chat/73c28487-bec3-4073-8110-50d1a2dd6b84
-def _generate_help():
+def _generate_help() -> dict[str, dict[str, str | None]]:
     out: dict[str, dict[str, str | None]] = {}
 
     def recursive_help(
         cmd: Command, parent: Context | None = None, name: tuple[str, ...] = ()
-    ):
+    ) -> None:
         if getattr(cmd, "hidden", False):
             return
         ctx = click.Context(cmd, info_name=cmd.name, parent=parent)
