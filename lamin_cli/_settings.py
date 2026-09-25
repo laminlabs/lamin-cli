@@ -20,7 +20,7 @@ def _set_worktree(settings_, value: bool) -> None:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def settings(ctx):
-    """Manage development, cache, modules, branch, space, and mount settings.
+    """Manage development, cache, modules, branch, space, mount, and run settings.
 
     Get or set the following settings:
 
@@ -30,6 +30,8 @@ def settings(ctx):
     - `branch` → current {attr}`~lamindb.setup.core.SetupSettings.branch`
     - `space` → current {attr}`~lamindb.setup.core.SetupSettings.space`
     - `worktree` → toggle {attr}`~lamindb.setup.core.SetupSettings.worktree` mode (dev-dir is a worktree parent where each child directory maps on a branch)
+    - `mount` → read-only mounts of storage locations, used by `lamin run` to read inputs in place
+    - `run-where` → default place for `lamin run` (overridden by `$LAMIN_RUN_WHERE` and `--where`)
 
     You can display your current settings by running: `lamin info`
 
@@ -61,7 +63,12 @@ def settings(ctx):
     lamin settings worktree unset
     # mount
     lamin settings mount storage ./mnt
+    lamin settings mount path lamin://acme/data/artifact/key/my_file.parquet
     lamin settings mount unset ./mnt
+    # run-where
+    lamin settings run-where get
+    lamin settings run-where set modal
+    lamin settings run-where unset
     ```
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.modules`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
@@ -157,6 +164,51 @@ def worktree_unset():
 
 
 settings.add_command(worktree_group)
+
+
+# -----------------------------------------------------------------------------
+# run-where group (pattern: lamin settings run-where get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("run-where")
+def run_where_group():
+    """Get or set where `lamin run` runs by default."""
+
+
+@run_where_group.command("get")
+def run_where_get():
+    """Show the default place to run and where that default comes from."""
+    from lamin_cli._run import RunError, resolve_where
+
+    try:
+        where, source = resolve_where(None)
+    except RunError as error:
+        raise click.ClickException(str(error)) from None
+    click.echo(f"{where} (from {source})")
+
+
+@run_where_group.command("set")
+@click.argument("value", type=str)
+def run_where_set(value: str):
+    """Set the default place to run, e.g. `local` or `modal`."""
+    from lamin_cli._run import RunError, write_where_setting
+
+    try:
+        write_where_setting(value)
+    except RunError as error:
+        raise click.ClickException(str(error)) from None
+
+
+@run_where_group.command("unset")
+def run_where_unset():
+    """Unset the default place to run, falling back to `local`."""
+    from lamin_cli._run import write_where_setting
+
+    write_where_setting(None)
+
+
+settings.add_command(run_where_group)
 
 
 # -----------------------------------------------------------------------------
