@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 import os
-import shutil
 import sys
 import warnings
 from collections import OrderedDict
@@ -1463,50 +1462,131 @@ def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ul
     logger.important(f"annotated {registry}: {obj_rep}")
 
 
-@main.command()
-@click.argument("filepath", type=str)
-@click.option("--project", type=str, default=None, help="A valid project name or uid. When running on Modal, creates an app with the same name.", required=True)
-@click.option("--image-url", type=str, default=None, help="A URL to the base docker image to use.")
-@click.option("--packages", type=str, default=None, help="A comma-separated list of additional packages to install.")
-@click.option("--cpu", type=float, default=None, help="Configuration for the CPU.")
-@click.option("--gpu", type=str, default=None, help="The type of GPU to use (only compatible with cuda images).")
-def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gpu: str | None):
-    """Run a compute job in the cloud.
+_CommandBase = getattr(click, "RichCommand", click.Command)
 
-    This is an EXPERIMENTAL feature that enables to run a script on Modal.
 
-    Example: Given a valid project name "my_project",
+class _RunCommand(_CommandBase):  # type: ignore[misc,valid-type]
+    """Split the command line at `--`: lamin parses before it, the target gets after.
+
+    Only arguments after `--` reach the target, so a lamin option can never be taken
+    for a script option or vice versa, and new lamin options stay backward compatible.
+    """
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if "--" in args:
+            separator = args.index("--")
+            ctx.meta["target_args"] = args[separator + 1 :]
+            args = args[:separator]
+        else:
+            ctx.meta["target_args"] = []
+        try:
+            return super().parse_args(ctx, args)
+        except click.UsageError as error:
+            if isinstance(error, click.NoSuchOption) or "extra argument" in str(error):
+                raise click.UsageError(
+                    f"{error.message}\nArguments for the target go after `--`, e.g.:"
+                    " lamin run train.py -- --epochs 3",
+                    ctx=error.ctx,
+                ) from None
+            raise
+
+
+from lamin_cli._run import EXECUTORS as RUN_EXECUTORS
+
+_MODAL_ONLY = ("image_url", "packages", "cpu", "gpu")
+
+
+# fmt: off
+@main.command(cls=_RunCommand)
+@click.argument("target", type=str)
+@click.option("--where", type=click.Choice(list(RUN_EXECUTORS)), default=None, help="Where to run. Defaults to $LAMIN_RUN_WHERE, then `lamin settings run-where`, then local.")
+@click.option("--project", type=str, default=None, help="A valid project name or uid to link the run to. On Modal, also names the app.")
+@click.option("--register-output", "register_outputs", multiple=True, type=str, help="Register a file the target writes as an output artifact. Repeatable.")
+@click.option("--remount", is_flag=True, default=False, help="Remount a storage location if it serves stale metadata for an input.")
+@click.option("--image-url", type=str, default=None, help="Modal only: a URL to the base docker image.")
+@click.option("--packages", type=str, default=None, help="Modal only: a comma-separated list of additional packages.")
+@click.option("--cpu", type=float, default=None, help="Modal only: CPU configuration.")
+@click.option("--gpu", type=str, default=None, help="Modal only: the type of GPU (cuda images only).")
+@click.pass_context
+# fmt: on
+def run(
+    ctx: click.Context,
+    target: str,
+    where: str | None,
+    project: str | None,
+    register_outputs: tuple[str, ...],
+    remount: bool,
+    image_url: str | None,
+    packages: str | None,
+    cpu: float | None,
+    gpu: str | None,
+):
+    """Run a script or executable, tracked as a run.
+
+    Arguments for the target go after `--`. Any `lamin://` URI among them, or the
+    target itself, is replaced by a local path: read in place from a mounted storage
+    location if there is one (see `lamin settings mount`), otherwise from the cache.
 
     ```
-    lamin run my_script.py --project my_project
+    lamin run train.py -- --data lamin://acme/data/artifact/key/train.parquet --epochs 3
+    lamin run samtools -- view -b lamin://acme/data/artifact/3TrLu3AbQx9dZq2K -o out.bam
+    lamin run --register-output out.bam align.sh -- --out out.bam
+    lamin run --where modal --project my_project my_script.py
     ```
+
+    URIs take two forms. The uid form matches nf-lamin; the key form accepts
+    `space`, `branch` and `version` qualifiers:
+
+    ```
+    lamin://<owner>/<instance>/artifact/<uid>[/<subpath>]
+    lamin://<owner>/<instance>/artifact/key/<key>[/<subpath>][?space=&branch=&version=]
+    ```
+
+    Resolved artifacts are linked as run inputs. The target receives
+    `LAMIN_INITIATED_BY_RUN_UID`, so a script calling `ln.track()` records its run as
+    a child of this one, plus `LAMIN_INPUT_PATHS` and `LAMIN_MOUNTS` (JSON) to
+    translate URIs it reads from elsewhere, e.g. config files.
 
     → Python/R alternative: no equivalent
     """
-    from lamin_cli.compute.modal import Runner
+    from lamin_cli._run import RunError, RunRequest, dispatch, resolve_where
+    from lamin_cli._uri import InvalidLaminUri, UnresolvableLaminUri
 
-    default_mount_dir = Path('./modal_mount_dir')
-    if not default_mount_dir.is_dir():
-        default_mount_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        where_value, source = resolve_where(where)
+    except RunError as error:
+        raise click.ClickException(str(error)) from None
 
-    shutil.copy(filepath, default_mount_dir)
+    modal_only = [
+        f"--{name.replace('_', '-')}"
+        for name in _MODAL_ONLY
+        if ctx.params[name] is not None
+    ]
+    if modal_only and where_value != "modal":
+        verb = "applies" if len(modal_only) == 1 else "apply"
+        raise click.ClickException(
+            f"{', '.join(modal_only)} only {verb} to --where modal, but this runs"
+            f" {where_value} (from {source}). If meant for the target, pass it after"
+            f" `--`: lamin run {target} -- {modal_only[0]} ..."
+        )
 
-    filepath_in_mount_dir = default_mount_dir / Path(filepath).name
-
-    package_list = []
-    if packages:
-        package_list = [package.strip() for package in packages.split(',')]
-
-    runner = Runner(
-        local_mount_dir=default_mount_dir,
-        app_name=project,
-        packages=package_list,
+    request = RunRequest(
+        target=target,
+        args=list(ctx.meta.get("target_args", [])),
+        project=project,
+        register_outputs=register_outputs,
+        remount=remount,
         image_url=image_url,
+        packages=packages,
         cpu=cpu,
-        gpu=gpu
+        gpu=gpu,
     )
-
-    runner.run(filepath_in_mount_dir)
+    try:
+        returncode = dispatch(where_value, request)
+    except (RunError, InvalidLaminUri, UnresolvableLaminUri) as error:
+        raise click.ClickException(str(error)) from None
+    if returncode != 0:
+        raise SystemExit(returncode)
 
 
 @main.group()

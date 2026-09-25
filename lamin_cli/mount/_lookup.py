@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from . import _registry
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from ._registry import MountRecord
 
@@ -58,7 +58,17 @@ def resolve_artifact_location(
     """Resolve an artifact to its storage location and physical storage key."""
     from ._resolve import resolve_artifact
 
-    target = resolve_artifact(uid=uid, key=key)[0]
+    return _location_from_target(resolve_artifact(uid=uid, key=key)[0])
+
+
+def location_from_artifact(artifact) -> ArtifactLocation:
+    """Resolve an already fetched artifact, which may live in another instance."""
+    from ._resolve import target_from_artifact
+
+    return _location_from_target(target_from_artifact(artifact))
+
+
+def _location_from_target(target) -> ArtifactLocation:
     assert target.artifact_storage_key is not None
     assert target.artifact_uid is not None
     return ArtifactLocation(
@@ -166,3 +176,108 @@ def check_visibility(local_path: Path, origin: str) -> Visibility:
     if local_path.exists():
         return Visibility.FOUND_AFTER_REFRESH
     return Visibility.STALE
+
+
+class LocalPathError(Exception):
+    """Raised when an artifact cannot be read through a local path."""
+
+
+class NotMounted(LocalPathError):
+    """Raised when the artifact's storage location is not mounted on this machine."""
+
+
+def resolve_local_path(
+    location: ArtifactLocation,
+    *,
+    mountpoint: str | Path | None = None,
+    check: bool = True,
+    remount: bool = False,
+    note: Callable[[str], None] | None = None,
+) -> Path:
+    """Resolve the local path of an artifact inside a mounted storage location.
+
+    This is the single implementation behind `lamin settings mount path` and the
+    argument translation of `lamin run`. A local storage location is readable without
+    any mount. Otherwise the registry is consulted, and when ``check`` is set a "not
+    found" is verified against the origin and the mount refreshed before giving up.
+    """
+    notify = note or (lambda message: None)
+
+    if mountpoint is not None:
+        mount_root = Path(mountpoint)
+        local_path = local_path_for(mount_root, location.storage_key)
+    else:
+        record = find_mount(location.storage_uid, location.storage_root)
+        if record is not None:
+            location.mount = record
+            mount_root = Path(record.mountpoint)
+            local_path = local_path_for(mount_root, location.storage_key)
+        elif location.protocol == "local":
+            mount_root = Path(location.storage_root)
+            local_path = Path(location.origin)
+        else:
+            raise NotMounted(
+                f"Storage location {location.storage_root} is not mounted. Mount it"
+                f" with: lamin settings mount storage --uid {location.storage_uid}"
+                " <mountpoint>"
+            )
+
+    location.local_path = local_path
+    if location.key_is_virtual:
+        notify(
+            f"note: key '{location.key}' is virtual, the artifact is stored at"
+            f" '{location.storage_key}'"
+        )
+    if not check:
+        return local_path
+
+    visibility = check_visibility(local_path, location.origin)
+    if visibility is Visibility.FOUND_AFTER_REFRESH:
+        notify("note: the mount served stale metadata, it was refreshed")
+    elif visibility is Visibility.MISSING_IN_ORIGIN:
+        raise LocalPathError(
+            f"Artifact {location.artifact_uid} is recorded at {location.origin} but"
+            " that path does not exist in the storage location."
+        )
+    elif visibility is Visibility.STALE:
+        local_path = _recover_stale(location, local_path, mount_root, remount, notify)
+    return local_path
+
+
+def _recover_stale(
+    location: ArtifactLocation,
+    local_path: Path,
+    mount_root: Path,
+    remount: bool,
+    notify: Callable[[str], None],
+) -> Path:
+    from ._mount import MountError
+    from ._mount import remount as remount_storage
+
+    if not remount:
+        remedy = (
+            "Refresh it with the tool that created it."
+            if location.mount is not None and location.mount.external
+            else f"Retry with --remount, or: lamin settings mount refresh {mount_root}"
+        )
+        raise LocalPathError(
+            f"{local_path} is not visible through the mount although"
+            f" {location.origin} exists. The mount is stale. {remedy}"
+        )
+    if location.mount is None:
+        raise LocalPathError("Cannot remount a mountpoint that is not in the registry.")
+    if location.mount.pid is not None:
+        notify(
+            "warning: this mount runs in the foreground in another process, which"
+            " remounting will terminate"
+        )
+    notify(f"remounting {location.storage_root} ...")
+    try:
+        with stdout_to_stderr():
+            record = remount_storage(location.mount)
+    except MountError as error:
+        raise LocalPathError(str(error)) from None
+    local_path = local_path_for(record.mountpoint, location.storage_key)
+    if not local_path.exists():
+        raise LocalPathError(f"{local_path} is still not readable after remounting.")
+    return local_path
