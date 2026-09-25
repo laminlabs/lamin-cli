@@ -1548,9 +1548,9 @@ def notion_sync(
     """Sync Notion page/database trees into LaminDB records."""
     if not parents:
         raise click.UsageError("Missing argument 'PARENTS...'.")
-    from lamindb.integrations.notion import sync_from_notion
+    from lamindb.integrations.notion import sync_objects_from_notion
 
-    sync_from_notion(
+    sync_objects_from_notion(
         token=token,
         parents=list(parents),
         apply=apply,
@@ -1599,9 +1599,9 @@ def transfer_artifact(
     lamin transfer artifact UID --from laminlabs/lamindata
     ```
     """
-    from lamindb.models._transfer import sync_objects
+    from lamindb.models._transfer import sync_objects_from_database
 
-    sync_objects(
+    sync_objects_from_database(
         "artifact",
         uid,
         source=source,

@@ -11,7 +11,7 @@ def test_notion_sync_forwards_args(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_from_notion(*, parents, token=None, apply=False, depth=None):
+    def fake_sync_objects_from_notion(*, parents, token=None, apply=False, depth=None):
         calls["token"] = token
         calls["parents"] = parents
         calls["apply"] = apply
@@ -19,7 +19,8 @@ def test_notion_sync_forwards_args(monkeypatch):
         return DummyReport()
 
     monkeypatch.setattr(
-        "lamindb.integrations.notion.sync_from_notion", fake_sync_from_notion
+        "lamindb.integrations.notion.sync_objects_from_notion",
+        fake_sync_objects_from_notion,
     )
     result = CliRunner().invoke(
         main,
@@ -54,7 +55,7 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_from_notion(*, parents, token=None, apply=False, depth=None):
+    def fake_sync_objects_from_notion(*, parents, token=None, apply=False, depth=None):
         calls["token"] = token
         calls["parents"] = parents
         calls["apply"] = apply
@@ -62,7 +63,8 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
         return DummyReport()
 
     monkeypatch.setattr(
-        "lamindb.integrations.notion.sync_from_notion", fake_sync_from_notion
+        "lamindb.integrations.notion.sync_objects_from_notion",
+        fake_sync_objects_from_notion,
     )
     result = CliRunner().invoke(main, ["integrations", "notion", "sync", "page-a"])
 
@@ -77,13 +79,14 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
         def as_dict(self):
             return {"created": 0, "updated": 0}
 
-    def fake_sync_from_notion(*, parents, token=None, apply=False, depth=None):
+    def fake_sync_objects_from_notion(*, parents, token=None, apply=False, depth=None):
         calls["parents"] = parents
         calls["depth"] = depth
         return DummyReport()
 
     monkeypatch.setattr(
-        "lamindb.integrations.notion.sync_from_notion", fake_sync_from_notion
+        "lamindb.integrations.notion.sync_objects_from_notion",
+        fake_sync_objects_from_notion,
     )
     result = CliRunner().invoke(
         main, ["integrations", "notion", "sync", "page-a", "--depth", "0"]
@@ -96,7 +99,9 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
 def test_transfer_artifact_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync_objects(registry, uids, *, source, depth=None, transfer=None):
+    def fake_sync_objects_from_database(
+        registry, uids, *, source, depth=None, transfer=None
+    ):
         calls["registry"] = registry
         calls["uids"] = uids
         calls["source"] = source
@@ -104,7 +109,10 @@ def test_transfer_artifact_forwards_args(monkeypatch):
         calls["transfer"] = transfer
         return []
 
-    monkeypatch.setattr("lamindb.models._transfer.sync_objects", fake_sync_objects)
+    monkeypatch.setattr(
+        "lamindb.models._transfer.sync_objects_from_database",
+        fake_sync_objects_from_database,
+    )
     result = CliRunner().invoke(
         main,
         [
