@@ -1534,16 +1534,16 @@ def notion():
     help="Apply writes to LaminDB. By default, runs as dry run.",
 )
 @click.option(
-    "--limit",
+    "--depth",
     type=click.IntRange(0),
     default=None,
-    help="Maximum rows to read per discovered Notion database. Use 0 to skip child traversal.",
+    help="How many levels of child pages and databases to walk. Use 0 to sync only the given parents.",
 )
 def notion_sync(
     parents: tuple[str, ...],
     token: str | None,
     apply: bool,
-    limit: int | None,
+    depth: int | None,
 ) -> None:
     """Sync Notion page/database trees into LaminDB records."""
     if not parents:
@@ -1554,7 +1554,59 @@ def notion_sync(
         token=token,
         parents=list(parents),
         apply=apply,
-        limit=limit,
+        depth=depth,
+    )
+
+
+@main.group()
+def transfer():
+    """Sync SQLRecord objects from another LaminDB instance."""
+
+
+@transfer.command("artifact")
+@click.argument("uid", type=str)
+@click.option(
+    "--from",
+    "source",
+    type=str,
+    required=True,
+    help="Source instance slug, for example laminlabs/lamindata.",
+)
+@click.option(
+    "--depth",
+    type=click.IntRange(0),
+    default=None,
+    help="How many levels of related records to follow. Use 0 to sync only this artifact.",
+)
+@click.option(
+    "--transfer",
+    "transfer_mode",
+    type=click.Choice(["sqlrecord", "notes", "annotations"]),
+    default=None,
+    help="What to copy. Omit to use the registry default.",
+)
+def transfer_artifact(
+    uid: str,
+    source: str,
+    depth: int | None,
+    transfer_mode: str | None,
+) -> None:
+    """Sync an artifact into the current default database.
+
+    Example:
+
+    ```
+    lamin transfer artifact UID --from laminlabs/lamindata
+    ```
+    """
+    from lamindb.models._transfer import sync_objects
+
+    sync_objects(
+        "artifact",
+        uid,
+        source=source,
+        depth=depth,
+        transfer=transfer_mode,
     )
 
 main.add_command(settings)
