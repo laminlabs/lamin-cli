@@ -443,7 +443,7 @@ def test_run_translates_uris_links_inputs_and_registers_outputs(
 
     run = ln.Run.filter(transform__key="script.py").order_by("-started_at").first()
     assert run.status == "completed"
-    assert uri not in run.cli_args
+    assert run.cli_args == f"{uri} --out out.txt"
     assert input_artifact.uid in {a.uid for a in run.input_artifacts.all()}
     output = ln.Artifact.filter(run=run, key="out.txt").one()
     env = json.loads((tmp_path / "env.json").read_text())

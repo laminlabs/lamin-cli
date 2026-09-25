@@ -148,7 +148,8 @@ def resolve_uri_to_local_path(
             "local" if location.mount is None else "mount"
         )
     except NotMounted:
-        local_path = Path(str(resolved.artifact.cache()))
+        # inputs are linked explicitly once the run exists, see _link_inputs
+        local_path = Path(str(resolved.artifact.cache(is_run_input=False)))
         via = "cache"
     if resolved.subpath is not None:
         local_path = local_path / resolved.subpath
@@ -446,7 +447,9 @@ def _prepare_run(request: RunRequest):
     run = ln.Run(transform=_prepare_transform(target, kind))
     run.started_at = datetime.now(timezone.utc)
     run._status_code = -1
-    run.cli_args = shlex.join(child_argv)
+    # like ln.track(), record only the arguments, and keep lamin:// URIs rather than
+    # machine-specific local paths so the call can be reproduced elsewhere
+    run.cli_args = shlex.join(request.args)
     run.save()
     if project_record is not None:
         run.projects.add(project_record)
