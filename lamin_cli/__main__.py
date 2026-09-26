@@ -220,7 +220,7 @@ def main():
 @click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
     # note that the docstring needs to be synced with ln.setup.login()
-    """Log into LaminHub.
+    """Log into the hub.
 
     `lamin login` prompts for your API key unless you set it via environment variable `LAMIN_API_KEY`.
 
@@ -235,7 +235,7 @@ def login(user: str, key: str | None):
 
 @main.command()
 def logout():
-    """Log out of LaminHub."""
+    """Log out of the hub."""
     return logout_()
 
 
@@ -263,7 +263,7 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Initialize a LaminDB instance.
+    """Initialize a database in the current directory.
 
     Create a new development directory for your source code and `cd` into it:
 
@@ -303,7 +303,7 @@ def init(
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
 def connect(instance: str, here: bool):
-    """Set the default database for this environment or directory.
+    """Set the default database for this directory.
 
     This command updates your local configuration to target the specified instance:
     all subsequent CLI commands and Python/R sessions will auto-connect to this instance.
@@ -311,10 +311,10 @@ def connect(instance: str, here: bool):
     You can pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
     ```
-    # set a default instance for the current environment
-    lamin connect laminlabs/cellxgene
-    # set a default instance for the current directory
+    # set a default database for the current directory (recommended)
     lamin connect laminlabs/cellxgene --here
+    # set a default database for the entire home directory
+    lamin connect laminlabs/cellxgene
     # use a URL instead of a slug
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
@@ -327,17 +327,16 @@ def connect(instance: str, here: bool):
 @main.command()
 @click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
 def disconnect(here: bool):
-    """Unset the default database for this environment or directory.
+    """Unset the default database for this directory.
 
-    - Without `--here`, it clears the global default instance.
-    - With `--here`, it removes the nearest local marker from the current
-      directory hierarchy and unsets `dev-dir` for that instance.
+    - With `--here`, it clears the default database for the current directory.
+    - Without `--here`, it clears the default database for the entire home directory.
 
     For example:
 
     ```
-    lamin disconnect
     lamin disconnect --here
+    lamin disconnect
     ```
 
     → Python/R alternative: {func}`~lamindb.setup.disconnect`
@@ -360,6 +359,10 @@ def create(
     """Create an object.
 
     Currently only supports creating branches and projects.
+
+    Use `lamin save` to create artifacts, transforms, and records.
+
+    Examples:
 
     ```
     lamin create branch my_branch
@@ -572,7 +575,7 @@ def merge(branch: str):
 @main.command()
 @click.option("--schema", is_flag=True, help="View database schema via Django plugin.")
 def info(schema: bool):
-    """Show info about the instance, development & cache directories, branch, space, and user.
+    """Show info about the database, branch, space, and user.
 
     Manage settings via [lamin settings](https://docs.lamin.ai/cli#settings).
 
@@ -662,7 +665,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     help='Fine-grained settings for artifact or collection downloads as a JSON object (normally not needed), e.g. \'{"batch_size": 20}\'.',
 )
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, batch_size: int | None = None, store_kwargs: str | None = None):
-    """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
+    """Sync a file/folder into a local cache (artifacts) or development directory (transforms, records).
 
     Pass an entity or a `--key`. For example:
 
@@ -905,7 +908,7 @@ def get(
     status_field: bool = False,
     description_field: bool = False,
 ):
-    """Get a field value or describe an object.
+    """Get object metadata.
 
     If no field flag is passed, this behaves like `lamin describe`.
     If a field flag is passed, it reads that field from the resolved entity.
@@ -979,7 +982,7 @@ def update(
     status: str | None = None,
     description: str | None = None,
 ):
-    """Update mutable fields of an entity.
+    """Update an object.
 
     Examples:
 
@@ -1056,7 +1059,7 @@ def save(
     batch_size: int | None,
     store_kwargs: str | None,
 ):
-    """Save a file or folder as an `artifact`, `transform`, or `record`.
+    """Save a file or folder as an artifact, transform, or record.
 
     Save a **dataset** or **model** as {class}`~lamindb.Artifact`:
 
@@ -1313,7 +1316,7 @@ def finish():
 @click.option("--readme", "readme_path", type=click.Path(exists=True, path_type=Path), default=None, help="Path to a README file to attach as a readme block to the entity.")
 @click.option("--comment", type=str, default=None, help="Comment text to attach as a comment block to the entity.")
 def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None, comment: str | None):
-    r"""Annotate an artifact, transform, or collection.
+    r"""Annotate an object.
 
     You can annotate with projects, labels, records, version tags, a readme, a comment, and, for artifacts, with features. For example,
 
@@ -1511,7 +1514,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
 @main.group()
 def integrations():
-    """Integrations.
+    """Use integrations.
 
     Examples:
 
