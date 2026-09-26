@@ -117,7 +117,7 @@ def test_transfer_url_forwards_args(monkeypatch):
         main,
         [
             "io",
-            "transfer",
+            "sync",
             "https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE",
             "--depth",
             "1",
@@ -157,7 +157,7 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
         main,
         [
             "io",
-            "transfer",
+            "sync",
             "artifact",
             "--uid",
             "e2G7k9EVul4JbfsE",

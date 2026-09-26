@@ -148,7 +148,7 @@ def importdb(modules: str | None, input_dir: str, if_exists: str):
     )
 
 
-@io.command("transfer")
+@io.command("sync")
 @click.argument("entity", type=str, required=False)
 @click.option("--uid", help="The uid for the entity.")
 @click.option("--key", help="The key for the entity (artifact, transform, collection).")
@@ -173,7 +173,7 @@ def importdb(modules: str | None, input_dir: str, if_exists: str):
     default=None,
     help="What to copy: `sqlrecord`, `notes`, or `annotations`. Omit to use the registry default.",
 )
-def transfer(
+def sync(
     entity: str | None = None,
     uid: str | None = None,
     key: str | None = None,
@@ -182,18 +182,20 @@ def transfer(
     depth: int | None = None,
     transfer_mode: str | None = None,
 ) -> None:
-    """Transfer an object from another database.
+    """Sync an object to the current database.
 
-    Paste a LaminDB URL. The instance, entity, and uid are read from it, and the object is synced into the current default database.
-
-    Examples:
+    The following commands will create mirrored objects in the current database:
 
     ```
-    lamin io transfer https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE
-    lamin io transfer https://lamin.ai/laminlabs/lamindata/artifact/e2G7k9EVul4JbfsE --depth 0
-    lamin io transfer record --uid UrcIKR8v0ywim0pE --from laminlabs/lamindata
-    lamin io transfer artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
+    lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE
+    lamin io sync https://lamin.ai/laminlabs/lamindata/artifact/e2G7k9EVul4JbfsE --depth 0
+    lamin io sync record --uid UrcIKR8v0ywim0pE --from laminlabs/lamindata
+    lamin io sync artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
     ```
+
+    If you re-run the command, the mirrored objects will be updated.
+
+    Guide: {doc}`transfer`
 
     → Python/R alternative: {func}`~lamindb.models.sync_objects_from_database`
     """

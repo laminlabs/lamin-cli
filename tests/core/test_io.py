@@ -80,7 +80,7 @@ def test_io_transfer_ulabel():
             [
                 "lamin",
                 "io",
-                "transfer",
+                "sync",
                 f"https://lamin.ai/{handle}/{source_name}/ulabel/{uid}",
             ]
         )
