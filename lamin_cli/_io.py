@@ -182,7 +182,7 @@ def transfer(
     depth: int | None = None,
     transfer_mode: str | None = None,
 ) -> None:
-    """Transfer an object from another database into the current one.
+    """Transfer an object from another database.
 
     Paste a LaminDB URL. The instance, entity, and uid are read from it, and the object is synced into the current default database.
 
