@@ -116,6 +116,7 @@ def test_transfer_url_forwards_args(monkeypatch):
     result = CliRunner().invoke(
         main,
         [
+            "io",
             "transfer",
             "https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE",
             "--depth",
@@ -155,6 +156,7 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
     result = CliRunner().invoke(
         main,
         [
+            "io",
             "transfer",
             "artifact",
             "--uid",

@@ -145,3 +145,65 @@ def importdb(modules: str | None, input_dir: str, if_exists: str):
         input_dir=input_dir,
         if_exists=if_exists,
     )
+
+
+@io.command("transfer")
+@click.argument("entity", type=str, required=False)
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity (artifact, transform, collection).")
+@click.option("--name", help="The name for the entity (record, project, ulabel, branch).")
+@click.option(
+    "--from",
+    "source",
+    type=str,
+    default=None,
+    help="Source instance slug. Not needed when `entity` is a LaminDB URL.",
+)
+@click.option(
+    "--depth",
+    type=click.IntRange(0),
+    default=None,
+    help="How many levels of related records to follow. Use 0 to sync only this object.",
+)
+@click.option(
+    "--transfer",
+    "transfer_mode",
+    type=click.Choice(["sqlrecord", "notes", "annotations"]),
+    default=None,
+    help="What to copy: `sqlrecord`, `notes`, or `annotations`. Omit to use the registry default.",
+)
+def transfer(
+    entity: str | None = None,
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+    source: str | None = None,
+    depth: int | None = None,
+    transfer_mode: str | None = None,
+) -> None:
+    """Transfer an object from another database into the current one.
+
+    Paste a LaminDB URL. The instance, entity, and uid are read from it, and the object is synced into the current default database.
+
+    Examples:
+
+    ```
+    lamin io transfer https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE
+    lamin io transfer https://lamin.ai/laminlabs/lamindata/artifact/e2G7k9EVul4JbfsE --depth 0
+    lamin io transfer record --uid UrcIKR8v0ywim0pE --from laminlabs/lamindata
+    lamin io transfer artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
+    ```
+
+    → Python/R alternative: {func}`~lamindb.models.sync_objects_from_database`
+    """
+    from lamin_cli._transfer import transfer as transfer_
+
+    return transfer_(
+        entity,
+        uid=uid,
+        key=key,
+        name=name,
+        source=source,
+        depth=depth,
+        transfer=transfer_mode,
+    )
