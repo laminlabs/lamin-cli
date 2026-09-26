@@ -21,7 +21,7 @@ else:
 
 @click.group()
 def io():
-    """Sync, import, and export data.
+    """Transfer, import, and export data.
 
     Use `lamin io sync` to sync objects to the current database:
 
