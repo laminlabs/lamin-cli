@@ -13,7 +13,6 @@ ENTITIES_NAME = {
     "run",
     "feature",
     "schema",
-    "space",
     "reference",
 }
 ENTITIES = ENTITIES_KEY | ENTITIES_NAME
