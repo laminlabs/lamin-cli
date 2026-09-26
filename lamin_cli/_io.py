@@ -30,7 +30,8 @@ def io():
 @click.option("--track/--no-track", is_flag=True, help="Whether to track snapshot generation.", default=True)
 # fmt: on
 def snapshot(upload: bool, track: bool) -> None:
-    """Create a SQLite snapshot of the connected instance."""
+    # An. "SQLite" starts with an "ess" sound, so the article is "an SQLite snapshot."
+    """Create an SQLite snapshot of the current database."""
     from lamindb_setup.io import export_db
     if not ln_setup.settings.is_configured:
         raise click.ClickException(
@@ -109,7 +110,7 @@ def snapshot(upload: bool, track: bool) -> None:
 @click.option("--chunk-size", type=int, default=500_000, help="Number of rows per chunk for large tables.")
 # fmt: on
 def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size: int):
-    """Export registry tables to parquet files."""
+    """Export registries to parquet files."""
     from lamindb_setup.io import export_db
     if not ln_setup.settings.is_configured:
         raise click.ClickException(
@@ -132,7 +133,7 @@ def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size:
 @click.option("--if-exists", type=click.Choice(["fail", "replace", "append"]), default="replace", help="How to handle existing data.")
 # fmt: on
 def importdb(modules: str | None, input_dir: str, if_exists: str):
-    """Import registry tables from parquet files."""
+    """Import registries from parquet files."""
     from lamindb_setup.io import import_db
     if not ln_setup.settings.is_configured:
         raise click.ClickException(
