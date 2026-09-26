@@ -1511,7 +1511,7 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
 @main.group()
 def integrations():
-    """Run integration helpers.
+    """Integrations.
 
     Examples:
 
