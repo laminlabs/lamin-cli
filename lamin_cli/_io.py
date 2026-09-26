@@ -21,7 +21,87 @@ else:
 
 @click.group()
 def io():
-    """Import and export databases."""
+    """Sync, import, and export data.
+
+    Use `lamin io sync` to sync objects to the current database:
+
+    ```
+    lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE
+    lamin io sync https://lamin.ai/laminlabs/lamindata/artifact/e2G7k9EVul4JbfsE --depth 0
+    lamin io sync record --uid UrcIKR8v0ywim0pE --from laminlabs/lamindata
+    lamin io sync artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
+    ```
+
+    → Guide: {doc}`transfer` → Python/R alternative: {func}`~lamindb.models.sync_objects_from_database`
+
+    Use `lamin io snapshot` to create an SQLite snapshot of the current database:
+
+    ```
+    lamin io snapshot
+    ```
+
+    Use `lamin io importdb` to import data from parquet files:
+
+    ```
+    lamin io importdb --input-dir path/to/parquet/files
+    ```
+
+    Use `lamin io exportdb` to export data to parquet files:
+
+    ```
+    lamin io exportdb --output-dir path/to/parquet/files
+    ```
+    """
+
+
+@io.command("sync")
+@click.argument("entity", type=str, required=False)
+@click.option("--uid", help="The uid for the entity.")
+@click.option("--key", help="The key for the entity (artifact, transform, collection).")
+@click.option(
+    "--name", help="The name for the entity (record, project, ulabel, branch)."
+)
+@click.option(
+    "--from",
+    "source",
+    type=str,
+    default=None,
+    help="Source instance slug. Not needed when `entity` is a LaminDB URL.",
+)
+@click.option(
+    "--depth",
+    type=click.IntRange(0),
+    default=None,
+    help="How many levels of related records to follow. Use 0 to sync only this object.",
+)
+@click.option(
+    "--transfer",
+    "transfer_mode",
+    type=click.Choice(["sqlrecord", "notes", "annotations"]),
+    default=None,
+    help="What to copy: `sqlrecord`, `notes`, or `annotations`. Omit to use the registry default.",
+)
+def sync(
+    entity: str | None = None,
+    uid: str | None = None,
+    key: str | None = None,
+    name: str | None = None,
+    source: str | None = None,
+    depth: int | None = None,
+    transfer_mode: str | None = None,
+) -> None:
+    """Sync an object to the current database."""
+    from lamin_cli._transfer import transfer as transfer_
+
+    return transfer_(
+        entity,
+        uid=uid,
+        key=key,
+        name=name,
+        source=source,
+        depth=depth,
+        transfer=transfer_mode,
+    )
 
 
 # fmt: off
@@ -30,7 +110,8 @@ def io():
 @click.option("--track/--no-track", is_flag=True, help="Whether to track snapshot generation.", default=True)
 # fmt: on
 def snapshot(upload: bool, track: bool) -> None:
-    """Create a SQLite snapshot of the connected instance."""
+    # An. "SQLite" starts with an "ess" sound, so the article is "an SQLite snapshot."
+    """Create an SQLite snapshot of the current database."""
     from lamindb_setup.io import export_db
     if not ln_setup.settings.is_configured:
         raise click.ClickException(
@@ -109,7 +190,7 @@ def snapshot(upload: bool, track: bool) -> None:
 @click.option("--chunk-size", type=int, default=500_000, help="Number of rows per chunk for large tables.")
 # fmt: on
 def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size: int):
-    """Export registry tables to parquet files."""
+    """Export registries to parquet files."""
     from lamindb_setup.io import export_db
     if not ln_setup.settings.is_configured:
         raise click.ClickException(
@@ -132,7 +213,7 @@ def exportdb(modules: str | None, output_dir: str, max_workers: int, chunk_size:
 @click.option("--if-exists", type=click.Choice(["fail", "replace", "append"]), default="replace", help="How to handle existing data.")
 # fmt: on
 def importdb(modules: str | None, input_dir: str, if_exists: str):
-    """Import registry tables from parquet files."""
+    """Import registries from parquet files."""
     from lamindb_setup.io import import_db
     if not ln_setup.settings.is_configured:
         raise click.ClickException(

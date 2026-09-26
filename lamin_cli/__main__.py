@@ -56,11 +56,11 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Settings & migrations",
+            "name": "Administer",
             "commands": ["settings", "migrate", "io", "integrations"],
         },
         {
-            "name": "Auth",
+            "name": "Authenticate",
             "commands": [
                 "login",
                 "logout",
@@ -1511,7 +1511,17 @@ def run(filepath: str, project: str, image_url: str, packages: str, cpu: int, gp
 
 @main.group()
 def integrations():
-    """Run integration helpers."""
+    """Integrations.
+
+    Examples:
+
+    ```
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 0 --apply
+    ```
+
+    → Python/R alternative: {func}`~lamindb.integrations.notion.sync_objects_from_notion`
+    """
 
 
 @integrations.group()
@@ -1534,28 +1544,29 @@ def notion():
     help="Apply writes to LaminDB. By default, runs as dry run.",
 )
 @click.option(
-    "--limit",
+    "--depth",
     type=click.IntRange(0),
     default=None,
-    help="Maximum rows to read per discovered Notion database. Use 0 to skip child traversal.",
+    help="How many levels of child pages and databases to walk. Use 0 to sync only the given parents.",
 )
 def notion_sync(
     parents: tuple[str, ...],
     token: str | None,
     apply: bool,
-    limit: int | None,
+    depth: int | None,
 ) -> None:
     """Sync Notion page/database trees into LaminDB records."""
     if not parents:
         raise click.UsageError("Missing argument 'PARENTS...'.")
-    from lamindb.integrations.notion import sync_from_notion
+    from lamindb.integrations.notion import sync_objects_from_notion
 
-    sync_from_notion(
+    sync_objects_from_notion(
         token=token,
         parents=list(parents),
         apply=apply,
-        limit=limit,
+        depth=depth,
     )
+
 
 main.add_command(settings)
 main.add_command(migrate)

@@ -53,6 +53,13 @@ def test_decompose_url():
     assert entity == "branch"
     assert uid == "main"
 
+    instance_slug, entity, uid = decompose_url(
+        "https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE"
+    )
+    assert instance_slug == "laminlabs/lamindata"
+    assert entity == "record"
+    assert uid == "UrcIKR8v0ywim0pE"
+
 
 def test_load_transform():
     ln_setup.settings.dev_dir = None
