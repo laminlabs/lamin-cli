@@ -237,6 +237,18 @@ INTERPRETERS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _active_python_executable() -> str:
+    """The python lamin resolves scripts to, i.e. `which python`, not lamin's own.
+
+    Lamin may be installed in an isolated tool environment (pipx, uv tool, ...) that
+    lacks a script's dependencies, so scripts and their environment are always
+    resolved against the active environment on PATH instead.
+    """
+    from shutil import which
+
+    return which("python") or which("python3") or sys.executable
+
+
 def command_for(target: str) -> list[str]:
     """The argv prefix that runs a target, as the user would run it by hand.
 
@@ -254,9 +266,7 @@ def command_for(target: str) -> list[str]:
         return [target]
     executable = interpreter[0]
     if executable == "python":
-        from shutil import which
-
-        executable = which("python") or which("python3") or sys.executable
+        executable = _active_python_executable()
     return [executable, *interpreter[1:], target]
 
 
@@ -283,8 +293,16 @@ def _prepare_transform(target: str, kind: Literal["script", "executable"]):
 
     path = Path(target)
     if kind == "script":
+        # the interpreter's version, e.g. "train.py (Python 3.12.3)"; the script
+        # itself is versioned by its source code hash, tracked below
+        interpreter = command_for(target)[0]
+        version = _probe_version(interpreter)
+        description = f"{path.name} ({version})" if version else None
         transform = ln.Transform(
-            key=path.name, source_code=path.read_text(), kind="script"
+            key=path.name,
+            source_code=path.read_text(),
+            kind="script",
+            description=description,
         )
     else:
         version = _probe_version(target)
@@ -295,6 +313,55 @@ def _prepare_transform(target: str, kind: Literal["script", "executable"]):
     transform.branch = ln_setup.settings.branch
     transform.space = ln_setup.settings.space
     return transform.save()
+
+
+def _track_child_python_environment(run) -> None:
+    """Snapshot `pip freeze` of the interpreter a Python script runs under.
+
+    Links it to the run as `run.environment`, mirroring what `ln.track()` does for
+    its own process (see `lamindb.core._track_environment`), but for the child
+    interpreter `lamin run` resolves the script to rather than lamin's own.
+    """
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+    from lamindb_setup.core.hashing import hash_file
+
+    executable = _active_python_executable()
+    try:
+        result = subprocess.run(
+            [executable, "-m", "pip", "freeze"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        _note(f"could not track the Python environment: {error}")
+        return
+    if result.returncode != 0 or not result.stdout.strip():
+        _note("could not track the Python environment: `pip freeze` returned nothing")
+        return
+    env_dir = ln_setup.settings.cache_dir / "environments" / f"run_{run.uid}"
+    env_dir.mkdir(parents=True, exist_ok=True)
+    env_path = env_dir / "run_env_pip.txt"
+    env_path.write_text(result.stdout)
+
+    # reuse an identical, previously uploaded environment rather than duplicating it
+    _, env_hash, _ = hash_file(env_path)
+    artifact = (
+        ln.Artifact.filter(hash=env_hash, kind="__lamindb_run__")
+        .exclude(size=0)
+        .one_or_none()
+    )
+    if artifact is None:
+        artifact = ln.Artifact(
+            env_path,
+            description="requirements.txt",
+            kind="__lamindb_run__",
+            run=False,
+        )
+        artifact.save(upload=True, print_progress=False)
+    run.environment = artifact
+    _note(f"tracked the Python environment ({executable})")
 
 
 def status_code_for(returncode: int) -> int:
@@ -472,6 +539,8 @@ def run_local(request: RunRequest) -> int:
         from lamindb.core._finish import save_run_logs
 
         run, target, target_args, child_argv, translations = _prepare_run(request)
+        if Path(target).suffix in {".py", ".pyw"}:
+            _track_child_python_environment(run)
 
     env = {
         **os.environ,

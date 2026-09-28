@@ -248,6 +248,15 @@ def test_executables_on_path_run_as_given():
     assert _run.command_for("samtools") == ["samtools"]
 
 
+def test_probe_version_reads_the_first_line_of_a_working_tool():
+    version = _run._probe_version(sys.executable)
+    assert version is not None and version.lower().startswith("python")
+
+
+def test_probe_version_is_none_for_a_tool_without_the_flag():
+    assert _run._probe_version("lamin-no-such-tool") is None
+
+
 # -- teeing the target's output ----------------------------------------------
 
 _SPLIT_CHAR_CHILD = r"""
@@ -446,6 +455,10 @@ def test_run_translates_uris_links_inputs_and_registers_outputs(
     assert run.cli_args == f"{uri} --out out.txt"
     assert run.params == {"argv": [uri, "--out", "out.txt"]}
     assert input_artifact.uid in {a.uid for a in run.input_artifacts.all()}
+    assert run.transform.description is not None
+    assert "(Python" in run.transform.description
+    assert run.environment is not None
+    assert run.environment.description == "requirements.txt"
     output = ln.Artifact.filter(run=run, key="out.txt").one()
     env = json.loads((tmp_path / "env.json").read_text())
     assert env["LAMIN_INITIATED_BY_RUN_UID"] == run.uid
@@ -547,3 +560,17 @@ def test_stdout_carries_only_the_targets_output_and_logs_capture_both(
     logs = Path(run.report.cache()).read_text()
     assert "result line" in logs
     assert "progress note" in logs
+
+
+def test_non_python_scripts_get_no_environment_snapshot(tmp_path, where_setting):
+    import lamindb as ln
+
+    script = tmp_path / "greet.sh"
+    script.write_text("echo hi\n")
+    result = _lamin("run", str(script), cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+
+    run = ln.Run.filter(transform__key="greet.sh").order_by("-started_at").first()
+    assert run.environment is None
+    # the interpreter is still versioned, just not its packages
+    assert run.transform.description is not None

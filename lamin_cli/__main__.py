@@ -1547,6 +1547,11 @@ def run(
     a child of this one, plus `LAMIN_INPUT_PATHS` and `LAMIN_MOUNTS` (JSON) to
     translate URIs it reads from elsewhere, e.g. config files.
 
+    The target's `--version` output, when it has one, is recorded on the run's
+    transform. For a Python script, the interpreter's `pip freeze` is additionally
+    snapshotted and linked as `run.environment`, mirroring what `ln.track()` does
+    for its own process.
+
     → Python/R alternative: no equivalent
     """
     from lamin_cli._run import RunError, RunRequest, dispatch, resolve_where
