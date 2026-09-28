@@ -450,6 +450,11 @@ def _prepare_run(request: RunRequest):
     # like ln.track(), record only the arguments, and keep lamin:// URIs rather than
     # machine-specific local paths so the call can be reproduced elsewhere
     run.cli_args = shlex.join(request.args)
+    if request.args:
+        # a generic target's argv has no known flag/value structure (e.g. `wc -l`), so
+        # unlike `ln.track(params=...)` we can't infer typed, named params; expose the
+        # raw argv as a single param so it still shows up in the Hub's params table
+        run.params = {"argv": list(request.args)}
     run.save()
     if project_record is not None:
         run.projects.add(project_record)
