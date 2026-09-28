@@ -453,10 +453,9 @@ def test_run_translates_uris_links_inputs_and_registers_outputs(
     run = ln.Run.filter(transform__key="script.py").order_by("-started_at").first()
     assert run.status == "completed"
     assert run.cli_args == f"{uri} --out out.txt"
-    assert run.params == {"argv": [uri, "--out", "out.txt"]}
+    assert run.params["argv"] == [uri, "--out", "out.txt"]
+    assert run.params["tool_version"].lower().startswith("python")
     assert input_artifact.uid in {a.uid for a in run.input_artifacts.all()}
-    assert run.transform.description is not None
-    assert "(Python" in run.transform.description
     assert run.environment is not None
     assert run.environment.description == "requirements.txt"
     output = ln.Artifact.filter(run=run, key="out.txt").one()
@@ -501,6 +500,40 @@ def test_a_failing_target_propagates_its_exit_code(tmp_path, where_setting):
     assert result.returncode == 3
     run = ln.Run.filter(transform__key="failing.py").order_by("-started_at").first()
     assert run.status == "errored"
+
+
+def test_a_reused_executables_version_lands_on_each_run_not_the_transform(
+    tmp_path, where_setting
+):
+    """Two different versions of a same-named tool must not rewrite each other's
+    history: lamindb never auto-versions an executable transform (no source code to
+    hash it by), so it's the same transform record for both runs.
+    """
+    import lamindb as ln
+
+    tool_v1 = tmp_path / "mytool"
+    tool_v1.write_text(
+        '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "mytool 1.0.0"; fi\nexit 0\n'
+    )
+    tool_v1.chmod(0o755)
+    result = _lamin("run", str(tool_v1), cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    run_1 = ln.Run.filter(transform__key="mytool").order_by("-started_at").first()
+    assert run_1.params["tool_version"] == "mytool 1.0.0"
+
+    tool_v1.write_text(
+        '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "mytool 2.0.0"; fi\nexit 0\n'
+    )
+    result = _lamin("run", str(tool_v1), cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    run_2 = ln.Run.filter(transform__key="mytool").order_by("-started_at").first()
+    assert run_2.uid != run_1.uid
+    assert run_2.transform.uid == run_1.transform.uid  # same, reused transform
+    assert run_2.params["tool_version"] == "mytool 2.0.0"
+
+    # re-fetch: run_1's own record must still show what it actually ran
+    run_1.refresh_from_db()
+    assert run_1.params["tool_version"] == "mytool 1.0.0"
 
 
 def test_a_missing_executable_is_recorded_as_errored(tmp_path, where_setting):
@@ -572,5 +605,6 @@ def test_non_python_scripts_get_no_environment_snapshot(tmp_path, where_setting)
 
     run = ln.Run.filter(transform__key="greet.sh").order_by("-started_at").first()
     assert run.environment is None
-    # the interpreter is still versioned, just not its packages
-    assert run.transform.description is not None
+    # the interpreter is still versioned, just not its packages, and per run rather
+    # than on the (possibly reused) transform
+    assert run.params["tool_version"].lower().startswith("gnu bash")

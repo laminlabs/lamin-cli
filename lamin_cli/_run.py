@@ -288,31 +288,30 @@ def _probe_version(executable: str) -> str | None:
 
 
 def _prepare_transform(target: str, kind: Literal["script", "executable"]):
+    """Create or reuse the transform, and probe the version of whatever runs it.
+
+    The version is deliberately not stored on the transform: it's reused across
+    runs (by content hash for a script, by key alone for an executable, which
+    lamindb never auto-versions), so a later run with a different version would
+    silently rewrite earlier runs' history. `_prepare_run` records it per run
+    instead, in `run.params["tool_version"]`.
+    """
     import lamindb as ln
     import lamindb_setup as ln_setup
 
     path = Path(target)
     if kind == "script":
-        # the interpreter's version, e.g. "train.py (Python 3.12.3)"; the script
-        # itself is versioned by its source code hash, tracked below
         interpreter = command_for(target)[0]
         version = _probe_version(interpreter)
-        description = f"{path.name} ({version})" if version else None
         transform = ln.Transform(
-            key=path.name,
-            source_code=path.read_text(),
-            kind="script",
-            description=description,
+            key=path.name, source_code=path.read_text(), kind="script"
         )
     else:
         version = _probe_version(target)
-        description = f"{path.name} ({version})" if version else path.name
-        transform = ln.Transform(
-            key=path.name, kind="pipeline", description=description
-        )
+        transform = ln.Transform(key=path.name, kind="pipeline")
     transform.branch = ln_setup.settings.branch
     transform.space = ln_setup.settings.space
-    return transform.save()
+    return transform.save(), version
 
 
 def _track_child_python_environment(run) -> None:
@@ -511,17 +510,27 @@ def _prepare_run(request: RunRequest):
         _note(f"{translation.uri} -> {translation.local_path} (via {translation.via})")
     child_argv = [*command_for(target), *target_args]
 
-    run = ln.Run(transform=_prepare_transform(target, kind))
+    transform, tool_version = _prepare_transform(target, kind)
+    run = ln.Run(transform=transform)
     run.started_at = datetime.now(timezone.utc)
     run._status_code = -1
     # like ln.track(), record only the arguments, and keep lamin:// URIs rather than
     # machine-specific local paths so the call can be reproduced elsewhere
     run.cli_args = shlex.join(request.args)
+    params: dict = {}
     if request.args:
         # a generic target's argv has no known flag/value structure (e.g. `wc -l`), so
         # unlike `ln.track(params=...)` we can't infer typed, named params; expose the
         # raw argv as a single param so it still shows up in the Hub's params table
-        run.params = {"argv": list(request.args)}
+        params["argv"] = list(request.args)
+    if tool_version is not None:
+        # per run, not on the transform: the same transform is reused across runs
+        # (by key for an executable, which lamindb never auto-versions; by content
+        # hash for a script whose text is unchanged), so a later run with a
+        # different version would otherwise silently rewrite earlier runs' history
+        params["tool_version"] = tool_version
+    if params:
+        run.params = params
     run.save()
     if project_record is not None:
         run.projects.add(project_record)
