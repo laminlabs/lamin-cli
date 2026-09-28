@@ -24,7 +24,7 @@ def transfer(
     key: str | None = None,
     name: str | None = None,
     source: str | None = None,
-    depth: int | None = None,
+    depth: int = 0,
     transfer: str | None = None,
 ):
     """Transfer one object from a source database into the current default database."""
