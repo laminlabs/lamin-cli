@@ -45,6 +45,10 @@ class RunRequest:
     packages: str | None = None
     cpu: float | None = None
     gpu: str | None = None
+    branch: str | None = None
+    space: str | None = None
+    upload_outputs: bool = False
+    dry_run: bool = False
 
 
 @dataclass(frozen=True)
@@ -287,7 +291,9 @@ def _probe_version(executable: str) -> str | None:
     return output.splitlines()[0] if output else None
 
 
-def _prepare_transform(target: str, kind: Literal["script", "executable"]):
+def _prepare_transform(
+    target: str, kind: Literal["script", "executable"], branch, space
+):
     """Create or reuse the transform, and probe the version of whatever runs it.
 
     The version is deliberately not stored on the transform: it's reused across
@@ -297,7 +303,6 @@ def _prepare_transform(target: str, kind: Literal["script", "executable"]):
     instead, in `run.params["tool_version"]`.
     """
     import lamindb as ln
-    import lamindb_setup as ln_setup
 
     path = Path(target)
     if kind == "script":
@@ -309,8 +314,8 @@ def _prepare_transform(target: str, kind: Literal["script", "executable"]):
     else:
         version = _probe_version(target)
         transform = ln.Transform(key=path.name, kind="pipeline")
-    transform.branch = ln_setup.settings.branch
-    transform.space = ln_setup.settings.space
+    transform.branch = branch
+    transform.space = space
     return transform.save(), version
 
 
@@ -396,16 +401,81 @@ def collect_output_paths(child_argv: list[str], register_outputs) -> list[Path]:
     return paths
 
 
-def _register_outputs(run, paths: list[Path]) -> None:
+def _register_outputs(
+    run, paths: list[Path], branch, space, *, upload_outputs: bool
+) -> None:
     import lamindb as ln
+    import lamindb_setup as ln_setup
 
+    keep_local = ln_setup.settings.instance.keep_artifacts_local
+    cwd = Path.cwd()
     seen: set[Path] = set()
     for path in paths:
         resolved = path.resolve()
         if resolved in seen or not path.exists():
             continue
         seen.add(resolved)
-        ln.Artifact(path, key=path.name, run=run).save()
+        try:
+            # preserve the directory structure the target wrote into, e.g.
+            # "results/summary.csv" rather than just "summary.csv"
+            key = str(resolved.relative_to(cwd))
+        except ValueError:
+            # outside cwd (e.g. an absolute path elsewhere): fall back to the name
+            key = path.name
+        artifact = ln.Artifact(path, key=key, run=run, branch=branch, space=space)
+        artifact.save(upload=True if upload_outputs else None, print_progress=False)
+        if keep_local and not upload_outputs:
+            _note(
+                f"{key!r} registered but kept local (instance policy"
+                " keep_artifacts_local); pass --upload-outputs to force upload for"
+                " this run"
+            )
+
+
+def _resolve_project(request: RunRequest):
+    import lamindb as ln
+
+    if request.project is None:
+        return None
+    from django.db.models import Q
+
+    project_record = ln.Project.filter(
+        Q(name=request.project) | Q(uid=request.project)
+    ).one_or_none()
+    if project_record is None:
+        raise RunError(f"Project {request.project!r} not found.")
+    return project_record
+
+
+def _resolve_branch_and_space(request: RunRequest):
+    """Resolve --branch/--space, falling back to the ambient local settings.
+
+    Unlike inputs, which are fully explicit via a URI's own `?branch=&space=`
+    query params, the transform/run/outputs otherwise silently inherit whatever
+    branch/space the local machine happens to be pointed at.
+    """
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+
+    branch = ln_setup.settings.branch
+    if request.branch is not None:
+        from django.db.models import Q
+
+        branch = ln.Branch.filter(
+            Q(name=request.branch) | Q(uid=request.branch)
+        ).one_or_none()
+        if branch is None:
+            raise RunError(f"Branch {request.branch!r} not found.")
+    space = ln_setup.settings.space
+    if request.space is not None:
+        from django.db.models import Q
+
+        space = ln.Space.filter(
+            Q(name=request.space) | Q(uid=request.space)
+        ).one_or_none()
+        if space is None:
+            raise RunError(f"Space {request.space!r} not found.")
+    return branch, space
 
 
 def _link_inputs(run, translations: list[Translation]) -> None:
@@ -495,23 +565,18 @@ def _prepare_run(request: RunRequest):
     if kind == "script" and not Path(target).is_file():
         raise RunError(f"Script {target!r} does not exist.")
 
-    project_record = None
-    if request.project is not None:
-        from django.db.models import Q
-
-        project_record = ln.Project.filter(
-            Q(name=request.project) | Q(uid=request.project)
-        ).one_or_none()
-        if project_record is None:
-            raise RunError(f"Project {request.project!r} not found.")
+    project_record = _resolve_project(request)
+    branch, space = _resolve_branch_and_space(request)
 
     target_args, translations = translate_argv(request.args, request.remount, _note)
     for translation in translations:
         _note(f"{translation.uri} -> {translation.local_path} (via {translation.via})")
     child_argv = [*command_for(target), *target_args]
 
-    transform, tool_version = _prepare_transform(target, kind)
+    transform, tool_version = _prepare_transform(target, kind, branch, space)
     run = ln.Run(transform=transform)
+    run.branch = branch
+    run.space = space
     run.started_at = datetime.now(timezone.utc)
     run._status_code = -1
     # like ln.track(), record only the arguments, and keep lamin:// URIs rather than
@@ -535,7 +600,7 @@ def _prepare_run(request: RunRequest):
     if project_record is not None:
         run.projects.add(project_record)
     _link_inputs(run, translations)
-    return run, target, target_args, child_argv, translations
+    return run, target, target_args, child_argv, translations, branch, space
 
 
 def run_local(request: RunRequest) -> int:
@@ -547,7 +612,9 @@ def run_local(request: RunRequest) -> int:
         import lamindb as ln
         from lamindb.core._finish import save_run_logs
 
-        run, target, target_args, child_argv, translations = _prepare_run(request)
+        run, target, target_args, child_argv, translations, branch, space = (
+            _prepare_run(request)
+        )
         if Path(target).suffix in {".py", ".pyw"}:
             _track_child_python_environment(run)
 
@@ -576,6 +643,9 @@ def run_local(request: RunRequest) -> int:
             _register_outputs(
                 run,
                 collect_output_paths([target, *target_args], request.register_outputs),
+                branch,
+                space,
+                upload_outputs=request.upload_outputs,
             )
         else:
             _note(f"{Path(target).name} exited with code {returncode}")
@@ -588,6 +658,92 @@ def run_local(request: RunRequest) -> int:
             run.save()
             save_run_logs(run, save_run=True)
     return returncode
+
+
+def run_dry(request: RunRequest) -> int:
+    """Report what `run_local` would do, without executing the target or saving.
+
+    Useful before trusting a new mapping of inputs/outputs with a real, possibly
+    shared instance: nothing here writes to the database or uploads anything.
+    """
+    import lamindb as ln
+
+    from lamin_cli._uri import is_lamin_uri
+
+    target = request.target
+    if is_lamin_uri(target):
+        translation = resolve_uri_to_local_path(target, request.remount, _note)
+        target = str(translation.local_path)
+    kind = classify_target(target)
+    if kind == "script" and not Path(target).is_file():
+        raise RunError(f"Script {target!r} does not exist.")
+
+    project_record = _resolve_project(request)
+    branch, space = _resolve_branch_and_space(request)
+
+    target_args, translations = translate_argv(request.args, request.remount, _note)
+    child_argv = [*command_for(target), *target_args]
+
+    _note(f"would run: {shlex.join(child_argv)}")
+    _note(f"branch: {branch.name!r} | space: {space.name!r}")
+    if project_record is not None:
+        _note(f"project: {project_record.name!r}")
+
+    # constructing (not saving) a Transform still runs its own reuse-by-key /
+    # reuse-by-content-hash lookup, so this reports the real outcome without a write
+    path = Path(target)
+    if kind == "script":
+        interpreter = command_for(target)[0]
+        version = _probe_version(interpreter)
+        transform = ln.Transform(
+            key=path.name, source_code=path.read_text(), kind="script"
+        )
+    else:
+        version = _probe_version(target)
+        transform = ln.Transform(key=path.name, kind="pipeline")
+    outcome = "would create a new" if transform._state.adding else "would reuse the"
+    _note(f"transform: {outcome} transform {path.name!r} (uid={transform.uid})")
+    if version is not None:
+        _note(f"tool_version: {version}")
+    if kind == "script" and Path(target).suffix in {".py", ".pyw"}:
+        _note(f"would snapshot the Python environment ({_active_python_executable()})")
+
+    for translation in translations:
+        if translation.in_current_instance:
+            _note(
+                f"input: {translation.uri} -> {translation.local_path}"
+                f" (via {translation.via})"
+            )
+        else:
+            _note(
+                f"input: {translation.uri} -> {translation.local_path}"
+                f" (via {translation.via}, in another instance, would NOT be linked)"
+            )
+
+    output_paths = collect_output_paths(
+        [target, *target_args], request.register_outputs
+    )
+    cwd = Path.cwd()
+    seen: set[Path] = set()
+    for path in output_paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        try:
+            key = str(resolved.relative_to(cwd))
+        except ValueError:
+            key = path.name
+        if path.exists():
+            _note(f"output: {path} -> key {key!r} (exists now; would be registered)")
+        else:
+            _note(
+                f"output: {path} -> key {key!r} (does not exist yet; would only be"
+                " registered if the run creates it)"
+            )
+
+    _note("dry run: nothing was executed or saved")
+    return 0
 
 
 # -- modal executor ------------------------------------------------------------

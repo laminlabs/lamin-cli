@@ -1507,6 +1507,10 @@ _MODAL_ONLY = ("image_url", "packages", "cpu", "gpu")
 @click.option("--packages", type=str, default=None, help="Modal only: a comma-separated list of additional packages.")
 @click.option("--cpu", type=float, default=None, help="Modal only: CPU configuration.")
 @click.option("--gpu", type=str, default=None, help="Modal only: the type of GPU (cuda images only).")
+@click.option("--branch", type=str, default=None, help="A branch name or uid for the transform, run and any outputs. Defaults to the current local branch.")
+@click.option("--space", type=str, default=None, help="A space name or uid for the transform, run and any outputs. Defaults to the current local space.")
+@click.option("--upload-outputs", is_flag=True, default=False, help="Force outputs to upload even if the instance keeps artifacts local by default.")
+@click.option("--dry-run", is_flag=True, default=False, help="Report what would be linked as inputs and registered as outputs, without executing the target or saving anything. Local only.")
 @click.pass_context
 # fmt: on
 def run(
@@ -1520,6 +1524,10 @@ def run(
     packages: str | None,
     cpu: float | None,
     gpu: str | None,
+    branch: str | None,
+    space: str | None,
+    upload_outputs: bool,
+    dry_run: bool,
 ):
     """Run a script or executable, tracked as a run.
 
@@ -1532,6 +1540,7 @@ def run(
     lamin run samtools -- view -b lamin://acme/data/artifact/3TrLu3AbQx9dZq2K -o out.bam
     lamin run --register-output out.bam align.sh -- --out out.bam
     lamin run --where modal --project my_project my_script.py
+    lamin run --dry-run align.sh -- --out out.bam
     ```
 
     URIs take two forms. The uid form matches nf-lamin; the key form accepts
@@ -1552,6 +1561,14 @@ def run(
     Python script, the interpreter's `pip freeze` is additionally snapshotted and
     linked as `run.environment`, mirroring what `ln.track()` does for its own
     process.
+
+    Unlike inputs, which carry their own `?branch=&space=` in the URI, the
+    transform/run/outputs otherwise inherit whatever branch/space the local machine
+    is pointed at; pass `--branch`/`--space` to make this explicit instead.
+
+    An output only registers if the target exits 0, and is uploaded or kept local
+    following the instance's `keep_artifacts_local` setting; pass `--upload-outputs`
+    to force it for this run. Use `--dry-run` to preview all of this first.
 
     → Python/R alternative: no equivalent
     """
@@ -1575,6 +1592,8 @@ def run(
             f" {where_value} (from {source}). If meant for the target, pass it after"
             f" `--`: lamin run {target} -- {modal_only[0]} ..."
         )
+    if dry_run and where_value == "modal":
+        raise click.ClickException("--dry-run only supports --where local.")
 
     request = RunRequest(
         target=target,
@@ -1586,9 +1605,18 @@ def run(
         packages=packages,
         cpu=cpu,
         gpu=gpu,
+        branch=branch,
+        space=space,
+        upload_outputs=upload_outputs,
+        dry_run=dry_run,
     )
     try:
-        returncode = dispatch(where_value, request)
+        if dry_run:
+            from lamin_cli._run import run_dry
+
+            returncode = run_dry(request)
+        else:
+            returncode = dispatch(where_value, request)
     except (RunError, InvalidLaminUri, UnresolvableLaminUri) as error:
         raise click.ClickException(str(error)) from None
     if returncode != 0:

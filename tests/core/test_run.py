@@ -608,3 +608,194 @@ def test_non_python_scripts_get_no_environment_snapshot(tmp_path, where_setting)
     # the interpreter is still versioned, just not its packages, and per run rather
     # than on the (possibly reused) transform
     assert run.params["tool_version"].lower().startswith("gnu bash")
+
+
+# -- output key, upload policy, branch/space, dry-run ------------------------
+
+
+def test_output_key_preserves_the_relative_path(tmp_path, where_setting):
+    import lamindb as ln
+
+    script = _script(
+        tmp_path,
+        """
+        from pathlib import Path
+        Path("results").mkdir(exist_ok=True)
+        Path("results/summary.csv").write_text("a,b\\n1,2\\n")
+        """,
+    )
+    result = _lamin(
+        "run", str(script), "--register-output", "results/summary.csv", cwd=tmp_path
+    )
+    assert result.returncode == 0, result.stderr
+
+    run = ln.Run.filter(transform__key="script.py").order_by("-started_at").first()
+    output = ln.Artifact.filter(run=run).one()
+    assert output.key == "results/summary.csv"
+    _lamin("delete", "artifact", "--uid", output.uid, "--permanent", cwd=tmp_path)
+
+
+def test_output_outside_cwd_falls_back_to_the_basename(tmp_path, where_setting):
+    import lamindb as ln
+
+    outside = tmp_path.parent / f"outside-{tmp_path.name}.csv"
+    outside.write_text("a,b\n1,2\n")
+    script = _script(tmp_path, "pass")
+    try:
+        result = _lamin(
+            "run", str(script), "--register-output", str(outside), cwd=tmp_path
+        )
+        assert result.returncode == 0, result.stderr
+        run = ln.Run.filter(transform__key="script.py").order_by("-started_at").first()
+        output = ln.Artifact.filter(run=run).one()
+        assert output.key == outside.name
+        _lamin("delete", "artifact", "--uid", output.uid, "--permanent", cwd=tmp_path)
+    finally:
+        outside.unlink(missing_ok=True)
+
+
+def test_keep_artifacts_local_is_honored_and_warns(tmp_path, monkeypatch, capsys):
+    """`monkeypatch` can't reach `--register-output`'s subprocess, so this exercises
+    `_register_outputs` directly, the same function `lamin run` calls after a
+    successful target.
+    """
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+
+    monkeypatch.setattr(
+        type(ln_setup.settings.instance),
+        "keep_artifacts_local",
+        property(lambda self: True),
+    )
+    monkeypatch.chdir(tmp_path)
+    transform = ln.Transform(key="unit-test-keep-local-warns", kind="pipeline").save()
+    run = ln.Run(transform=transform).save()
+    try:
+        output = tmp_path / "out.txt"
+        output.write_text("x")
+        _run._register_outputs(
+            run,
+            [output],
+            ln_setup.settings.branch,
+            ln_setup.settings.space,
+            upload_outputs=False,
+        )
+        stderr = capsys.readouterr().err
+        assert "kept local" in stderr
+        assert "--upload-outputs" in stderr
+        artifact = ln.Artifact.filter(run=run).one()
+        artifact.delete(permanent=True)
+    finally:
+        run.delete()
+        transform.delete()
+
+
+def test_upload_outputs_suppresses_the_keep_local_warning(
+    tmp_path, monkeypatch, capsys
+):
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+
+    monkeypatch.setattr(
+        type(ln_setup.settings.instance),
+        "keep_artifacts_local",
+        property(lambda self: True),
+    )
+    monkeypatch.chdir(tmp_path)
+    transform = ln.Transform(
+        key="unit-test-keep-local-override", kind="pipeline"
+    ).save()
+    run = ln.Run(transform=transform).save()
+    try:
+        output = tmp_path / "out.txt"
+        output.write_text("x")
+        _run._register_outputs(
+            run,
+            [output],
+            ln_setup.settings.branch,
+            ln_setup.settings.space,
+            upload_outputs=True,
+        )
+        assert "kept local" not in capsys.readouterr().err
+        artifact = ln.Artifact.filter(run=run).one()
+        artifact.delete(permanent=True)
+    finally:
+        run.delete()
+        transform.delete()
+
+
+def test_branch_and_space_apply_to_transform_run_and_outputs(tmp_path, where_setting):
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+
+    branch_name = f"lamin-run-test-branch-{tmp_path.name}"
+    branch = ln.Branch(name=branch_name).save()
+    script = _script(tmp_path, "__import__('pathlib').Path('out.txt').write_text('x')")
+    result = _lamin(
+        "run",
+        str(script),
+        "--branch",
+        branch_name,
+        "--register-output",
+        "out.txt",
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+
+    run = (
+        ln.Run.filter(transform__key="script.py", branch=branch)
+        .order_by("-started_at")
+        .first()
+    )
+    assert run is not None
+    assert run.transform.branch_id == branch.id
+    # lamindb's default queryset scoping only includes [ambient branch, main]
+    # unless branch is referenced explicitly, so this needs it too
+    output = ln.Artifact.filter(run=run, branch=branch).one()
+    assert output.branch_id == branch.id
+    # the ambient local branch is untouched
+    assert ln_setup.settings.branch.id != branch.id
+    _lamin("delete", "artifact", "--uid", output.uid, "--permanent", cwd=tmp_path)
+    # the branch is left in place: Transform/Run still reference it (PROTECT), and
+    # the session-scoped test instance is torn down wholesale at the end anyway
+
+
+def test_an_unknown_branch_errors_clearly(tmp_path, where_setting):
+    script = _script(tmp_path, "pass")
+    result = _lamin("run", str(script), "--branch", "no-such-branch", cwd=tmp_path)
+    assert result.returncode != 0
+    assert "no-such-branch" in result.stderr
+
+
+def test_dry_run_reports_without_executing_or_saving(
+    tmp_path, input_artifact, where_setting
+):
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+
+    marker = tmp_path / "ran"
+    script = _script(tmp_path, f"open({str(marker)!r}, 'w').close()")
+    slug = ln_setup.settings.instance.slug
+    uri = f"lamin://{slug}/artifact/key/lamin-run-test/input.txt"
+    before = ln.Run.filter(transform__key="script.py").count()
+
+    result = _lamin(
+        "run", "--dry-run", str(script), "--", uri, "--out", "out.txt", cwd=tmp_path
+    )
+    assert result.returncode == 0, result.stderr
+    assert "dry run: nothing was executed or saved" in result.stderr
+    assert "would run:" in result.stderr
+    assert uri in result.stderr
+
+    # nothing actually happened
+    assert not marker.exists()
+    assert not (tmp_path / "out.txt").exists()
+    after = ln.Run.filter(transform__key="script.py").count()
+    assert after == before
+
+
+def test_dry_run_does_not_support_modal(tmp_path, where_setting):
+    script = _script(tmp_path, "pass")
+    result = _lamin("run", "--dry-run", "--where", "modal", str(script), cwd=tmp_path)
+    assert result.returncode != 0
+    assert "--dry-run only supports --where local" in result.stderr
