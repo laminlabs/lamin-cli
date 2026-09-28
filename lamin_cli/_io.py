@@ -27,7 +27,7 @@ def io():
 
     ```
     lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE
-    lamin io sync https://lamin.ai/laminlabs/lamindata/artifact/e2G7k9EVul4JbfsE --depth 0
+    lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE --depth 1
     lamin io sync record --uid UrcIKR8v0ywim0pE --from laminlabs/lamindata
     lamin io sync artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
     ```
@@ -71,8 +71,13 @@ def io():
 @click.option(
     "--depth",
     type=click.IntRange(0),
-    default=None,
-    help="How many levels of related records to follow. Use 0 to sync only this object.",
+    default=0,
+    show_default=True,
+    help=(
+        "How many levels of records under a type to transfer. "
+        "0 transfers only this object. Applies to record, feature, schema, "
+        "project, ulabel, and reference."
+    ),
 )
 @click.option(
     "--transfer",
@@ -87,7 +92,7 @@ def sync(
     key: str | None = None,
     name: str | None = None,
     source: str | None = None,
-    depth: int | None = None,
+    depth: int = 0,
     transfer_mode: str | None = None,
 ) -> None:
     """Sync an object to the current database."""
