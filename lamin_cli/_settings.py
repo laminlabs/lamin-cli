@@ -27,11 +27,8 @@ def settings(ctx):
     Examples:
 
     ```
-    # dev-dir
+    # dev-dir (created by lamin init or lamin connect <account/name> --here)
     lamin settings dev-dir get
-    lamin settings dev-dir set .  # set to current directory
-    lamin settings dev-dir set ~/my-project
-    lamin settings dev-dir unset
     lamin settings dev-dir find .
     # cache-dir
     lamin settings cache-dir get
@@ -62,13 +59,13 @@ def settings(ctx):
 
 
 # -----------------------------------------------------------------------------
-# dev-dir group (pattern: lamin settings dev-dir get/set)
+# dev-dir group (pattern: lamin settings dev-dir get/find)
 # -----------------------------------------------------------------------------
 
 
 @click.group("dev-dir")
 def dev_dir_group():
-    """Get, set, or find development directories."""
+    """Get or find development directories."""
 
 
 @dev_dir_group.command("get")
@@ -80,7 +77,7 @@ def dev_dir_get():
     click.echo(value if value is not None else "None")
 
 
-@dev_dir_group.command("set")
+@dev_dir_group.command("set", hidden=True)
 @click.argument("value", type=str)
 def dev_dir_set(value: str):
     """Set the development directory."""
@@ -94,7 +91,7 @@ def dev_dir_set(value: str):
         raise click.ClickException(str(error)) from error
 
 
-@dev_dir_group.command("unset")
+@dev_dir_group.command("unset", hidden=True)
 def dev_dir_unset():
     """Unset the development directory."""
     from lamindb_setup import settings as settings_
