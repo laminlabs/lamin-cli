@@ -50,8 +50,9 @@ def test_describe_artifact_by_uid_and_key():
 def test_describe_transform_by_uid_and_key():
     """Describe transform by --uid and by --key."""
     # Transform key is path relative to dev-dir; set dev-dir so script path is under it
+    dev_dir = scripts_dir.parent
     subprocess.run(
-        f"lamin settings dev-dir set {scripts_dir.parent}",
+        f"lamin settings dev-dir set {dev_dir}",
         shell=True,
         capture_output=True,
     )
@@ -61,6 +62,7 @@ def test_describe_transform_by_uid_and_key():
         f"lamin save {script_path}",
         shell=True,
         capture_output=True,
+        cwd=dev_dir,
     )
     assert result.returncode == 0, result.stderr.decode()
 
@@ -91,13 +93,19 @@ def test_describe_transform_by_uid_and_key():
     )
     script_path.unlink(missing_ok=True)
     # Restore dev-dir so other tests (e.g. test_save_annotate_scripts) are not affected
-    subprocess.run("lamin settings dev-dir unset", shell=True, capture_output=True)
+    subprocess.run(
+        "lamin settings dev-dir unset",
+        shell=True,
+        capture_output=True,
+        cwd=dev_dir,
+    )
 
 
 def test_describe_run_by_uid():
     """Describe run by --uid."""
+    dev_dir = scripts_dir.parent
     subprocess.run(
-        f"lamin settings dev-dir set {scripts_dir.parent}",
+        f"lamin settings dev-dir set {dev_dir}",
         shell=True,
         capture_output=True,
     )
@@ -107,6 +115,7 @@ def test_describe_run_by_uid():
         f"lamin save {script_path}",
         shell=True,
         capture_output=True,
+        cwd=dev_dir,
     )
     assert result.returncode == 0, result.stderr.decode()
 
@@ -133,7 +142,12 @@ def test_describe_run_by_uid():
     )
     script_path.unlink(missing_ok=True)
     # Restore dev-dir so other tests (e.g. test_save_annotate_scripts) are not affected
-    subprocess.run("lamin settings dev-dir unset", shell=True, capture_output=True)
+    subprocess.run(
+        "lamin settings dev-dir unset",
+        shell=True,
+        capture_output=True,
+        cwd=dev_dir,
+    )
 
 
 def test_describe_record_by_name_and_uid():
