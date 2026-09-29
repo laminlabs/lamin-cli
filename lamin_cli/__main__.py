@@ -81,6 +81,7 @@ if os.environ.get("NO_RICH"):
         ApiKeyError,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
+        NoReadAccess,
         NotInBranchDir,
         NoWriteAccess,
         WorktreePathError,
@@ -106,6 +107,7 @@ if os.environ.get("NO_RICH"):
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
                 NotInBranchDir,
+                NoReadAccess,
                 NoWriteAccess,
                 WorktreePathError,
             ) as e:
@@ -122,6 +124,7 @@ else:
         ApiKeyError,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
+        NoReadAccess,
         NotInBranchDir,
         NoWriteAccess,
         WorktreePathError,
@@ -136,6 +139,7 @@ else:
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
                 NotInBranchDir,
+                NoReadAccess,
                 NoWriteAccess,
                 WorktreePathError,
             ) as e:
