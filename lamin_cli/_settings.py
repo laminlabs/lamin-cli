@@ -1,20 +1,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 if os.environ.get("NO_RICH"):
     import click as click
 else:
     import rich_click as click
-
-from lamindb_setup.errors import DevDirNonEmpty, NoDevDirConfigured
-
-
-def _set_worktree(settings_, value: bool) -> None:
-    try:
-        settings_.worktree = value
-    except (NoDevDirConfigured, DevDirNonEmpty) as error:
-        raise click.ClickException(str(error)) from error
 
 
 @click.group(invoke_without_command=True)
@@ -29,7 +21,6 @@ def settings(ctx):
     - `modules` → environment schema modules {attr}`~lamindb.setup.core.SetupSettings.modules`
     - `branch` → current {attr}`~lamindb.setup.core.SetupSettings.branch`
     - `space` → current {attr}`~lamindb.setup.core.SetupSettings.space`
-    - `worktree` → toggle {attr}`~lamindb.setup.core.SetupSettings.worktree` mode (dev-dir is a worktree parent where each child directory maps on a branch)
 
     You can display your current settings by running: `lamin info`
 
@@ -41,6 +32,7 @@ def settings(ctx):
     lamin settings dev-dir set .  # set to current directory
     lamin settings dev-dir set ~/my-project
     lamin settings dev-dir unset
+    lamin settings dev-dir find .
     # cache-dir
     lamin settings cache-dir get
     lamin settings cache-dir set /path/to/cache
@@ -55,10 +47,6 @@ def settings(ctx):
     # space
     lamin settings space get
     lamin settings space set all
-    # worktree
-    lamin settings worktree get
-    lamin settings worktree set true
-    lamin settings worktree unset
     # mount
     lamin settings mount storage ./mnt
     lamin settings mount unset ./mnt
@@ -80,7 +68,7 @@ def settings(ctx):
 
 @click.group("dev-dir")
 def dev_dir_group():
-    """Get or set the development directory."""
+    """Get, set, or find development directories."""
 
 
 @dev_dir_group.command("get")
@@ -100,7 +88,10 @@ def dev_dir_set(value: str):
 
     if value.lower() == "none":
         value = None  # type: ignore[assignment]
-    settings_.dev_dir = value
+    try:
+        settings_.dev_dir = value
+    except ValueError as error:
+        raise click.ClickException(str(error)) from error
 
 
 @dev_dir_group.command("unset")
@@ -111,52 +102,27 @@ def dev_dir_unset():
     settings_.dev_dir = None
 
 
+@dev_dir_group.command("find")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=False,
+)
+def dev_dir_find(path: Path | None):
+    """List development directories under a path.
+
+    `$HOME` is never listed. Passing `$HOME` does not scan it.
+    """
+    from lamindb_setup.core._settings_store import find_dev_dirs, is_home_directory
+
+    root = path if path is not None else Path.cwd()
+    if is_home_directory(root):
+        return
+    for directory, slug, branch in find_dev_dirs(root):
+        click.echo(f"{directory.as_posix()}\t{slug}\t{branch}")
+
+
 settings.add_command(dev_dir_group)
-
-
-# -----------------------------------------------------------------------------
-# worktree group (pattern: lamin settings worktree get/set)
-# -----------------------------------------------------------------------------
-
-
-@click.group("worktree")
-def worktree_group():
-    """Get or set whether dev-dir is interpreted as a worktree parent."""
-
-
-@worktree_group.command("get")
-def worktree_get():
-    """Show whether worktree mode is enabled."""
-    from lamindb_setup import settings as settings_
-
-    click.echo("true" if settings_.worktree else "false")
-
-
-@worktree_group.command("set")
-@click.argument("value", type=str)
-def worktree_set(value: str):
-    """Enable or disable worktree mode."""
-    from lamindb_setup import settings as settings_
-
-    value_normalized = value.strip().lower()
-    if value_normalized in {"1", "true", "yes"}:
-        _set_worktree(settings_, True)
-        return
-    if value_normalized in {"0", "false", "no"}:
-        _set_worktree(settings_, False)
-        return
-    raise click.ClickException("Invalid value for worktree. Pass one of: true, false.")
-
-
-@worktree_group.command("unset")
-def worktree_unset():
-    """Unset worktree mode (equivalent to false)."""
-    from lamindb_setup import settings as settings_
-
-    _set_worktree(settings_, False)
-
-
-settings.add_command(worktree_group)
 
 
 # -----------------------------------------------------------------------------
@@ -210,7 +176,7 @@ settings.add_command(modules_group)
 @click.argument(
     "setting",
     type=click.Choice(
-        ["auto-connect", "private-django-api", "dev-dir", "worktree"],
+        ["auto-connect", "private-django-api", "dev-dir"],
         case_sensitive=False,
     ),
 )
@@ -226,9 +192,10 @@ def set_legacy(setting: str, value: str):
     if setting == "dev-dir":
         if value.lower() == "none":
             value = None  # type: ignore[assignment]
-        settings_.dev_dir = value
-    if setting == "worktree":
-        _set_worktree(settings_, click.BOOL(value))
+        try:
+            settings_.dev_dir = value
+        except ValueError as error:
+            raise click.ClickException(str(error)) from error
 
 
 @settings.command("get", hidden=True)
@@ -241,7 +208,6 @@ def set_legacy(setting: str, value: str):
             "space",
             "branch",
             "dev-dir",
-            "worktree",
         ],
         case_sensitive=False,
     ),
@@ -258,8 +224,6 @@ def get_legacy(setting: str):
         value = settings_.dev_dir
         if value is None:
             value = "None"
-    elif setting == "worktree":
-        value = "true" if settings_.worktree else "false"
     else:
         value = getattr(settings_, setting.replace("-", "_"))
     click.echo(value)

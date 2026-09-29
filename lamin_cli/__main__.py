@@ -82,9 +82,7 @@ if os.environ.get("NO_RICH"):
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
         NoReadAccess,
-        NotInBranchDir,
         NoWriteAccess,
-        WorktreePathError,
     )
 
     class OrderedExceptionHandlingGroup(click.Group):
@@ -106,10 +104,8 @@ if os.environ.get("NO_RICH"):
                 ApiKeyError,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
-                NotInBranchDir,
                 NoReadAccess,
                 NoWriteAccess,
-                WorktreePathError,
             ) as e:
                 raise click.ClickException(str(e)) from None
 
@@ -125,9 +121,7 @@ else:
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
         NoReadAccess,
-        NotInBranchDir,
         NoWriteAccess,
-        WorktreePathError,
     )
 
     class OrderedRichExceptionHandlingGroup(click.RichGroup):
@@ -138,10 +132,8 @@ else:
                 ApiKeyError,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
-                NotInBranchDir,
                 NoReadAccess,
                 NoWriteAccess,
-                WorktreePathError,
             ) as e:
                 raise click.ClickException(str(e)) from None
 
@@ -388,13 +380,6 @@ def create(
         )
 
     if registry == "branch":
-        branch_dir: Path | None = None
-        if ln_setup.settings.worktree and ln_setup.settings.dev_dir is not None:
-            branch_dir = ln_setup.settings.dev_dir.resolve() / resolved_name
-            if branch_dir.exists() and not branch_dir.is_dir():
-                raise click.ClickException(
-                    f"Cannot create worktree directory '{branch_dir}': path exists and is not a directory."
-                )
         if ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import create_branch
 
@@ -404,8 +389,6 @@ def create(
             from lamindb import Branch
 
             created_name = Branch(name=resolved_name).save().name
-        if branch_dir is not None:
-            branch_dir.mkdir(parents=True, exist_ok=True)
     elif registry == "project":
         from lamindb import Project
 
@@ -563,9 +546,6 @@ def merge(branch: str):
 
     → Python/R alternative: {func}`~lamindb.setup.merge`
     """
-    if ln_setup.settings.worktree:
-        ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
-
     from lamindb_setup import merge as merge_
 
     try:
