@@ -87,16 +87,7 @@ def load(
             "--store-kwargs and --batch-size are only supported when loading artifacts or collections"
         )
 
-    # In worktree mode, load requires a concrete branch context from a child
-    # directory. This raises NotInBranchDir in dev-dir root/outside the worktree.
-    if ln_setup.settings.worktree:
-        _ = ln_setup.settings._branch_path
-
-    active_dev_dir = (
-        ln_setup.settings.effective_dev_dir
-        if ln_setup.settings.dev_dir is not None
-        else None
-    )
+    active_dev_dir = ln_setup.settings.dev_dir
 
     current_run = None
     if get_current_run_file().exists():

@@ -442,9 +442,9 @@ def save(
         uid = parse_uid_from_code(content, ppath.suffix)
 
         ppath = ppath.resolve().expanduser()
-        effective_dev_dir = ln_setup.settings.effective_dev_dir
-        if effective_dev_dir is not None:
-            key = ppath.relative_to(effective_dev_dir).as_posix()
+        dev_dir = ln_setup.settings.dev_dir
+        if dev_dir is not None:
+            key = ppath.relative_to(dev_dir).as_posix()
         else:
             key = ppath.name
 

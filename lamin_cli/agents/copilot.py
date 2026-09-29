@@ -65,7 +65,7 @@ def _persistent_run_uid_file(session_id: str, ln: object) -> Path:
 
 
 def _configured_dest_state_dir() -> Path | None:
-    """Configured dest-dir `.copilot/`, not the worktree branch folder."""
+    """Configured dev-dir `.copilot/` when the working directory is inside one."""
     try:
         from lamindb_setup import settings as ln_setup_settings
 
@@ -115,9 +115,7 @@ def _known_session_ids() -> set[str]:
     if not root.exists():
         return set()
     return {
-        path.parent.name
-        for path in root.glob("*/events.jsonl")
-        if path.parent.name
+        path.parent.name for path in root.glob("*/events.jsonl") if path.parent.name
     }
 
 
@@ -125,9 +123,7 @@ def _foreign_session_ids_in_text(
     text: str, session_id: str, known: set[str]
 ) -> list[str]:
     return sorted(
-        other_id
-        for other_id in known
-        if other_id != session_id and other_id in text
+        other_id for other_id in known if other_id != session_id and other_id in text
     )
 
 

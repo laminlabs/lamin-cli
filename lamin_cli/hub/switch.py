@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import lamindb_setup as ln_setup
@@ -68,32 +67,6 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
             "Please pass a branch name or uid. Example: lamin switch main"
         )
     if create:
-        if ln_setup.settings.worktree:
-            from lamindb_setup._switch import (
-                missing_branch_create_and_navigate_message,
-                worktree_switch_instruction,
-            )
-
-            instruction = worktree_switch_instruction(target, create=True)
-            if instruction is not None:
-                existing_branch = _get_branch(target)
-                uid_existing, name_existing = _extract_uid_name(existing_branch)
-                if uid_existing is None or name_existing is None:
-                    raise click.ClickException(
-                        missing_branch_create_and_navigate_message(target, instruction)
-                    )
-                raise click.ClickException(instruction)
-            # `_branch_path` raises NotInBranchDir at the worktree parent.
-            # Resolve it before create so a hub branch is not left behind.
-            _ = _branch_settings_path()
-        is_worktree_bootstrap = (
-            ln_setup.settings.worktree
-            and target is not None
-            and ln_setup.settings.dev_dir is not None
-            and Path.cwd().resolve().parent == ln_setup.settings.dev_dir.resolve()
-            and Path.cwd().resolve().name == target
-            and not ln_setup.settings._branch_path.exists()
-        )
         created_branch = create_branch(target)
         uid, name = _extract_uid_name(created_branch)
         if uid is None or name is None:
@@ -112,15 +85,6 @@ def switch_branch(target: str | None, *, create: bool = False) -> None:
                 f"Branch '{target}' does not exist. "
                 f"To create and switch, run: lamin switch -c {target}"
             )
-        if ln_setup.settings.worktree:
-            from lamindb_setup._switch import worktree_switch_instruction
-
-            instruction = worktree_switch_instruction(name, create=False)
-            if instruction is not None:
-                raise click.ClickException(instruction)
 
     _write_current_branch(uid, name)
-    if create and is_worktree_bootstrap:
-        logger.important_hint(f"to switch, cd into {target}")
-    else:
-        logger.important(f"switched to {target}")
+    logger.important(f"switched to {target}")

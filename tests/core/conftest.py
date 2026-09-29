@@ -14,7 +14,6 @@ def pytest_sessionstart(session: pytest.Session):
     for pattern in (
         "current-branch--*--lamin-cli-unit-tests.txt",
         "current-space--*--lamin-cli-unit-tests.txt",
-        "dev-dir--*--lamin-cli-unit-tests.txt",
     ):
         for f in settings_dir.glob(pattern):
             f.unlink(missing_ok=True)
@@ -29,7 +28,6 @@ def pytest_sessionstart(session: pytest.Session):
         name="lamin-cli-unit-tests",
     )
     ln.setup.settings.dev_dir = None
-    ln.setup.settings.worktree = False
     os.system("lamin connect lamin-cli-unit-tests")
 
 

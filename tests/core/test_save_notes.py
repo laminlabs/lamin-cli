@@ -33,7 +33,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
 
-        result = run_lamin("save", str(note_path))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -53,7 +53,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert "First version" in readmes.first().content
 
         note_path.write_text("# Second version\n\nhello again")
-        result = run_lamin("save", str(note_path))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -64,7 +64,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert readmes.last().is_latest
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         note_path.unlink(missing_ok=True)
         if note_dir.exists() and not any(note_dir.iterdir()):
             note_dir.rmdir()
@@ -93,11 +93,11 @@ def test_save_markdown_note_requires_existing_type():
     try:
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        result = run_lamin("save", str(note_path))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
         assert result.returncode == 1
         assert f"Record type '{topic}' not found" in result.stderr
     finally:
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         note_path.unlink(missing_ok=True)
         if note_dir.exists() and not any(note_dir.iterdir()):
             note_dir.rmdir()
@@ -123,7 +123,7 @@ def test_save_markdown_note_type_match_is_case_insensitive():
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
 
-        result = run_lamin("save", str(note_path))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -136,7 +136,7 @@ def test_save_markdown_note_type_match_is_case_insensitive():
         assert note_record is not None
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         note_path.unlink(missing_ok=True)
         if note_dir.exists() and not any(note_dir.iterdir()):
             note_dir.rmdir()
@@ -171,7 +171,13 @@ def test_save_markdown_note_registry_record_forces_record():
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
 
         result = run_lamin(
-            "save", str(note_path), "--registry", "record", "--key", "ignored"
+            "save",
+            str(note_path),
+            "--registry",
+            "record",
+            "--key",
+            "ignored",
+            cwd=notes_root,
         )
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -184,7 +190,7 @@ def test_save_markdown_note_registry_record_forces_record():
         assert note_record is not None
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         note_path.unlink(missing_ok=True)
         if note_dir.exists() and not any(note_dir.iterdir()):
             note_dir.rmdir()
@@ -240,7 +246,7 @@ def test_save_markdown_note_registry_artifact_forces_artifact():
         assert note_record is None
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         note_path.unlink(missing_ok=True)
         if note_dir.exists() and not any(note_dir.iterdir()):
             note_dir.rmdir()
@@ -271,7 +277,7 @@ def test_save_markdown_note_at_dev_dir_root_creates_record_and_recordblock():
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        result = run_lamin("save", str(note_path))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -282,7 +288,7 @@ def test_save_markdown_note_at_dev_dir_root_creates_record_and_recordblock():
         assert "Root note" in readmes.first().content
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         note_path.unlink(missing_ok=True)
         if notes_root.exists() and not any(notes_root.iterdir()):
             notes_root.rmdir()
@@ -304,7 +310,7 @@ def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        result = run_lamin("save", str(readme_path))
+        result = run_lamin("save", str(readme_path), cwd=notes_root)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -324,7 +330,7 @@ def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
         assert readme_artifact is not None
     finally:
         ln.setup.switch(branch.name)
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         readme_path.unlink(missing_ok=True)
         if notes_root.exists() and not any(notes_root.iterdir()):
             notes_root.rmdir()
@@ -415,7 +421,7 @@ def test_save_readme_relative_path_in_dev_dir_saves_artifact_and_block():
         assert "README relative" in block.content
     finally:
         ln.setup.switch(branch.name)
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         readme_path.unlink(missing_ok=True)
         if notes_root.exists() and not any(notes_root.iterdir()):
             notes_root.rmdir()
@@ -524,7 +530,7 @@ def test_save_markdown_note_three_level_hierarchy():
         typed_note_path.parent.mkdir(parents=True, exist_ok=True)
         typed_note_path.write_text("# Three level note\n\ncontent")
 
-        result = run_lamin("save", str(typed_note_path))
+        result = run_lamin("save", str(typed_note_path), cwd=notes_root)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
@@ -541,7 +547,7 @@ def test_save_markdown_note_three_level_hierarchy():
         assert "Three level note" in readme_block.content
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         if note_record is not None:
@@ -576,7 +582,7 @@ def test_load_markdown_note_inside_dev_dir_preserves_nesting():
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        save_result = run_lamin("save", str(typed_source_path))
+        save_result = run_lamin("save", str(typed_source_path), cwd=notes_root)
         assert save_result.returncode == 0, (
             f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
         )
@@ -610,7 +616,7 @@ def test_load_markdown_note_inside_dev_dir_preserves_nesting():
         assert "inside dev-dir" in typed_source_path.read_text()
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         if note_record is not None:
@@ -646,7 +652,7 @@ def test_load_markdown_note_outside_dev_dir_flattens_output():
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        save_result = run_lamin("save", str(source_path))
+        save_result = run_lamin("save", str(source_path), cwd=notes_root)
         assert save_result.returncode == 0, (
             f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
         )
@@ -674,7 +680,7 @@ def test_load_markdown_note_outside_dev_dir_flattens_output():
         ).exists()
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         if outside_root.exists():
@@ -711,7 +717,7 @@ def test_load_markdown_note_via_record_url_inside_dev_dir():
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        save_result = run_lamin("save", str(source_path))
+        save_result = run_lamin("save", str(source_path), cwd=notes_root)
         assert save_result.returncode == 0, (
             f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
         )
@@ -732,7 +738,7 @@ def test_load_markdown_note_via_record_url_inside_dev_dir():
         assert "from record url" in source_path.read_text()
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         if note_record is not None:
@@ -768,7 +774,7 @@ def test_load_markdown_note_resolves_hierarchy_by_parent_chain():
         source_path_a = notes_root / topic_a.name / subtopic_name / "my-note.md"
         source_path_a.parent.mkdir(parents=True, exist_ok=True)
         source_path_a.write_text("# Note A\n\nfrom parent A")
-        save_a = run_lamin("save", str(source_path_a))
+        save_a = run_lamin("save", str(source_path_a), cwd=notes_root)
         assert save_a.returncode == 0, (
             f"stdout: {save_a.stdout}\nstderr: {save_a.stderr}"
         )
@@ -776,7 +782,7 @@ def test_load_markdown_note_resolves_hierarchy_by_parent_chain():
         source_path_b = notes_root / topic_b.name / subtopic_name / "my-note.md"
         source_path_b.parent.mkdir(parents=True, exist_ok=True)
         source_path_b.write_text("# Note B\n\nfrom parent B")
-        save_b = run_lamin("save", str(source_path_b))
+        save_b = run_lamin("save", str(source_path_b), cwd=notes_root)
         assert save_b.returncode == 0, (
             f"stdout: {save_b.stdout}\nstderr: {save_b.stderr}"
         )
@@ -805,7 +811,7 @@ def test_load_markdown_note_resolves_hierarchy_by_parent_chain():
         assert "from parent B" in source_path_b.read_text()
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         if note_record_a is not None:
@@ -835,12 +841,12 @@ def test_save_markdown_note_missing_intermediate_type_in_chain():
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
-        result = run_lamin("save", str(note_path))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
         assert result.returncode == 1
         assert f"Record type '{missing_subtopic_name}' not found" in result.stderr
     finally:
         ln.setup.switch("main")
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         existing_topic = ln.Record.filter(uid=topic_type.uid).one_or_none()
@@ -863,13 +869,13 @@ def test_load_readme_with_dev_dir_writes_to_dev_dir_root():
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
         assert set_dev_dir.returncode == 0, set_dev_dir.stderr
 
-        save_result = run_lamin("save", str(readme_path))
+        save_result = run_lamin("save", str(readme_path), cwd=notes_root)
         assert save_result.returncode == 0, (
             f"stdout: {save_result.stdout}\nstderr: {save_result.stderr}"
         )
         readme_path.unlink()
 
-        load_result = run_lamin("load", "README.md")
+        load_result = run_lamin("load", "README.md", cwd=notes_root)
         assert load_result.returncode == 0, (
             f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
         )
@@ -884,15 +890,13 @@ def test_load_readme_with_dev_dir_writes_to_dev_dir_root():
             block_uids.append(block.uid)
     finally:
         ln.setup.switch(branch.name)
-        run_lamin("settings", "dev-dir", "unset")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
         if notes_root.exists():
             shutil.rmtree(notes_root)
         for artifact in ln.Artifact.filter(key="README.md", branch=branch):
             artifact.delete(permanent=True)
-        for uid in block_uids:
-            block = ln.models.Block.filter(uid=uid).one_or_none()
-            if block is not None:
-                block.delete(permanent=True)
+        for block in ln.models.Block.filter(key="README.md", branch=branch):
+            block.delete(permanent=True)
         ln.setup.switch("main")
         branch.delete(permanent=True)
 
