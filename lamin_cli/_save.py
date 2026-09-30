@@ -541,11 +541,9 @@ def save(
                 raise click.ClickException("The stem uid is not found.")
         if transform is None:
             if ppath.suffix == ".ipynb":
-                from nbproject.dev import read_notebook
-                from nbproject.dev._meta_live import get_title
+                from lamindb.integrations.jupyter import get_title, read_notebook
 
-                nb = read_notebook(ppath)
-                description = get_title(nb)
+                description = get_title(read_notebook(ppath))
             elif ppath.suffix in {".qmd", ".Rmd"}:
                 description = parse_title_r_notebook(content)
             else:

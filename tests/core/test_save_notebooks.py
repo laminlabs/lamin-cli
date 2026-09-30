@@ -5,17 +5,18 @@ from pathlib import Path
 
 import lamindb as ln
 import nbproject_test
-import orjson
 import pytest
 from nbclient.exceptions import CellExecutionError
-from nbproject.dev import read_notebook
 
 notebook_dir = Path(__file__).resolve().parents[1] / "notebooks"
 
 
-def _write_notebook(nb, path: Path) -> None:
-    # Avoid deprecated Pydantic v2 `dict()` call in nbproject.write_notebook.
-    path.write_bytes(orjson.dumps(nb.model_dump(), option=orjson.OPT_INDENT_2))
+def _read_notebook(path: Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def _write_notebook(nb: dict, path: Path) -> None:
+    path.write_text(json.dumps(nb, indent=2) + "\n", encoding="utf-8")
 
 
 def test_save_not_initialized():
@@ -172,10 +173,10 @@ print("my consecutive cell")
     assert transform.latest_run.environment.path.exists()
 
     # edit the notebook
-    nb = read_notebook(notebook_path)
-    new_cell = nb.cells[-1].copy()
+    nb = _read_notebook(notebook_path)
+    new_cell = nb["cells"][-1].copy()
     new_cell["execution_count"] += 1
-    nb.cells.append(new_cell)  # duplicate last cell
+    nb["cells"].append(new_cell)  # duplicate last cell
     _write_notebook(nb, notebook_path)
 
     # attempt re-saving - it works but the user needs to confirm overwriting
@@ -232,8 +233,8 @@ print("my consecutive cell")
     assert "new_name.ipynb" in transform.key
 
     # edit the notebook
-    nb = read_notebook(new_path)
-    nb.cells[-1]["source"] = ["ln.finish()"]
+    nb = _read_notebook(new_path)
+    nb["cells"][-1]["source"] = ["ln.finish()"]
     _write_notebook(nb, new_path)
 
     # run omitting the `--inplace` flag
