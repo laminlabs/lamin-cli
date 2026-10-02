@@ -42,6 +42,25 @@ def _workspace(fs_path: str, workspace_id: str = "ws") -> dict:
     return {"id": workspace_id, "uri": {"fsPath": fs_path}}
 
 
+def _set_composer_headers_table(conn, composers: list[dict]) -> None:
+    """Cursor 3.20 composerHeaders table: isArchived is a column, not JSON."""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS composerHeaders ("
+        "composerId TEXT PRIMARY KEY, isArchived INTEGER, value TEXT)"
+    )
+    for composer in composers:
+        payload = {key: value for key, value in composer.items() if key != "isArchived"}
+        conn.execute(
+            "INSERT OR REPLACE INTO composerHeaders "
+            "(composerId, isArchived, value) VALUES (?, ?, ?)",
+            (
+                composer["composerId"],
+                1 if composer.get("isArchived") else 0,
+                json.dumps(payload),
+            ),
+        )
+
+
 def _set_composer_headers(conn, composers: list[dict]) -> None:
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value BLOB)"
@@ -344,6 +363,130 @@ def test_echo_command_identifies_session_before_result(isolated):
             params={"command": "echo LAMIN_CURSOR_SESSION_ID=marker-a"},
         )
     assert cursor._conversation_id_for_session("marker-a") == "chat-a"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "lamin switch -c branch && echo LAMIN_CURSOR_SESSION_ID=marker-a",
+        "lamin switch -c branch || echo LAMIN_CURSOR_SESSION_ID=marker-a",
+        "lamin switch -c branch; echo LAMIN_CURSOR_SESSION_ID=marker-a",
+        "lamin switch -c branch\necho LAMIN_CURSOR_SESSION_ID=marker-a",
+        'lamin switch -c branch && echo "LAMIN_CURSOR_SESSION_ID=marker-a"',
+    ],
+)
+def test_compound_echo_identifies_session_before_result(isolated, command):
+    db, _ = isolated
+    with sqlite3.connect(db) as conn:
+        _add_bubble(
+            conn,
+            "chat-a",
+            "echo",
+            "2026-01-01T00:00:00Z",
+            tool_name="run_terminal_command_v2",
+            params={"command": command},
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-a"
+
+
+@pytest.mark.parametrize("tool_name", ["run_terminal_command_v3", "Shell"])
+def test_renamed_shell_tool_identifies_session(isolated, tool_name):
+    db, _ = isolated
+    with sqlite3.connect(db) as conn:
+        _add_bubble(
+            conn,
+            "chat-a",
+            "echo",
+            "2026-01-01T00:00:00Z",
+            tool_name=tool_name,
+            params={"command": "echo LAMIN_CURSOR_SESSION_ID=marker-a"},
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-a"
+
+
+def test_track_export_is_not_a_session_marker(isolated):
+    db, _ = isolated
+    with sqlite3.connect(db) as conn:
+        _add_bubble(
+            conn,
+            "chat-a",
+            "track",
+            "2026-01-01T00:00:00Z",
+            tool_name="run_terminal_command_v2",
+            params={
+                "command": "LAMIN_CURSOR_SESSION_ID=marker-a lamin track cursor --name x"
+            },
+            result={"output": "started tracking\n"},
+        )
+    with pytest.raises(ValueError, match="could not uniquely identify"):
+        cursor._conversation_id_for_session("marker-a")
+
+
+def test_composer_headers_table_prefers_workspace(isolated):
+    db, project = isolated
+    sibling = project.parent / "other-workspace"
+    sibling.mkdir()
+    with sqlite3.connect(db) as conn:
+        _add_session_marker(conn, "chat-here", "marker-a")
+        _add_session_marker(conn, "chat-elsewhere", "marker-a")
+        _set_composer_headers_table(
+            conn,
+            [
+                _composer_header("chat-here", fs_path=str(project)),
+                _composer_header("chat-elsewhere", fs_path=str(sibling)),
+            ],
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-here"
+
+
+def test_composer_headers_table_overrides_item_table(isolated):
+    db, project = isolated
+    with sqlite3.connect(db) as conn:
+        _add_session_marker(conn, "chat-a", "marker-a")
+        _add_session_marker(conn, "chat-b", "marker-a")
+        _set_composer_headers(
+            conn,
+            [
+                _composer_header("chat-a", archived=True, fs_path=str(project)),
+                _composer_header("chat-b", fs_path=str(project)),
+            ],
+        )
+        _set_composer_headers_table(
+            conn,
+            [
+                _composer_header("chat-a", fs_path=str(project)),
+                _composer_header("chat-b", archived=True, fs_path=str(project)),
+            ],
+        )
+    assert cursor._conversation_id_for_session("marker-a") == "chat-a"
+
+
+def test_track_waits_for_delayed_marker_write(isolated, monkeypatch):
+    db, _ = isolated
+    monkeypatch.setenv("LAMIN_CURSOR_SESSION_ID", "marker-a")
+
+    def write_delayed_marker():
+        time.sleep(0.3)
+        with sqlite3.connect(db) as conn:
+            _add_bubble(
+                conn,
+                "chat-a",
+                "echo",
+                "2026-01-01T00:00:00Z",
+                tool_name="run_terminal_command_v2",
+                params={
+                    "command": (
+                        "lamin switch -c branch && "
+                        "echo LAMIN_CURSOR_SESSION_ID=marker-a"
+                    )
+                },
+            )
+
+    writer = threading.Thread(target=write_delayed_marker)
+    writer.start()
+    cursor.track_cursor_session(name="delayed marker")
+    writer.join()
+    assert cursor._run_uid_file("chat-a").exists()
 
 
 def test_transcript_follows_conversation_header_order(isolated):
