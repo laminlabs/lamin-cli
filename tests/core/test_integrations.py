@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import lamindb as ln
 from click.testing import CliRunner
 from lamin_cli.__main__ import main
 
@@ -11,9 +12,9 @@ def test_notion_sync_forwards_args(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_objects_from_notion(*, parents, token=None, apply=False, depth=None):
+    def fake_sync_objects_from_notion(*, notion_uuid, token=None, apply=False, depth=0):
         calls["token"] = token
-        calls["parents"] = parents
+        calls["notion_uuid"] = notion_uuid
         calls["apply"] = apply
         calls["depth"] = depth
         return DummyReport()
@@ -29,7 +30,6 @@ def test_notion_sync_forwards_args(monkeypatch):
             "notion",
             "sync",
             "page-a",
-            "db-b",
             "--token",
             "token-123",
             "--apply",
@@ -41,7 +41,7 @@ def test_notion_sync_forwards_args(monkeypatch):
     assert result.exit_code == 0, result.output
     assert calls == {
         "token": "token-123",
-        "parents": ["page-a", "db-b"],
+        "notion_uuid": "page-a",
         "apply": True,
         "depth": 5,
     }
@@ -55,9 +55,9 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_objects_from_notion(*, parents, token=None, apply=False, depth=None):
+    def fake_sync_objects_from_notion(*, notion_uuid, token=None, apply=False, depth=0):
         calls["token"] = token
-        calls["parents"] = parents
+        calls["notion_uuid"] = notion_uuid
         calls["apply"] = apply
         calls["depth"] = depth
         return DummyReport()
@@ -70,6 +70,7 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls["apply"] is False
+    assert calls["depth"] == 0
 
 
 def test_notion_sync_accepts_zero_depth(monkeypatch):
@@ -79,8 +80,8 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
         def as_dict(self):
             return {"created": 0, "updated": 0}
 
-    def fake_sync_objects_from_notion(*, parents, token=None, apply=False, depth=None):
-        calls["parents"] = parents
+    def fake_sync_objects_from_notion(*, notion_uuid, token=None, apply=False, depth=0):
+        calls["notion_uuid"] = notion_uuid
         calls["depth"] = depth
         return DummyReport()
 
@@ -93,7 +94,7 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    assert calls == {"parents": ["page-a"], "depth": 0}
+    assert calls == {"notion_uuid": "page-a", "depth": 0}
 
 
 def test_transfer_url_forwards_args(monkeypatch):
@@ -123,7 +124,7 @@ def test_transfer_url_forwards_args(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls == {
-        "registry": "record",
+        "registry": ln.Record,
         "uid": "UrcIKR8v0ywim0pE",
         "source_db": "laminlabs/lamindata",
         "depth": 1,
@@ -157,13 +158,13 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    assert calls["registry"] == "artifact"
+    assert calls["registry"] is ln.Artifact
     assert calls["uid"] == "e2G7k9EVul4JbfsE"
     assert calls["source_db"] == "laminlabs/lamindata"
 
 
-def test_notion_sync_requires_parents():
+def test_notion_sync_requires_notion_uuid():
     result = CliRunner().invoke(main, ["integrations", "notion", "sync"])
 
     assert result.exit_code != 0
-    assert "PARENTS" in result.output
+    assert "NOTION_UUID" in result.output

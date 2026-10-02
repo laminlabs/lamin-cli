@@ -2,7 +2,7 @@ from typing import get_args
 
 from lamindb.base.types import RegistryId
 
-from ._delete import ENTITIES_KEY, ENTITIES_NAME
+from ._delete import ENTITIES_KEY, ENTITIES_NAME, get_registry
 
 # Registries that have ablocks (can be annotated with readme)
 _REGISTRY_IDS = frozenset(get_args(RegistryId))
@@ -24,13 +24,7 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
     if registry in ENTITIES_KEY:
         if key is None and uid is None:
             raise ln.errors.InvalidArgument(f"For {registry} pass --key or --uid")
-        model = (
-            ln.Artifact
-            if registry == "artifact"
-            else ln.Transform
-            if registry == "transform"
-            else ln.Collection
-        )
+        model = get_registry(registry)
         if key is not None:
             return model.get(key=key)
         return model.get(uid)
@@ -43,27 +37,10 @@ def _get_obj(registry: str, key: str | None, uid: str | None, name: str | None):
                 name = ln_setup.settings.branch.name
             else:
                 raise ln.errors.InvalidArgument(f"For {registry} pass --uid or --name")
+        model = get_registry(registry)
         if uid is not None:
-            return {
-                "record": ln.Record.get,
-                "project": ln.Project.get,
-                "ulabel": ln.ULabel.get,
-                "branch": ln.Branch.get,
-                "run": ln.Run.get,
-                "feature": ln.Feature.get,
-                "schema": ln.Schema.get,
-                "space": ln.Space.get,
-            }[registry](uid)
-        return {
-            "record": ln.Record.get,
-            "project": ln.Project.get,
-            "ulabel": ln.ULabel.get,
-            "branch": ln.Branch.get,
-            "run": ln.Run.get,
-            "feature": ln.Feature.get,
-            "schema": ln.Schema.get,
-            "space": ln.Space.get,
-        }[registry](name=name)
+            return model.get(uid)
+        return model.get(name=name)
     raise ln.errors.InvalidArgument(f"Unsupported registry: {registry}")
 
 

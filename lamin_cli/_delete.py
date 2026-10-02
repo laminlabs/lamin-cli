@@ -18,6 +18,26 @@ ENTITIES_NAME: set[str] = {
 }
 
 
+def get_registry(entity: str):
+    """Registry class for a CLI entity name, for example `artifact` to `ln.Artifact`."""
+    import lamindb as ln
+
+    return {
+        "artifact": ln.Artifact,
+        "transform": ln.Transform,
+        "collection": ln.Collection,
+        "record": ln.Record,
+        "project": ln.Project,
+        "ulabel": ln.ULabel,
+        "branch": ln.Branch,
+        "run": ln.Run,
+        "feature": ln.Feature,
+        "schema": ln.Schema,
+        "space": ln.Space,
+        "reference": ln.Reference,
+    }[entity]
+
+
 def delete(
     entity: str,
     name: str | None = None,
@@ -33,18 +53,12 @@ def delete(
         connect(instance)
 
     if entity in ENTITIES_KEY | ENTITIES_NAME:
-        import lamindb as ln
-
+        model = get_registry(entity)
         if entity in ENTITIES_KEY:
             if uid is None and key is None:
                 raise click.ClickException(
                     f"For entity '{entity}' you must pass --uid or --key"
                 )
-            model = {
-                "artifact": ln.Artifact,
-                "transform": ln.Transform,
-                "collection": ln.Collection,
-            }[entity]
             if key is not None:
                 record = model.objects.filter(key=key).order_by("-created_at").first()
                 if record is None:
@@ -58,16 +72,6 @@ def delete(
                 raise click.ClickException(
                     f"For entity '{entity}' you must pass --uid or --name"
                 )
-            model = {
-                "record": ln.Record,
-                "project": ln.Project,
-                "ulabel": ln.ULabel,
-                "branch": ln.Branch,
-                "run": ln.Run,
-                "feature": ln.Feature,
-                "schema": ln.Schema,
-                "space": ln.Space,
-            }[entity]
             record = model.get(uid) if uid is not None else model.get(name=name)
         record.delete(permanent=permanent)
     else:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import click
 
+from ._delete import get_registry
 from .urls import decompose_url
 
 ENTITIES_KEY = {"artifact", "transform", "collection"}
@@ -52,7 +53,7 @@ def transfer(
     from lamindb.core import sync
 
     return sync(
-        registry=entity,
+        registry=get_registry(entity),
         uid=uid,
         source_db=source,
         depth=depth,
@@ -61,10 +62,7 @@ def transfer(
 
 
 def _lookup_uid(entity: str, source: str, *, key: str | None, name: str | None) -> str:
-    from lamindb.core._sync import _registry_class_name
-    from lamindb.models.db import DB
-
-    queryset = getattr(DB(source), _registry_class_name(entity))
+    queryset = get_registry(entity).connect(source)
     if entity in ENTITIES_KEY:
         if key is None:
             raise click.ClickException(f"For {entity} pass --uid or --key.")

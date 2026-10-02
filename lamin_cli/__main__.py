@@ -752,40 +752,18 @@ def _describe(
         instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
-    import lamindb as ln
+    from lamin_cli._delete import get_registry
 
+    registry = get_registry(entity)
     if entity in DESCRIBE_ENTITIES_KEY:
         if uid is None and key is None:
             raise SystemExit(
                 f"For entity '{entity}' you must pass --uid or --key"
             )
-        if uid is not None:
-            record = (
-                ln.Artifact.get(uid)
-                if entity == "artifact"
-                else ln.Transform.get(uid)
-                if entity == "transform"
-                else ln.Collection.get(uid)
-            )
-        else:
-            record = (
-                ln.Artifact.get(key=key)
-                if entity == "artifact"
-                else ln.Transform.get(key=key)
-                if entity == "transform"
-                else ln.Collection.get(key=key)
-            )
+        record = registry.get(uid) if uid is not None else registry.get(key=key)
     elif entity in DESCRIBE_ENTITIES_NAME:
         if uid is not None:
-            record = (
-                ln.Record.get(uid)
-                if entity == "record"
-                else ln.Project.get(uid)
-                if entity == "project"
-                else ln.ULabel.get(uid)
-                if entity == "ulabel"
-                else ln.Branch.get(uid)
-            )
+            record = registry.get(uid)
         elif entity == "branch" and name is None:
             # Default to current branch (like lamin annotate)
             record = ln_setup.settings.branch
@@ -793,20 +771,14 @@ def _describe(
             raise SystemExit(
                 f"For entity '{entity}' you must pass --uid or --name"
             )
+        elif entity == "branch":
+            record = registry.get(name=name)
         else:
-            record = (
-                ln.Record.filter(name=name).one()
-                if entity == "record"
-                else ln.Project.filter(name=name).one()
-                if entity == "project"
-                else ln.ULabel.filter(name=name).one()
-                if entity == "ulabel"
-                else ln.Branch.get(name=name)
-            )
+            record = registry.filter(name=name).one()
     else:  # uid-only (run)
         if uid is None:
             raise SystemExit(f"For entity '{entity}' you must pass --uid")
-        record = ln.Run.get(uid)
+        record = registry.get(uid)
 
     record.describe(include=include if include == "comments" else None)
 
@@ -1504,7 +1476,7 @@ def integrations():
 
     ```
     lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27
-    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 0 --apply
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 1 --apply
     ```
 
     → Python/R alternative: {func}`~lamindb.integrations.notion.sync_objects_from_notion`
@@ -1517,7 +1489,7 @@ def notion():
 
 
 @notion.command("sync")
-@click.argument("parents", type=str, nargs=-1)
+@click.argument("notion_uuid", type=str)
 @click.option(
     "--token",
     type=str,
@@ -1533,23 +1505,21 @@ def notion():
 @click.option(
     "--depth",
     type=click.IntRange(0),
-    default=None,
-    help="How many levels of child pages and databases to walk. Use 0 to sync only the given parents.",
+    default=0,
+    help="How many levels of child pages and databases to walk. 0 syncs only this page.",
 )
 def notion_sync(
-    parents: tuple[str, ...],
+    notion_uuid: str,
     token: str | None,
     apply: bool,
-    depth: int | None,
+    depth: int,
 ) -> None:
-    """Sync Notion page/database trees into LaminDB records."""
-    if not parents:
-        raise click.UsageError("Missing argument 'PARENTS...'.")
+    """Sync a Notion page or database into LaminDB records."""
     from lamindb.integrations.notion import sync_objects_from_notion
 
     sync_objects_from_notion(
         token=token,
-        parents=list(parents),
+        notion_uuid=notion_uuid,
         apply=apply,
         depth=depth,
     )
