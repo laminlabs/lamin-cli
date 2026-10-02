@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 
 from django.db import OperationalError, ProgrammingError
-from lamin_utils import logger
+from lamindb_setup import logger
 
 
 def _count_instance_records() -> dict[str, int]:

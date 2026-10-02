@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import click
-from lamin_utils import logger
+from lamindb_setup import logger
 
 from ._context import get_current_run_file
 from ._notes import is_path_within, parse_note_target, resolve_note_record
@@ -97,7 +97,7 @@ def load(
         transform: ln.Transform, notebook_path: Path, bump_revision: bool = False
     ) -> None:
         import jupytext
-        from lamin_utils._base62 import increment_base62
+        from lamindb_setup.core.base62 import increment_base62
 
         if notebook_path.suffix == ".ipynb":
             # below is backward compat

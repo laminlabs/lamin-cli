@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import click
-from lamin_utils import logger
+from lamindb_setup import logger
 from lamindb_setup.core._settings_store import settings_dir
 
 

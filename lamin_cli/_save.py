@@ -7,7 +7,7 @@ from typing import Any
 
 import click
 import lamindb_setup as ln_setup
-from lamin_utils import logger
+from lamindb_setup import logger
 from lamindb_setup.core.hashing import hash_file
 
 from lamin_cli._context import get_current_run_file

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import lamindb_setup as ln_setup
-from lamin_utils import logger
+from lamindb_setup import logger
 
 from ._click import click
 from ._client import module_model_path, request_json

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import lamindb as ln
 import pytest
-from lamin_utils import logger
+from lamindb_setup import logger
 from lamindb_setup.core._settings_store import local_current_instance_file, settings_dir
 
 

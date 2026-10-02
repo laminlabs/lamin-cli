@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from lamin_utils import logger
+from lamindb_setup import logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -543,7 +543,7 @@ def _lamin_logs_to_stderr() -> None:
     """Keep lamin's own messages off stdout, which belongs to the target."""
     import logging
 
-    from lamin_utils import logger as lamin_logger
+    from lamindb_setup import logger as lamin_logger
 
     for handler in lamin_logger.handlers:
         if isinstance(handler, logging.StreamHandler) and handler.stream is sys.stdout:
