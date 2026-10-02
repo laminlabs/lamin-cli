@@ -99,9 +99,7 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
 def test_transfer_url_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync_objects_from_database(
-        registry, uids, *, source, depth=None, transfer=None
-    ):
+    def fake_sync(registry, uids, *, source, depth=None, transfer=None):
         calls["registry"] = registry
         calls["uids"] = uids
         calls["source"] = source
@@ -109,10 +107,7 @@ def test_transfer_url_forwards_args(monkeypatch):
         calls["transfer"] = transfer
         return []
 
-    monkeypatch.setattr(
-        "lamindb.models.sync_objects_from_database",
-        fake_sync_objects_from_database,
-    )
+    monkeypatch.setattr("lamindb.core.sync", fake_sync)
     result = CliRunner().invoke(
         main,
         [
@@ -139,9 +134,7 @@ def test_transfer_url_forwards_args(monkeypatch):
 def test_transfer_entity_uid_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync_objects_from_database(
-        registry, uids, *, source, depth=None, transfer=None
-    ):
+    def fake_sync(registry, uids, *, source, depth=None, transfer=None):
         calls["registry"] = registry
         calls["uids"] = uids
         calls["source"] = source
@@ -149,10 +142,7 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
         calls["transfer"] = transfer
         return []
 
-    monkeypatch.setattr(
-        "lamindb.models.sync_objects_from_database",
-        fake_sync_objects_from_database,
-    )
+    monkeypatch.setattr("lamindb.core.sync", fake_sync)
     result = CliRunner().invoke(
         main,
         [
