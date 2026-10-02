@@ -514,30 +514,33 @@ def discover_command(paths: tuple[str, ...], register_: bool):
 
 # fmt: off
 @mount.command("path")
+@click.argument("uri", type=str, required=False)
 @click.option("--uid", type=str, default=None, help="The uid of the artifact.")
 @click.option("--key", type=str, default=None, help="The key of the artifact.")
 @click.option("--mountpoint", type=click.Path(file_okay=False, path_type=Path), default=None, help="Use this mountpoint instead of looking one up in the registry.")
 @click.option("--no-check", is_flag=True, default=False, help="Print the path without checking that it is readable.")
 @click.option("--remount", is_flag=True, default=False, help="Remount the storage location if it serves stale metadata.")
 # fmt: on
-def path_command(uid, key, mountpoint, no_check, remount):
+def path_command(uri, uid, key, mountpoint, no_check, remount):
     """Print the local path of an artifact inside a mounted storage location.
 
-    Only the path goes to stdout, so it can be used directly:
+    The artifact is given as a `lamin://` URI or via `--uid`/`--key`. Only the path
+    goes to stdout, so it can be used directly:
 
     ```
     head -c 100 "$(lamin settings mount path --key my_file.parquet)"
+    head -c 100 "$(lamin settings mount path lamin://acme/data/artifact/key/my_file.parquet)"
     ```
 
     If the artifact is not visible through the mount but does exist in the storage
-    location, the mount is refreshed once before giving up.
+    location, the mount is refreshed once before giving up. `lamin run` resolves its
+    arguments with the same logic.
     """
     from ._lookup import (
-        Visibility,
-        check_visibility,
-        find_mount,
-        local_path_for,
+        LocalPathError,
+        location_from_artifact,
         resolve_artifact_location,
+        resolve_local_path,
         stdout_to_stderr,
     )
 
@@ -545,82 +548,42 @@ def path_command(uid, key, mountpoint, no_check, remount):
         # diagnostics go to stderr so that stdout stays a bare path
         click.echo(message, err=True)
 
+    if uri is not None and (uid is not None or key is not None):
+        raise click.ClickException("Pass either a lamin:// URI or --uid/--key.")
+
+    subpath = None
     with stdout_to_stderr():
-        location = resolve_artifact_location(uid=uid, key=key)
+        if uri is not None:
+            from lamin_cli._uri import (
+                InvalidLaminUri,
+                UnresolvableLaminUri,
+                resolve_lamin_uri,
+            )
 
-    if mountpoint is not None:
-        mount_root = Path(mountpoint)
-        local_path = local_path_for(mount_root, location.storage_key)
-    else:
-        record = find_mount(location.storage_uid, location.storage_root)
-        if record is not None:
-            location.mount = record
-            mount_root = Path(record.mountpoint)
-            local_path = local_path_for(mount_root, location.storage_key)
-        elif location.protocol == "local":
-            # a local storage location is readable without any mount
-            mount_root = Path(location.storage_root)
-            local_path = Path(location.origin)
+            try:
+                resolved = resolve_lamin_uri(uri)
+            except (InvalidLaminUri, UnresolvableLaminUri) as error:
+                raise click.ClickException(str(error)) from None
+            location = location_from_artifact(resolved.artifact)
+            subpath = resolved.subpath
         else:
-            raise click.ClickException(
-                f"Storage location {location.storage_root} is not mounted. Mount it"
-                f" with: lamin settings mount storage --uid {location.storage_uid}"
-                " <mountpoint>"
-            )
+            location = resolve_artifact_location(uid=uid, key=key)
 
-    location.local_path = local_path
-
-    if location.key_is_virtual:
-        note(
-            f"note: key '{location.key}' is virtual, the artifact is stored at"
-            f" '{location.storage_key}'"
+    try:
+        local_path = resolve_local_path(
+            location,
+            mountpoint=mountpoint,
+            check=not no_check,
+            remount=remount,
+            note=note,
         )
+    except LocalPathError as error:
+        raise click.ClickException(str(error)) from None
 
-    if no_check:
-        click.echo(str(local_path))
-        return
-
-    visibility = check_visibility(local_path, location.origin)
-
-    if visibility is Visibility.FOUND_AFTER_REFRESH:
-        note("note: the mount served stale metadata, it was refreshed")
-    elif visibility is Visibility.MISSING_IN_ORIGIN:
-        raise click.ClickException(
-            f"Artifact {location.artifact_uid} is recorded at {location.origin} but"
-            " that path does not exist in the storage location."
-        )
-    elif visibility is Visibility.STALE:
-        if not remount:
-            remedy = (
-                "Refresh it with the tool that created it."
-                if location.mount is not None and location.mount.external
-                else f"Retry with --remount, or: lamin settings mount refresh {mount_root}"
-            )
-            raise click.ClickException(
-                f"{local_path} is not visible through the mount although"
-                f" {location.origin} exists. The mount is stale. {remedy}"
-            )
-        if location.mount is None:
-            raise click.ClickException(
-                "Cannot remount a mountpoint that is not in the registry."
-            )
-        if location.mount.pid is not None:
-            note(
-                "warning: this mount runs in the foreground in another process, which"
-                " remounting will terminate"
-            )
-        note(f"remounting {location.storage_root} ...")
-        try:
-            with stdout_to_stderr():
-                record = remount_storage(location.mount)
-        except MountError as error:
-            raise click.ClickException(str(error)) from None
-        local_path = local_path_for(record.mountpoint, location.storage_key)
-        if not local_path.exists():
-            raise click.ClickException(
-                f"{local_path} is still not readable after remounting."
-            )
-
+    if subpath is not None:
+        local_path = local_path / subpath
+        if not no_check and not local_path.exists():
+            raise click.ClickException(f"{subpath} does not exist in the artifact.")
     click.echo(str(local_path))
 
 
