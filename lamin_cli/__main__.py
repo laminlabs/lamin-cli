@@ -1517,7 +1517,7 @@ def notion():
 
 
 @notion.command("sync")
-@click.argument("parents", type=str, nargs=-1)
+@click.argument("notion_uuid", type=str)
 @click.option(
     "--token",
     type=str,
@@ -1534,22 +1534,20 @@ def notion():
     "--depth",
     type=click.IntRange(0),
     default=0,
-    help="How many levels of child pages and databases to walk. 0 syncs only the given parents.",
+    help="How many levels of child pages and databases to walk. 0 syncs only this page.",
 )
 def notion_sync(
-    parents: tuple[str, ...],
+    notion_uuid: str,
     token: str | None,
     apply: bool,
     depth: int,
 ) -> None:
-    """Sync Notion page/database trees into LaminDB records."""
-    if not parents:
-        raise click.UsageError("Missing argument 'PARENTS...'.")
+    """Sync a Notion page or database into LaminDB records."""
     from lamindb.integrations.notion import sync_objects_from_notion
 
     sync_objects_from_notion(
         token=token,
-        parents=list(parents),
+        notion_uuid=notion_uuid,
         apply=apply,
         depth=depth,
     )
