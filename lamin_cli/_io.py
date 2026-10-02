@@ -82,7 +82,9 @@ def io():
 @click.option(
     "--transfer",
     "transfer_mode",
-    type=click.Choice(["sqlrecord", "notes", "annotations"]),
+    type=click.Choice(
+        ["sqlrecord", "notes", "annotations"]
+    ),  # lamindb.base.types.TransferMode
     default=None,
     help="What to copy: `sqlrecord`, `notes`, or `annotations`. Omit to use the registry default.",
 )
