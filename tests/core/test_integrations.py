@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import lamindb as ln
 from click.testing import CliRunner
 from lamin_cli.__main__ import main
 
@@ -123,7 +124,7 @@ def test_transfer_url_forwards_args(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls == {
-        "registry": "record",
+        "registry": ln.Record,
         "uid": "UrcIKR8v0ywim0pE",
         "source_db": "laminlabs/lamindata",
         "depth": 1,
@@ -157,7 +158,7 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    assert calls["registry"] == "artifact"
+    assert calls["registry"] is ln.Artifact
     assert calls["uid"] == "e2G7k9EVul4JbfsE"
     assert calls["source_db"] == "laminlabs/lamindata"
 

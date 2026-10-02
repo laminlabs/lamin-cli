@@ -752,40 +752,18 @@ def _describe(
         instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
-    import lamindb as ln
+    from lamin_cli._delete import get_registry
 
+    registry = get_registry(entity)
     if entity in DESCRIBE_ENTITIES_KEY:
         if uid is None and key is None:
             raise SystemExit(
                 f"For entity '{entity}' you must pass --uid or --key"
             )
-        if uid is not None:
-            record = (
-                ln.Artifact.get(uid)
-                if entity == "artifact"
-                else ln.Transform.get(uid)
-                if entity == "transform"
-                else ln.Collection.get(uid)
-            )
-        else:
-            record = (
-                ln.Artifact.get(key=key)
-                if entity == "artifact"
-                else ln.Transform.get(key=key)
-                if entity == "transform"
-                else ln.Collection.get(key=key)
-            )
+        record = registry.get(uid) if uid is not None else registry.get(key=key)
     elif entity in DESCRIBE_ENTITIES_NAME:
         if uid is not None:
-            record = (
-                ln.Record.get(uid)
-                if entity == "record"
-                else ln.Project.get(uid)
-                if entity == "project"
-                else ln.ULabel.get(uid)
-                if entity == "ulabel"
-                else ln.Branch.get(uid)
-            )
+            record = registry.get(uid)
         elif entity == "branch" and name is None:
             # Default to current branch (like lamin annotate)
             record = ln_setup.settings.branch
@@ -793,20 +771,14 @@ def _describe(
             raise SystemExit(
                 f"For entity '{entity}' you must pass --uid or --name"
             )
+        elif entity == "branch":
+            record = registry.get(name=name)
         else:
-            record = (
-                ln.Record.filter(name=name).one()
-                if entity == "record"
-                else ln.Project.filter(name=name).one()
-                if entity == "project"
-                else ln.ULabel.filter(name=name).one()
-                if entity == "ulabel"
-                else ln.Branch.get(name=name)
-            )
+            record = registry.filter(name=name).one()
     else:  # uid-only (run)
         if uid is None:
             raise SystemExit(f"For entity '{entity}' you must pass --uid")
-        record = ln.Run.get(uid)
+        record = registry.get(uid)
 
     record.describe(include=include if include == "comments" else None)
 

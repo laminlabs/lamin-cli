@@ -266,7 +266,9 @@ def load(
         case "artifact" | "collection":
             ln.settings.track_run_inputs = False
 
-            EntityClass = ln.Artifact if entity == "artifact" else ln.Collection
+            from ._delete import get_registry
+
+            EntityClass = get_registry(entity)
 
             # we don't use .get here because DoesNotExist is hard to catch due to private django API
             # we use `.objects` here because we don't want to exclude kind = __lamindb_run__ artifacts
