@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -366,8 +367,11 @@ def test_target_arguments_without_separator_fail_loudly(captured):
 def test_modal_only_options_hint_at_the_separator(captured):
     result = _invoke("train.py", "--gpu", "0")
     assert result.exit_code != 0
-    assert "only applies to --where modal" in result.output
-    assert "lamin run train.py -- --gpu" in result.output
+    # GitHub Actions forces a color terminal, and rich-click then styles option
+    # names, which splits these phrases with ANSI codes.
+    output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "only applies to --where modal" in output
+    assert "lamin run train.py -- --gpu" in output
 
 
 def test_modal_needs_a_project(where_setting):
