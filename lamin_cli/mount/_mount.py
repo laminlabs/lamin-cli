@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from lamin_utils import logger
+from lamindb_setup import logger
 
 from . import _registry
 from ._commands import MountCommand, MountOptions, build_command

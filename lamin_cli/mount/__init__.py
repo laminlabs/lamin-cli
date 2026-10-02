@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from lamin_utils import logger
+from lamindb_setup import logger
 
 if os.environ.get("NO_RICH"):
     import click as click

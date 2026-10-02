@@ -109,7 +109,7 @@ def stdout_to_stderr() -> Iterator[None]:
     """
     import logging
 
-    from lamin_utils import logger
+    from lamindb_setup import logger
 
     swapped: list[tuple[logging.StreamHandler, object]] = []
     for source in (logger, logging.getLogger()):
