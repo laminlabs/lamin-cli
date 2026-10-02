@@ -107,13 +107,18 @@ def resolve_artifact(
         if artifact is None:
             raise SystemExit(f"No artifact found with key {key!r}.")
 
+    return [target_from_artifact(artifact)]
+
+
+def target_from_artifact(artifact) -> StorageTarget:
+    """Build a storage target for an already resolved artifact, from any instance."""
     from lamindb.core.storage.paths import auto_storage_key_from_artifact
 
     target = _to_target(artifact.storage)
     target.artifact_uid = artifact.uid
     target.artifact_key = artifact.key
     target.artifact_storage_key = auto_storage_key_from_artifact(artifact)
-    return [target]
+    return target
 
 
 def resolve_space(
