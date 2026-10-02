@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import sqlite3
 import sys
 import tempfile
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +30,10 @@ _TOOL_NAMES = {
 }
 _SESSION_ID_ENV_VAR = "LAMIN_CURSOR_SESSION_ID"
 _COMPOSER_HEADERS_KEY = "composer.composerHeaders"
+# One retry covers a marker row that commits while the first read is open.
+_MARKER_LOOKUP_DELAY_SECONDS = 0.5
+# `&&` / `||` / `;` / newlines. A bare `|` stays intact so quoted text is not split.
+_COMMAND_SEPARATORS = re.compile(r"&&|\|\||;|\n")
 _SUFFIX_TO_KIND = {
     ".ipynb": "notebook",
     ".py": "script",
@@ -74,16 +80,40 @@ def _read_tool_result(value: dict) -> dict | None:
     return result if isinstance(result, dict) else None
 
 
+def _is_cursor_shell_tool(name: object) -> bool:
+    # Cursor 3.20 still stores `run_terminal_command_v2`. Keep the unversioned
+    # prefix and the rendered `Shell` name so a later rename still matches.
+    return isinstance(name, str) and (
+        name == "Shell" or name.startswith("run_terminal_command")
+    )
+
+
+def _canonical_tool_name(tool_name: str) -> str:
+    if _is_cursor_shell_tool(tool_name):
+        return "Shell"
+    return _TOOL_NAMES.get(tool_name, tool_name)
+
+
 def _cursor_tool_rows(
     conversation_id: str | None = None,
     db_path: Path | None = None,
+    contains: str | None = None,
 ) -> list[tuple[str, dict]]:
     db_path = db_path or _cursor_db_path()
     if not db_path.is_file():
         raise FileNotFoundError(f"Cursor chat database not found: {db_path}")
     prefix = f"bubbleId:{conversation_id}:%" if conversation_id else "bubbleId:%"
-    query = "SELECT key, value FROM cursorDiskKV WHERE key LIKE ?"
-    params: tuple[str, ...] = (prefix,)
+    if contains is None:
+        query = "SELECT key, value FROM cursorDiskKV WHERE key LIKE ?"
+        params: tuple[str, ...] = (prefix,)
+    else:
+        # The marker always appears in the stored JSON (command or stdout).
+        # Filtering in SQL avoids parsing every bubble on a multi-GB database.
+        query = (
+            "SELECT key, value FROM cursorDiskKV "
+            "WHERE key LIKE ? AND instr(CAST(value AS TEXT), ?) > 0"
+        )
+        params = (prefix, contains)
     with _connect_db(db_path) as conn:
         rows = conn.execute(query, params).fetchall()
     parsed = []
@@ -128,8 +158,8 @@ def _json_object(raw: object) -> dict | None:
     return raw if isinstance(raw, dict) else None
 
 
-def _composer_headers(db_path: Path) -> dict[str, dict]:
-    # isArchived / workspaceIdentifier live on ItemTable, not cursorDiskKV.
+def _item_table_composer_headers(db_path: Path) -> dict[str, dict]:
+    # Older Cursor builds keep composer metadata in one ItemTable JSON blob.
     try:
         with _connect_db(db_path) as conn:
             row = conn.execute(
@@ -149,6 +179,37 @@ def _composer_headers(db_path: Path) -> dict[str, dict]:
         composer_id = composer.get("composerId")
         if isinstance(composer_id, str) and composer_id:
             headers[composer_id] = composer
+    return headers
+
+
+def _table_composer_headers(db_path: Path) -> dict[str, dict]:
+    # Cursor 3.20 moved the same metadata into a composerHeaders table.
+    # isArchived is a column; isDraft and workspaceIdentifier stay in value.
+    try:
+        with _connect_db(db_path) as conn:
+            rows = conn.execute(
+                "SELECT composerId, isArchived, value FROM composerHeaders"
+            ).fetchall()
+    except sqlite3.Error:
+        return {}
+    headers: dict[str, dict] = {}
+    for composer_id, is_archived, raw_value in rows:
+        if not isinstance(composer_id, str) or not composer_id:
+            continue
+        header = dict(_json_object(raw_value) or {})
+        header["composerId"] = composer_id
+        if is_archived is not None:
+            header["isArchived"] = bool(is_archived)
+        headers[composer_id] = header
+    return headers
+
+
+def _composer_headers(db_path: Path) -> dict[str, dict]:
+    headers = _item_table_composer_headers(db_path)
+    for composer_id, header in _table_composer_headers(db_path).items():
+        merged = dict(headers.get(composer_id, {}))
+        merged.update(header)
+        headers[composer_id] = merged
     return headers
 
 
@@ -179,21 +240,30 @@ def _uniquely_identify_error() -> ValueError:
     )
 
 
-def _is_echo_marker_command(cmd: str, marker: str) -> bool:
+def _command_tokens(segment: str) -> list[str]:
     try:
-        tokens = shlex.split(cmd)
+        return shlex.split(segment)
     except ValueError:
-        tokens = cmd.split()
-    if not tokens:
-        return False
-    if Path(tokens[0]).name != "echo":
-        return False
-    return any(token.strip("'\"") == marker for token in tokens[1:])
+        return segment.split()
+
+
+def _is_echo_marker_command(cmd: str, marker: str) -> bool:
+    # Match `echo <marker>` even when it is only one segment of a compound
+    # command (`lamin switch && echo <marker>`). The command text is stored
+    # when the tool starts, so this still matches before stdout is flushed.
+    # A `lamin track` invocation that only exports the marker is not a hit.
+    for segment in _COMMAND_SEPARATORS.split(cmd):
+        tokens = _command_tokens(segment.strip())
+        if not tokens or Path(tokens[0]).name != "echo":
+            continue
+        if any(token.strip("'\"") == marker for token in tokens[1:]):
+            return True
+    return False
 
 
 def _shell_output_is_marker(value: dict, marker: str) -> bool:
     tool = value.get("toolFormerData")
-    if not isinstance(tool, dict) or tool.get("name") != "run_terminal_command_v2":
+    if not isinstance(tool, dict) or not _is_cursor_shell_tool(tool.get("name")):
         return False
     result = _read_tool_result(value)
     if result is not None:
@@ -206,14 +276,36 @@ def _shell_output_is_marker(value: dict, marker: str) -> bool:
     return isinstance(cmd, str) and _is_echo_marker_command(cmd, marker)
 
 
-def _conversation_id_for_session(session_id: str, db_path: Path | None = None) -> str:
-    db_path = db_path or _cursor_db_path()
+def _matching_conversation_ids(session_id: str, db_path: Path) -> set[str]:
     marker = f"{_SESSION_ID_ENV_VAR}={session_id}"
-    conversation_ids = {
+    return {
         key.split(":", 2)[1]
-        for key, value in _cursor_tool_rows(db_path=db_path)
+        for key, value in _cursor_tool_rows(db_path=db_path, contains=marker)
         if len(key.split(":", 2)) == 3 and _shell_output_is_marker(value, marker)
     }
+
+
+def _db_recently_active(db_path: Path) -> bool:
+    # WAL mode updates the sidecar while the main file stays unchanged until
+    # the next checkpoint, so either mtime counts as a live Cursor session.
+    now = time.time()
+    for path in (db_path, db_path.with_name(db_path.name + "-wal")):
+        try:
+            if now - path.stat().st_mtime < _common._LIVENESS_WINDOW_SECONDS:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _conversation_id_for_session(
+    session_id: str, db_path: Path | None = None, *, wait: bool = False
+) -> str:
+    db_path = db_path or _cursor_db_path()
+    conversation_ids = _matching_conversation_ids(session_id, db_path)
+    if not conversation_ids and wait and _db_recently_active(db_path):
+        time.sleep(_MARKER_LOOKUP_DELAY_SECONDS)
+        conversation_ids = _matching_conversation_ids(session_id, db_path)
     if len(conversation_ids) == 1:
         return conversation_ids.pop()
     if not conversation_ids:
@@ -321,7 +413,7 @@ def _parse_sqlite_conversation(
                 {
                     "type": "tool_use",
                     "id": tool_id,
-                    "name": _TOOL_NAMES.get(tool_name, tool_name),
+                    "name": _canonical_tool_name(tool_name),
                     "input": _tool_params(value),
                 }
             )
@@ -360,7 +452,7 @@ def track_cursor_session(name: str | None = None) -> None:
                 "No lamindb instance connected. Run `lamin connect <instance>` "
                 "(or `lamin init` for a new one) and try again."
             )
-        conversation_id = _conversation_id_for_session(_cursor_session_id())
+        conversation_id = _conversation_id_for_session(_cursor_session_id(), wait=True)
         transform = ln.Transform.filter(uid=_TRANSFORM_UID).one_or_none()
         if transform is None:
             transform, _ = ln.Transform.objects.get_or_create(
@@ -405,7 +497,7 @@ def finish_cursor_session() -> None:
     try:
         if not _common.instance_connected(ln):
             _common.hard_error("No lamindb instance connected.")
-        conversation_id = _conversation_id_for_session(_cursor_session_id())
+        conversation_id = _conversation_id_for_session(_cursor_session_id(), wait=True)
         active_file = _run_uid_file(conversation_id)
         if not active_file.exists():
             _common.warn("no active Cursor session found, skipping session finish")
