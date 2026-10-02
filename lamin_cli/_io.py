@@ -32,7 +32,7 @@ def io():
     lamin io sync artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
     ```
 
-    → Guide: {doc}`transfer` → Python/R alternative: {func}`~lamindb.models.sync_objects_from_database`
+    → Guide: {doc}`transfer` → Python/R alternative: {func}`~lamindb.core.sync`
 
     Use `lamin io snapshot` to create an SQLite snapshot of the current database:
 

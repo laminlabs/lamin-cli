@@ -49,9 +49,9 @@ def transfer(
     if uid is None:
         uid = _lookup_uid(entity, source, key=key, name=name)
 
-    from lamindb.models import sync_objects_from_database
+    from lamindb.core import sync
 
-    return sync_objects_from_database(
+    return sync(
         entity,
         uid,
         source=source,
@@ -61,7 +61,7 @@ def transfer(
 
 
 def _lookup_uid(entity: str, source: str, *, key: str | None, name: str | None) -> str:
-    from lamindb.models._transfer import _registry_class_name
+    from lamindb.core._sync import _registry_class_name
     from lamindb.models.db import DB
 
     queryset = getattr(DB(source), _registry_class_name(entity))
