@@ -55,11 +55,11 @@ COMMAND_GROUPS = {
             "commands": ["track", "finish"],
         },
         {
-            "name": "Settings & migrations",
+            "name": "Administer",
             "commands": ["settings", "migrate", "io", "integrations"],
         },
         {
-            "name": "Auth",
+            "name": "Authenticate",
             "commands": [
                 "login",
                 "logout",
@@ -80,9 +80,8 @@ if os.environ.get("NO_RICH"):
         ApiKeyError,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
-        NotInBranchDir,
+        NoReadAccess,
         NoWriteAccess,
-        WorktreePathError,
     )
 
     class OrderedExceptionHandlingGroup(click.Group):
@@ -104,9 +103,8 @@ if os.environ.get("NO_RICH"):
                 ApiKeyError,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
-                NotInBranchDir,
+                NoReadAccess,
                 NoWriteAccess,
-                WorktreePathError,
             ) as e:
                 raise click.ClickException(str(e)) from None
 
@@ -121,9 +119,8 @@ else:
         ApiKeyError,
         ConnectWithinDevDirError,
         CurrentInstanceNotConfigured,
-        NotInBranchDir,
+        NoReadAccess,
         NoWriteAccess,
-        WorktreePathError,
     )
 
     class OrderedRichExceptionHandlingGroup(click.RichGroup):
@@ -134,9 +131,8 @@ else:
                 ApiKeyError,
                 ConnectWithinDevDirError,
                 CurrentInstanceNotConfigured,
-                NotInBranchDir,
+                NoReadAccess,
                 NoWriteAccess,
-                WorktreePathError,
             ) as e:
                 raise click.ClickException(str(e)) from None
 
@@ -219,7 +215,7 @@ def main():
 @click.option("--key", type=str, default=None, hidden=True, help="The legacy API key.")
 def login(user: str, key: str | None):
     # note that the docstring needs to be synced with ln.setup.login()
-    """Log into LaminHub.
+    """Log into the hub.
 
     `lamin login` prompts for your API key unless you set it via environment variable `LAMIN_API_KEY`.
 
@@ -234,7 +230,7 @@ def login(user: str, key: str | None):
 
 @main.command()
 def logout():
-    """Log out of LaminHub."""
+    """Log out of the hub."""
     return logout_()
 
 
@@ -262,7 +258,7 @@ def init(
     db: str | None,
     modules: str | None,
 ):
-    """Initialize a LaminDB instance.
+    """Initialize a database in the current directory.
 
     Create a new development directory for your source code and `cd` into it:
 
@@ -302,7 +298,7 @@ def init(
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
 # fmt: on
 def connect(instance: str, here: bool):
-    """Set the default database for this environment or directory.
+    """Set the default database for this directory.
 
     This command updates your local configuration to target the specified instance:
     all subsequent CLI commands and Python/R sessions will auto-connect to this instance.
@@ -310,10 +306,10 @@ def connect(instance: str, here: bool):
     You can pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
 
     ```
-    # set a default instance for the current environment
-    lamin connect laminlabs/cellxgene
-    # set a default instance for the current directory
+    # set a default database for the current directory (recommended)
     lamin connect laminlabs/cellxgene --here
+    # set a default database for the entire home directory
+    lamin connect laminlabs/cellxgene
     # use a URL instead of a slug
     lamin connect https://lamin.ai/laminlabs/cellxgene
     ```
@@ -326,17 +322,16 @@ def connect(instance: str, here: bool):
 @main.command()
 @click.option("--here", is_flag=True, default=False, help="Disconnect local directory context without changing the global default instance.")
 def disconnect(here: bool):
-    """Unset the default database for this environment or directory.
+    """Unset the default database for this directory.
 
-    - Without `--here`, it clears the global default instance.
-    - With `--here`, it removes the nearest local marker from the current
-      directory hierarchy and unsets `dev-dir` for that instance.
+    - With `--here`, it clears the default database for the current directory.
+    - Without `--here`, it clears the default database for the entire home directory.
 
     For example:
 
     ```
-    lamin disconnect
     lamin disconnect --here
+    lamin disconnect
     ```
 
     → Python/R alternative: {func}`~lamindb.setup.disconnect`
@@ -360,6 +355,10 @@ def create(
 
     Currently only supports creating branches and projects.
 
+    Use `lamin save` to create artifacts, transforms, and records.
+
+    Examples:
+
     ```
     lamin create branch my_branch
     lamin create project my_project
@@ -380,13 +379,6 @@ def create(
         )
 
     if registry == "branch":
-        branch_dir: Path | None = None
-        if ln_setup.settings.worktree and ln_setup.settings.dev_dir is not None:
-            branch_dir = ln_setup.settings.dev_dir.resolve() / resolved_name
-            if branch_dir.exists() and not branch_dir.is_dir():
-                raise click.ClickException(
-                    f"Cannot create worktree directory '{branch_dir}': path exists and is not a directory."
-                )
         if ln_setup.settings.instance.is_managed_by_hub:
             from lamin_cli.hub import create_branch
 
@@ -396,8 +388,6 @@ def create(
             from lamindb import Branch
 
             created_name = Branch(name=resolved_name).save().name
-        if branch_dir is not None:
-            branch_dir.mkdir(parents=True, exist_ok=True)
     elif registry == "project":
         from lamindb import Project
 
@@ -555,9 +545,6 @@ def merge(branch: str):
 
     → Python/R alternative: {func}`~lamindb.setup.merge`
     """
-    if ln_setup.settings.worktree:
-        ln_setup.settings._resolve_active_worktree_root(raise_on_error=True)
-
     from lamindb_setup import merge as merge_
 
     try:
@@ -571,7 +558,7 @@ def merge(branch: str):
 @main.command()
 @click.option("--schema", is_flag=True, help="View database schema via Django plugin.")
 def info(schema: bool):
-    """Show info about the instance, development & cache directories, branch, space, and user.
+    """Show info about the database, branch, space, and user.
 
     Manage settings via [lamin settings](https://docs.lamin.ai/cli#settings).
 
@@ -661,7 +648,7 @@ def delete(entity: str, name: str | None = None, uid: str | None = None, key: st
     help='Fine-grained settings for artifact or collection downloads as a JSON object (normally not needed), e.g. \'{"batch_size": 20}\'.',
 )
 def load(entity: str | None = None, uid: str | None = None, key: str | None = None, with_env: bool = False, batch_size: int | None = None, store_kwargs: str | None = None):
-    """Sync a file/folder into a local cache (artifacts) or development directory (transforms).
+    """Sync a file/folder into a local cache (artifacts) or development directory (transforms, records).
 
     Pass an entity or a `--key`. For example:
 
@@ -764,40 +751,18 @@ def _describe(
         instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
-    import lamindb as ln
+    from lamin_cli._delete import get_registry
 
+    registry = get_registry(entity)
     if entity in DESCRIBE_ENTITIES_KEY:
         if uid is None and key is None:
             raise SystemExit(
                 f"For entity '{entity}' you must pass --uid or --key"
             )
-        if uid is not None:
-            record = (
-                ln.Artifact.get(uid)
-                if entity == "artifact"
-                else ln.Transform.get(uid)
-                if entity == "transform"
-                else ln.Collection.get(uid)
-            )
-        else:
-            record = (
-                ln.Artifact.get(key=key)
-                if entity == "artifact"
-                else ln.Transform.get(key=key)
-                if entity == "transform"
-                else ln.Collection.get(key=key)
-            )
+        record = registry.get(uid) if uid is not None else registry.get(key=key)
     elif entity in DESCRIBE_ENTITIES_NAME:
         if uid is not None:
-            record = (
-                ln.Record.get(uid)
-                if entity == "record"
-                else ln.Project.get(uid)
-                if entity == "project"
-                else ln.ULabel.get(uid)
-                if entity == "ulabel"
-                else ln.Branch.get(uid)
-            )
+            record = registry.get(uid)
         elif entity == "branch" and name is None:
             # Default to current branch (like lamin annotate)
             record = ln_setup.settings.branch
@@ -805,20 +770,14 @@ def _describe(
             raise SystemExit(
                 f"For entity '{entity}' you must pass --uid or --name"
             )
+        elif entity == "branch":
+            record = registry.get(name=name)
         else:
-            record = (
-                ln.Record.filter(name=name).one()
-                if entity == "record"
-                else ln.Project.filter(name=name).one()
-                if entity == "project"
-                else ln.ULabel.filter(name=name).one()
-                if entity == "ulabel"
-                else ln.Branch.get(name=name)
-            )
+            record = registry.filter(name=name).one()
     else:  # uid-only (run)
         if uid is None:
             raise SystemExit(f"For entity '{entity}' you must pass --uid")
-        record = ln.Run.get(uid)
+        record = registry.get(uid)
 
     record.describe(include=include if include == "comments" else None)
 
@@ -904,7 +863,7 @@ def get(
     status_field: bool = False,
     description_field: bool = False,
 ):
-    """Get a field value or describe an object.
+    """Get object metadata.
 
     If no field flag is passed, this behaves like `lamin describe`.
     If a field flag is passed, it reads that field from the resolved entity.
@@ -978,7 +937,7 @@ def update(
     status: str | None = None,
     description: str | None = None,
 ):
-    """Update mutable fields of an entity.
+    """Update an object.
 
     Examples:
 
@@ -1055,7 +1014,7 @@ def save(
     batch_size: int | None,
     store_kwargs: str | None,
 ):
-    """Save a file or folder as an `artifact`, `transform`, or `record`.
+    """Save a file or folder as an artifact, transform, or record.
 
     Save a **dataset** or **model** as {class}`~lamindb.Artifact`:
 
@@ -1164,7 +1123,7 @@ def track(ctx: click.Context):
     sh my_script.sh
     ```
 
-    The `lamindb` [skill](https://github.com/laminlabs/lamin-skills) ships with the package. After installing `lamindb`, run `uvx library-skills --all` so your agent can read it (add `--claude` for Claude Code). It will call:
+    The `lamindb` [skill](https://github.com/laminlabs/lamindb/tree/main/lamindb/.agents) ships with the package. After installing `lamindb`, run `uvx library-skills --all` so your agent can read it (add `--claude` for Claude Code). It will call:
 
     ```
     lamin track claude   # or: lamin track copilot, or: lamin track cursor
@@ -1312,7 +1271,7 @@ def finish():
 @click.option("--readme", "readme_path", type=click.Path(exists=True, path_type=Path), default=None, help="Path to a README file to attach as a readme block to the entity.")
 @click.option("--comment", type=str, default=None, help="Comment text to attach as a comment block to the entity.")
 def annotate(entity: str | None, key: str, uid: str, name: str, project: str, ulabel: str, record: str, version: str, features: tuple, readme_path: Path | None, comment: str | None):
-    r"""Annotate an artifact, transform, or collection.
+    r"""Annotate an object.
 
     You can annotate with projects, labels, records, version tags, a readme, a comment, and, for artifacts, with features. For example,
 
@@ -1625,7 +1584,17 @@ def run(
 
 @main.group()
 def integrations():
-    """Run integration helpers."""
+    """Use integrations.
+
+    Examples:
+
+    ```
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 1 --apply
+    ```
+
+    → Python/R alternative: {func}`~lamindb.integrations.notion.sync_objects_from_notion`
+    """
 
 
 @integrations.group()
@@ -1634,7 +1603,7 @@ def notion():
 
 
 @notion.command("sync")
-@click.argument("parents", type=str, nargs=-1)
+@click.argument("notion_uuid", type=str)
 @click.option(
     "--token",
     type=str,
@@ -1648,28 +1617,27 @@ def notion():
     help="Apply writes to LaminDB. By default, runs as dry run.",
 )
 @click.option(
-    "--limit",
+    "--depth",
     type=click.IntRange(0),
-    default=None,
-    help="Maximum rows to read per discovered Notion database. Use 0 to skip child traversal.",
+    default=0,
+    help="How many levels of child pages and databases to walk. 0 syncs only this page.",
 )
 def notion_sync(
-    parents: tuple[str, ...],
+    notion_uuid: str,
     token: str | None,
     apply: bool,
-    limit: int | None,
+    depth: int,
 ) -> None:
-    """Sync Notion page/database trees into LaminDB records."""
-    if not parents:
-        raise click.UsageError("Missing argument 'PARENTS...'.")
-    from lamindb.integrations.notion import sync_from_notion
+    """Sync a Notion page or database into LaminDB records."""
+    from lamindb.integrations.notion import sync_objects_from_notion
 
-    sync_from_notion(
+    sync_objects_from_notion(
         token=token,
-        parents=list(parents),
+        notion_uuid=notion_uuid,
         apply=apply,
-        limit=limit,
+        depth=depth,
     )
+
 
 main.add_command(settings)
 main.add_command(migrate)

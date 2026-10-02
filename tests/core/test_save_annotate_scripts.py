@@ -59,34 +59,21 @@ def test_save_resave_script_no_uids():
     assert result.returncode == 0
 
 
-def test_save_script_in_worktree_uses_active_worktree_relative_key():
+def test_save_script_uses_dev_dir_relative_key():
     unique = time.time_ns()
-    previous_dev_dir = settings.dev_dir
-    worktree_parent = scripts_dir / f"worktrees-{unique}"
-    branch_name = f"feature-a-{unique}"
-    child = worktree_parent / branch_name
-    script_path = child / "pipelines" / f"worktree-script-{unique}.py"
+    project = scripts_dir / f"dev-dir-{unique}"
+    script_path = project / "pipelines" / f"script-{unique}.py"
     expected_key = f"pipelines/{script_path.name}"
     previous_cwd = Path.cwd()
     try:
-        worktree_parent.mkdir()
-        assert (
-            run_lamin("settings", "dev-dir", "set", str(worktree_parent)).returncode
-            == 0
-        )
-        assert run_lamin("settings", "worktree", "set", "true").returncode == 0
-        assert (
-            run_lamin("switch", "-c", branch_name, cwd=worktree_parent).returncode == 0
-        )
-        script_path.parent.mkdir(parents=True, exist_ok=True)
-        script_path.write_text("print('worktree save test')\n")
-        os.chdir(child)
-        result = run_lamin("save", str(script_path))
+        script_path.parent.mkdir(parents=True)
+        script_path.write_text("print('dev-dir save test')\n")
+        assert run_lamin("settings", "dev-dir", "set", str(project)).returncode == 0
+        os.chdir(project)
+        result = run_lamin("save", str(script_path), cwd=project)
         assert result.returncode == 0, (
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        # Query in a subprocess from the same child cwd so transform lookup uses
-        # the same active worktree context as `lamin save`.
         query_result = subprocess.run(
             [
                 sys.executable,
@@ -94,7 +81,7 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
                 "import lamindb as ln; "
                 f"assert ln.Transform.filter(key={expected_key!r}).count() >= 1",
             ],
-            cwd=child,
+            cwd=project,
             capture_output=True,
             text=True,
         )
@@ -102,19 +89,13 @@ def test_save_script_in_worktree_uses_active_worktree_relative_key():
             f"stdout: {query_result.stdout}\nstderr: {query_result.stderr}"
         )
     finally:
+        os.chdir(project if project.exists() else previous_cwd)
+        run_lamin("settings", "dev-dir", "unset", cwd=project)
         os.chdir(previous_cwd)
-        if child.exists():
-            run_lamin("delete", "branch", "--name", branch_name, cwd=child)
-            shutil.rmtree(child)
-        run_lamin("settings", "worktree", "set", "false")
-        if previous_dev_dir is None:
-            run_lamin("settings", "dev-dir", "unset")
-        else:
-            run_lamin("settings", "dev-dir", "set", str(previous_dev_dir))
         for transform in ln.Transform.filter(key=expected_key):
             transform.delete(permanent=True)
-        if worktree_parent.exists():
-            shutil.rmtree(worktree_parent)
+        if project.exists():
+            shutil.rmtree(project)
 
 
 def test_save_and_annotate_without_uid():

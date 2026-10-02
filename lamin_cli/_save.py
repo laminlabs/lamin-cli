@@ -442,9 +442,9 @@ def save(
         uid = parse_uid_from_code(content, ppath.suffix)
 
         ppath = ppath.resolve().expanduser()
-        effective_dev_dir = ln_setup.settings.effective_dev_dir
-        if effective_dev_dir is not None:
-            key = ppath.relative_to(effective_dev_dir).as_posix()
+        dev_dir = ln_setup.settings.dev_dir
+        if dev_dir is not None:
+            key = ppath.relative_to(dev_dir).as_posix()
         else:
             key = ppath.name
 
@@ -541,11 +541,9 @@ def save(
                 raise click.ClickException("The stem uid is not found.")
         if transform is None:
             if ppath.suffix == ".ipynb":
-                from nbproject.dev import read_notebook
-                from nbproject.dev._meta_live import get_title
+                from lamindb.integrations.jupyter import get_title, read_notebook
 
-                nb = read_notebook(ppath)
-                description = get_title(nb)
+                description = get_title(read_notebook(ppath))
             elif ppath.suffix in {".qmd", ".Rmd"}:
                 description = parse_title_r_notebook(content)
             else:
