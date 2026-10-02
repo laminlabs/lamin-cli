@@ -52,9 +52,9 @@ def transfer(
     from lamindb.core import sync
 
     return sync(
-        entity,
-        uid,
-        source=source,
+        registry=entity,
+        uid=uid,
+        source_db=source,
         depth=depth,
         transfer=transfer,
     )

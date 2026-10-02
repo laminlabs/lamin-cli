@@ -99,10 +99,10 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
 def test_transfer_url_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync(registry, uids, *, source, depth=None, transfer=None):
+    def fake_sync(*, registry, uid, source_db, depth=None, transfer=None):
         calls["registry"] = registry
-        calls["uids"] = uids
-        calls["source"] = source
+        calls["uid"] = uid
+        calls["source_db"] = source_db
         calls["depth"] = depth
         calls["transfer"] = transfer
         return []
@@ -124,8 +124,8 @@ def test_transfer_url_forwards_args(monkeypatch):
     assert result.exit_code == 0, result.output
     assert calls == {
         "registry": "record",
-        "uids": "UrcIKR8v0ywim0pE",
-        "source": "laminlabs/lamindata",
+        "uid": "UrcIKR8v0ywim0pE",
+        "source_db": "laminlabs/lamindata",
         "depth": 1,
         "transfer": "annotations",
     }
@@ -134,10 +134,10 @@ def test_transfer_url_forwards_args(monkeypatch):
 def test_transfer_entity_uid_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync(registry, uids, *, source, depth=None, transfer=None):
+    def fake_sync(*, registry, uid, source_db, depth=None, transfer=None):
         calls["registry"] = registry
-        calls["uids"] = uids
-        calls["source"] = source
+        calls["uid"] = uid
+        calls["source_db"] = source_db
         calls["depth"] = depth
         calls["transfer"] = transfer
         return []
@@ -158,8 +158,8 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls["registry"] == "artifact"
-    assert calls["uids"] == "e2G7k9EVul4JbfsE"
-    assert calls["source"] == "laminlabs/lamindata"
+    assert calls["uid"] == "e2G7k9EVul4JbfsE"
+    assert calls["source_db"] == "laminlabs/lamindata"
 
 
 def test_notion_sync_requires_parents():
