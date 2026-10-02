@@ -1504,7 +1504,7 @@ def integrations():
 
     ```
     lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27
-    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 0 --apply
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 1 --apply
     ```
 
     → Python/R alternative: {func}`~lamindb.integrations.notion.sync_objects_from_notion`
@@ -1533,14 +1533,14 @@ def notion():
 @click.option(
     "--depth",
     type=click.IntRange(0),
-    default=None,
-    help="How many levels of child pages and databases to walk. Use 0 to sync only the given parents.",
+    default=0,
+    help="How many levels of child pages and databases to walk. 0 syncs only the given parents.",
 )
 def notion_sync(
     parents: tuple[str, ...],
     token: str | None,
     apply: bool,
-    depth: int | None,
+    depth: int,
 ) -> None:
     """Sync Notion page/database trees into LaminDB records."""
     if not parents:

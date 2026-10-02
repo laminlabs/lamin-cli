@@ -70,6 +70,7 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls["apply"] is False
+    assert calls["depth"] == 0
 
 
 def test_notion_sync_accepts_zero_depth(monkeypatch):
