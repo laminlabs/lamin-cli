@@ -9,13 +9,19 @@ would be visible to other users via ``ps``).
 from __future__ import annotations
 
 import hashlib
+import os
 import shlex
+import shutil
 import sys
+import tempfile
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from upath import UPath
 
 
@@ -65,6 +71,23 @@ def credential_env(path: UPath, protocol: str) -> dict[str, str]:
             if token:
                 env["AWS_SESSION_TOKEN"] = str(token)
     return env
+
+
+def gcs_access_token_env(path: UPath) -> dict[str, str]:
+    """Environment variables carrying a short-lived OAuth token for GCS tools.
+
+    `CLOUDSDK_AUTH_ACCESS_TOKEN` is honored by `gcloud` and `gsutil`, and
+    `GOOGLE_OAUTH_ACCESS_TOKEN` by tools following the Terraform/rclone convention.
+    Anonymous access has no token and so yields no variables.
+    """
+    credentials = getattr(getattr(path, "fs", None), "credentials", None)
+    if credentials is None:
+        return {}
+    credentials.maybe_refresh()
+    token = getattr(credentials.credentials, "token", None)
+    if not token:
+        return {}
+    return {"CLOUDSDK_AUTH_ACCESS_TOKEN": token, "GOOGLE_OAUTH_ACCESS_TOKEN": token}
 
 
 def has_temporary_credentials(env: dict[str, str]) -> bool:
@@ -189,3 +212,86 @@ def write_profile_config(
     config_path.write_text("\n".join(lines) + "\n")
     config_path.chmod(0o600)
     return config_path
+
+
+class RefreshedCredentialsFile:
+    """An AWS shared credentials file that a background thread keeps fresh.
+
+    For tools that read credentials from the standard file, and re-read it as they
+    open objects, rather than relying on environment variables fixed at launch. The
+    file lives in a private temporary directory, is replaced atomically so a reader
+    never sees a partial write, and is removed on `stop`.
+    """
+
+    MIN_INTERVAL = 30
+    MAX_INTERVAL = 900
+
+    def __init__(
+        self,
+        storage_root: str,
+        credentials: dict,
+        note: Callable[[str], None] | None = None,
+    ):
+        self.storage_root = storage_root
+        self._credentials = credentials
+        self._note = note or (lambda message: None)
+        self._directory: Path | None = None
+        self._stopped = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def path(self) -> Path:
+        assert self._directory is not None, "call start() first"
+        return self._directory / "credentials"
+
+    def start(self) -> None:
+        self._directory = Path(tempfile.mkdtemp(prefix="lamin-aws-"))
+        self._write(self._credentials)
+        self._thread = threading.Thread(target=self._refresh_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stopped.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+        if self._directory is not None:
+            shutil.rmtree(self._directory, ignore_errors=True)
+
+    def _write(self, credentials: dict) -> None:
+        lines = [
+            f"[{PROFILE_NAME}]",
+            f"aws_access_key_id = {credentials['key']}",
+            f"aws_secret_access_key = {credentials['secret']}",
+        ]
+        if credentials.get("token"):
+            lines.append(f"aws_session_token = {credentials['token']}")
+        temporary = self.path.with_suffix(".tmp")
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w") as handle:
+            handle.write("\n".join(lines) + "\n")
+        temporary.replace(self.path)
+
+    def _interval(self, credentials: dict) -> float:
+        expiry = _to_datetime(credentials.get("expiry_time"))
+        if expiry is None:
+            return self.MAX_INTERVAL / 3
+        remaining = (expiry - datetime.now(timezone.utc)).total_seconds()
+        return min(max(remaining / 2, self.MIN_INTERVAL), self.MAX_INTERVAL)
+
+    def _refresh_loop(self) -> None:
+        interval = self._interval(self._credentials)
+        failing = False
+        while not self._stopped.wait(interval):
+            fresh = fetch_aws_credentials(self.storage_root)
+            if fresh is None:
+                if not failing:
+                    self._note(
+                        f"warning: could not refresh credentials for"
+                        f" {self.storage_root}; retrying"
+                    )
+                failing = True
+                interval = self.MIN_INTERVAL
+                continue
+            failing = False
+            self._write(fresh)
+            interval = self._interval(fresh)

@@ -160,6 +160,11 @@ def test_older_versions_are_not_resolved_by_key(monkeypatch):
 def where_setting(tmp_path, monkeypatch):
     monkeypatch.setattr(_run, "_where_setting_path", lambda: tmp_path / "run-where.txt")
     monkeypatch.delenv(_run.WHERE_ENV, raising=False)
+    # `lamin run` resolves its access methods alongside where to run
+    monkeypatch.setattr(
+        _run, "_access_setting_path", lambda: tmp_path / "run-access.txt"
+    )
+    monkeypatch.delenv(_run.ACCESS_ENV, raising=False)
     return tmp_path / "run-where.txt"
 
 
@@ -287,12 +292,12 @@ def test_tee_keeps_streams_apart_and_decodes_split_characters(monkeypatch):
 # -- argument translation ----------------------------------------------------
 
 
-def _fake_translation(uri, remount=False, note=None):
+def _fake_translation(uri, *args, **kwargs):
     return _run.Translation(uri=uri, local_path=Path(f"/mnt/{uri[-4:]}"), via="mount")
 
 
 def test_translation_rewrites_bare_and_flag_uris_only(monkeypatch):
-    monkeypatch.setattr(_run, "resolve_uri_to_local_path", _fake_translation)
+    monkeypatch.setattr(_run, "resolve_uri", _fake_translation)
     uri = f"lamin://acme/data/artifact/{UID16}"
     argv, translations = _run.translate_argv(
         ["tool", uri, f"--in={uri}", "--name=lamin", "plain", "-x"]
@@ -319,6 +324,409 @@ def test_child_environment(monkeypatch, tmp_path):
     assert env["LAMIN_CURRENT_PROJECT"] == "my-project"
     assert json.loads(env["LAMIN_INPUT_PATHS"]) == {translation.uri: "/mnt/Zq2K"}
     assert json.loads(env["LAMIN_MOUNTS"]) == {}
+
+
+# -- access methods ----------------------------------------------------------
+
+
+class _FakeFs:
+    def sign(self, path, expiration):
+        return f"https://signed.example/{path.split('://')[1]}?exp={expiration}"
+
+
+class _FakePath:
+    fs = _FakeFs()
+
+    def __init__(self, text, options=None):
+        self.text = text
+        self.storage_options = options or {
+            "key": "AKIA",
+            "secret": "shh",
+            "token": "tok",
+        }
+
+    def __truediv__(self, other):
+        return _FakePath(f"{self.text}/{other}", self.storage_options)
+
+    def __str__(self):
+        return self.text
+
+    def is_dir(self):
+        return self.text.endswith("/dir")
+
+
+URI = f"lamin://acme/data/artifact/{UID16}"
+
+
+def _resolved(storage_type="s3", subpath=None, n_files=None, root=None, key="AKIA"):
+    from lamin_cli import _uri
+
+    root = root or f"{'s3' if storage_type == 'local' else storage_type}://bucket"
+    artifact = SimpleNamespace(
+        storage=SimpleNamespace(type=storage_type, root=root),
+        path=_FakePath(f"{root}/data/a.bam", {"key": key, "secret": "shh"}),
+        n_files=n_files,
+        cache=lambda is_run_input: f"/cache/{root.split('://')[1]}/a.bam",
+    )
+    return _uri.ResolvedUri(
+        uri=None,
+        artifact=artifact,
+        subpath=PurePosixPath(subpath) if subpath else None,
+        in_current_instance=True,
+    )
+
+
+def _fake_resolved(monkeypatch, *args, by_uri=None, mounted=None, **kwargs):
+    """Fake URI resolution; storage roots in `mounted` resolve through a mount."""
+    from lamin_cli import _uri
+
+    single = _resolved(*args, **kwargs)
+    monkeypatch.setattr(
+        _uri, "resolve_lamin_uri", lambda value: (by_uri or {}).get(value, single)
+    )
+
+    def access_mount(uri, resolved, remount, note):
+        storage = resolved.artifact.storage
+        if storage.type == "local":
+            return _run.Translation(uri, Path("/local/a.bam"), "local")
+        if storage.root in (mounted or ()):
+            return _run.Translation(uri, Path("/mnt/a.bam"), "mount")
+        raise _run.AccessUnavailable("the storage location is not mounted", True)
+
+    monkeypatch.setattr(_run, "_access_mount", access_mount)
+
+
+def _translate(*argv, access, **kwargs):
+    return _run.translate_argv(list(argv), access=tuple(access.split(",")), **kwargs)
+
+
+def test_parse_access_keeps_order_and_rejects_typos_and_repeats():
+    assert _run.parse_access(" presigned, mount ") == ("presigned", "mount")
+    with pytest.raises(_run.RunError, match="Unknown access method.*'local'"):
+        _run.parse_access("local")
+    with pytest.raises(_run.RunError, match="listed twice: cache"):
+        _run.parse_access("cache,mount,cache")
+    with pytest.raises(_run.RunError, match="No access method"):
+        _run.parse_access(" , ")
+
+
+def test_access_precedence_is_flag_then_env_then_setting(where_setting, monkeypatch):
+    assert _run.resolve_access(None) == (("mount", "cache"), "default")
+    _run.write_access_setting("presigned,mount")
+    assert _run.resolve_access(None) == (
+        ("presigned", "mount"),
+        "lamin settings run-access",
+    )
+    monkeypatch.setenv(_run.ACCESS_ENV, "credentials")
+    assert _run.resolve_access(None) == (("credentials",), _run.ACCESS_ENV)
+    assert _run.resolve_access("cache") == (("cache",), "--access")
+    monkeypatch.setenv(_run.ACCESS_ENV, "bogus")
+    with pytest.raises(_run.RunError, match=f"from {_run.ACCESS_ENV}"):
+        _run.resolve_access(None)
+
+
+def test_an_invalid_access_setting_is_never_persisted(where_setting):
+    with pytest.raises(_run.RunError):
+        _run.write_access_setting("mount,ftp")
+    assert not (where_setting.parent / "run-access.txt").exists()
+
+
+def test_the_default_falls_back_to_the_cache_without_noise(monkeypatch):
+    _fake_resolved(monkeypatch)
+    argv, translations = _translate(URI, access="mount,cache")
+    assert argv == ["/cache/bucket/a.bam"]
+    assert translations[0].via == "cache"
+    # an unmounted storage location is the expected case, not worth a note
+    assert translations[0].skipped == []
+
+
+def test_a_mount_wins_over_urls_when_listed_first(monkeypatch):
+    _fake_resolved(monkeypatch, mounted={"s3://bucket"})
+    argv, translations = _translate(URI, access="mount,presigned")
+    assert argv == ["/mnt/a.bam"]
+    assert translations[0].via == "mount"
+
+
+def test_presigned_access_replaces_uris_but_never_shows_the_signature(monkeypatch):
+    _fake_resolved(monkeypatch)
+    argv, translations = _translate(
+        "view", URI, f"--in={URI}", access="presigned", expiry=60
+    )
+    signed = "https://signed.example/bucket/data/a.bam?exp=60"
+    assert argv == ["view", signed, f"--in={signed}"]
+    assert translations[0].via == "presigned"
+    assert translations[0].shown == "s3://bucket/data/a.bam"
+    assert "exp=" not in _run.describe_translation(translations[0])
+    assert translations[0].env == {}
+
+
+def test_presigned_access_needs_a_file(monkeypatch):
+    _fake_resolved(monkeypatch, n_files=3)
+    with pytest.raises(_run.RunError, match="presigned: it is a folder"):
+        _translate(URI, access="presigned")
+    _fake_resolved(monkeypatch, n_files=3, subpath="x.bam")
+    argv, _ = _translate(f"{URI}/x.bam", access="presigned")
+    assert argv[0].startswith("https://signed.example/bucket/data/a.bam/x.bam")
+    _fake_resolved(monkeypatch, n_files=3, subpath="dir")
+    with pytest.raises(_run.RunError, match="folder inside the artifact"):
+        _translate(f"{URI}/dir", access="presigned")
+
+
+def test_a_folder_falls_through_to_the_next_method_and_says_why(monkeypatch):
+    _fake_resolved(monkeypatch, n_files=3)
+    argv, translations = _translate(URI, access="presigned,credentials")
+    assert argv == ["s3://bucket/data/a.bam"]
+    assert translations[0].via == "credentials"
+    assert translations[0].skipped == [
+        ("presigned", "it is a folder, and only files can be presigned")
+    ]
+    assert "skipped presigned: it is a folder" in _run.describe_translation(
+        translations[0]
+    )
+
+
+def test_credentials_access_passes_an_unsigned_url_and_env(monkeypatch, tmp_path):
+    from lamin_cli.mount import _registry
+
+    monkeypatch.setattr(_registry, "_registry_path", lambda: tmp_path / "mounts.json")
+    _fake_resolved(monkeypatch)
+    argv, translations = _translate(URI, access="credentials")
+    assert argv == ["s3://bucket/data/a.bam"]
+    assert translations[0].via == "credentials"
+    env = _run.child_environment("RunUid00000000000000", None, translations)
+    assert env["AWS_ACCESS_KEY_ID"] == "AKIA"
+    assert env["AWS_SECRET_ACCESS_KEY"] == "shh"
+    assert "AKIA" not in " ".join(argv)
+
+
+def _gcs_token(monkeypatch):
+    class Credentials:
+        credentials = SimpleNamespace(token="ya29.tok")
+
+        def maybe_refresh(self):
+            pass
+
+    monkeypatch.setattr(_FakeFs, "credentials", Credentials(), raising=False)
+
+
+def test_credentials_access_passes_a_token_for_gcs(monkeypatch):
+    _fake_resolved(monkeypatch, storage_type="gs")
+    _gcs_token(monkeypatch)
+    argv, translations = _translate(URI, access="credentials")
+    assert argv == ["gs://bucket/data/a.bam"]
+    assert translations[0].env == {
+        "CLOUDSDK_AUTH_ACCESS_TOKEN": "ya29.tok",
+        "GOOGLE_OAUTH_ACCESS_TOKEN": "ya29.tok",
+    }
+
+
+def test_gcs_without_a_signing_key_falls_back_to_its_token(monkeypatch):
+    def refuse(self, path, expiration):
+        raise AttributeError("you need a private key to sign credentials")
+
+    _fake_resolved(monkeypatch, storage_type="gs")
+    _gcs_token(monkeypatch)
+    monkeypatch.setattr(_FakeFs, "sign", refuse)
+    with pytest.raises(_run.RunError, match="service account"):
+        _translate(URI, access="presigned")
+    argv, translations = _translate(URI, access="presigned,credentials")
+    assert argv == ["gs://bucket/data/a.bam"]
+    assert translations[0].skipped[0][0] == "presigned"
+
+
+def test_credentials_access_needs_s3_or_gcs(monkeypatch):
+    _fake_resolved(monkeypatch, storage_type="hf")
+    with pytest.raises(_run.RunError, match="only s3 and gs are supported"):
+        _translate(URI, access="credentials")
+
+
+def test_local_storage_has_no_url(monkeypatch):
+    _fake_resolved(monkeypatch, storage_type="local")
+    with pytest.raises(_run.RunError) as error:
+        _translate(URI, access="presigned,credentials")
+    # every allowed method explains itself
+    message = str(error.value)
+    assert "--access presigned,credentials" in message
+    assert "presigned: local storage has no URL" in message
+    assert "credentials: local storage has no URL" in message
+    argv, translations = _translate(URI, access="presigned,mount")
+    assert (argv, translations[0].via) == (["/local/a.bam"], "local")
+
+
+def test_inputs_with_other_credentials_fall_through_per_uri(monkeypatch):
+    """Two buckets with two identities: the first claims the process's identity,
+    the second gets the next allowed method instead of failing the run."""
+    first, second = f"{URI}/a", f"lamin://acme/data/artifact/{UID20}"
+    _fake_resolved(
+        monkeypatch,
+        by_uri={
+            first: _resolved(root="s3://one", key="KEY1"),
+            second: _resolved(root="s3://two", key="KEY2"),
+        },
+    )
+    argv, translations = _translate(first, second, access="credentials,presigned")
+    assert argv[0] == "s3://one/data/a.bam"
+    assert argv[1].startswith("https://signed.example/two/data/a.bam")
+    assert translations[1].skipped[0][0] == "credentials"
+    assert "one process holds one identity" in translations[1].skipped[0][1]
+    with pytest.raises(_run.RunError, match="credentials: it needs other"):
+        _translate(first, second, access="credentials")
+
+
+def test_inputs_sharing_credentials_share_the_process(monkeypatch):
+    first, second = f"{URI}/a", f"lamin://acme/data/artifact/{UID20}"
+    _fake_resolved(
+        monkeypatch,
+        by_uri={first: _resolved(root="s3://one"), second: _resolved(root="s3://two")},
+    )
+    argv, translations = _translate(first, second, access="credentials")
+    assert [t.via for t in translations] == ["credentials", "credentials"]
+
+
+def test_dry_run_neither_signs_nor_fetches_credentials(monkeypatch):
+    _fake_resolved(monkeypatch)
+    argv, _ = _translate(URI, access="presigned", sign=False)
+    assert argv == ["<presigned URL for s3://bucket/data/a.bam>"]
+    _, translations = _translate(URI, access="credentials", sign=False)
+    assert translations[0].env == {}
+
+
+def test_credentials_of_different_identities_cannot_share_a_process():
+    a = _run.Translation(
+        "u1", "s3://a/x", "credentials", env={"AWS_ACCESS_KEY_ID": "1"}
+    )
+    b = _run.Translation(
+        "u2", "s3://b/y", "credentials", env={"AWS_ACCESS_KEY_ID": "2"}
+    )
+    with pytest.raises(_run.RunError, match="presigned"):
+        _run.merge_credential_env([a, b])
+
+
+def _credential_translation(storage_type="s3", **env):
+    artifact = SimpleNamespace(
+        storage=SimpleNamespace(type=storage_type, root="s3://bucket")
+    )
+    env = env or {"AWS_ACCESS_KEY_ID": "AKIA", "AWS_SECRET_ACCESS_KEY": "shh"}
+    return _run.Translation(
+        "lamin://x", "s3://bucket/a", "credentials", artifact=artifact, env=env
+    )
+
+
+def test_refreshed_credentials_file_is_private_updated_and_removed(monkeypatch):
+    import time
+
+    from lamin_cli.mount import _credentials
+
+    fresh = {"key": "NEWKEY", "secret": "newsecret", "token": "newtoken"}
+    monkeypatch.setattr(_credentials, "fetch_aws_credentials", lambda root: fresh)
+    monkeypatch.setattr(_credentials.RefreshedCredentialsFile, "MIN_INTERVAL", 0.05)
+    monkeypatch.setattr(_credentials.RefreshedCredentialsFile, "MAX_INTERVAL", 0.05)
+    file = _credentials.RefreshedCredentialsFile(
+        "s3://bucket", {"key": "OLD", "secret": "old", "token": None}
+    )
+    file.start()
+    path = file.path
+    try:
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert "OLD" in path.read_text() or "NEWKEY" in path.read_text()
+        for _ in range(100):
+            if "NEWKEY" in path.read_text():
+                break
+            time.sleep(0.05)
+        content = path.read_text()
+        assert "[lamin]" in content
+        assert "aws_access_key_id = NEWKEY" in content
+        assert "aws_session_token = newtoken" in content
+    finally:
+        file.stop()
+    assert not path.exists()
+
+
+def test_file_delivery_replaces_secret_env_vars_with_a_profile(monkeypatch):
+    from lamin_cli.mount import _credentials
+
+    monkeypatch.setattr(_credentials, "fetch_aws_credentials", lambda root: None)
+    translation = _credential_translation(
+        AWS_ACCESS_KEY_ID="AKIA",
+        AWS_SECRET_ACCESS_KEY="shh",
+        AWS_ENDPOINT_URL="https://s3.example",
+    )
+    managed = _run.start_managed_credentials([translation], "file")
+    try:
+        assert managed.env["AWS_PROFILE"] == "lamin"
+        assert managed.env["AWS_ENDPOINT_URL"] == "https://s3.example"
+        assert "AKIA" in Path(managed.env["AWS_SHARED_CREDENTIALS_FILE"]).read_text()
+        assert not set(managed.env) & set(_run._AWS_SECRET_ENV)
+    finally:
+        managed.stop()
+    assert not Path(managed.env["AWS_SHARED_CREDENTIALS_FILE"]).exists()
+
+
+def test_process_delivery_writes_a_config_without_secrets(monkeypatch, tmp_path):
+    from lamin_cli.mount import _credentials
+
+    monkeypatch.setattr(
+        _credentials, "fetch_aws_credentials", lambda root: {"key": "k", "secret": "s"}
+    )
+    monkeypatch.setattr(
+        "lamindb_setup.core._settings_store.settings_dir", tmp_path, raising=False
+    )
+    translation = _credential_translation()
+    _run.validate_credentials_via([translation], "process")
+    managed = _run.start_managed_credentials([translation], "process")
+    config = Path(managed.env["AWS_CONFIG_FILE"]).read_text()
+    assert "credential_process" in config
+    assert "settings mount credentials --root s3://bucket" in config
+    assert "AKIA" not in config and "shh" not in config
+    assert managed.env["AWS_PROFILE"] == "lamin"
+    assert managed.env["AWS_SHARED_CREDENTIALS_FILE"] == os.devnull
+
+
+def test_process_delivery_needs_reissuable_credentials(monkeypatch):
+    from lamin_cli.mount import _credentials
+
+    monkeypatch.setattr(_credentials, "fetch_aws_credentials", lambda root: None)
+    with pytest.raises(_run.RunError, match="reissue"):
+        _run.validate_credentials_via([_credential_translation()], "process")
+
+
+def test_file_and_process_delivery_are_s3_only():
+    translation = _credential_translation(
+        storage_type="gs", CLOUDSDK_AUTH_ACCESS_TOKEN="t"
+    )
+    for via in ("file", "process"):
+        with pytest.raises(_run.RunError, match="only supports s3"):
+            _run.validate_credentials_via([translation], via)
+    _run.validate_credentials_via([translation], "env")
+
+
+def test_s3_and_gs_inputs_mix_with_gs_staying_in_the_environment(monkeypatch):
+    from lamin_cli.mount import _credentials
+
+    monkeypatch.setattr(_credentials, "fetch_aws_credentials", lambda root: None)
+    s3 = _credential_translation()
+    gs = _credential_translation(storage_type="gs", CLOUDSDK_AUTH_ACCESS_TOKEN="t")
+    gs.artifact.storage.root = "gs://other"
+    _run.validate_credentials_via([gs, s3], "file")
+    managed = _run.start_managed_credentials([gs, s3], "file")
+    try:
+        # the profile is for the s3 root, not whichever input came first
+        assert managed.file.storage_root == "s3://bucket"
+        assert _run.merge_credential_env([gs, s3])["CLOUDSDK_AUTH_ACCESS_TOKEN"] == "t"
+    finally:
+        managed.stop()
+
+
+def test_two_s3_identities_are_refused():
+    a = _credential_translation(AWS_ACCESS_KEY_ID="1", AWS_SECRET_ACCESS_KEY="x")
+    b = _credential_translation(AWS_ACCESS_KEY_ID="2", AWS_SECRET_ACCESS_KEY="y")
+    with pytest.raises(_run.RunError, match="presigned"):
+        _run.merge_credential_env([a, b])
+
+
+def test_env_delivery_leaves_the_environment_alone():
+    managed = _run.start_managed_credentials([_credential_translation()], "env")
+    assert managed.env == {}
 
 
 # -- command-line parsing ----------------------------------------------------
@@ -372,6 +780,50 @@ def test_modal_only_options_hint_at_the_separator(captured):
     output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "only applies to --where modal" in output
     assert "lamin run train.py -- --gpu" in output
+
+
+def test_access_options_reach_the_request(captured):
+    result = _invoke(
+        "--access", "mount,presigned", "--presign-expiry", "60", "s.py", "--", "x"
+    )
+    assert result.exit_code == 0, result.output
+    request = captured[0][1]
+    assert request.access == ("mount", "presigned")
+    assert request.presign_expiry == 60
+
+
+def test_access_defaults_to_local_paths_and_honors_the_environment(
+    captured, monkeypatch
+):
+    assert _invoke("s.py").exit_code == 0
+    assert captured[0][1].access == ("mount", "cache")
+    monkeypatch.setenv(_run.ACCESS_ENV, "credentials,cache")
+    assert _invoke("s.py").exit_code == 0
+    assert captured[1][1].access == ("credentials", "cache")
+
+
+def test_credentials_via_reaches_the_request_and_needs_credentials_access(captured):
+    result = _invoke(
+        "--access", "presigned,credentials", "--credentials-via", "file", "s.py"
+    )
+    assert result.exit_code == 0, result.output
+    assert captured[0][1].credentials_via == "file"
+    result = _invoke("--credentials-via", "file", "s.py")
+    assert result.exit_code != 0
+    assert "only applies when --access allows credentials" in result.output
+
+
+def test_access_misuse_is_rejected(captured):
+    result = _invoke("--presign-expiry", "60", "s.py")
+    assert result.exit_code != 0
+    assert "only applies when --access allows presigned" in result.output
+    result = _invoke("--access", "credentials", "--where", "modal", "s.py")
+    assert result.exit_code != 0
+    assert "--where local" in result.output
+    result = _invoke("--access", "mount,local", "s.py")
+    assert result.exit_code != 0
+    assert "Unknown access method" in result.output
+    assert not captured
 
 
 def test_modal_needs_a_project(where_setting):
