@@ -11,6 +11,11 @@ dependencies = [
     "rich-click>=1.7",
 ]
 
+[project.optional-dependencies]
+mcp = [
+    "fastmcp>=3.4.2,<4",
+]
+
 [project.urls]
 Home = "https://github.com/laminlabs/lamin-cli"
 

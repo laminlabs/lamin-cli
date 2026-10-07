@@ -67,7 +67,7 @@ COMMAND_GROUPS = {
         },
         {
             "name": "Experimental",
-            "commands": ["run", "hub"],
+            "commands": ["run", "mcp", "hub"],
         },
     ]
 }
@@ -1637,6 +1637,14 @@ def notion_sync(
         apply=apply,
         depth=depth,
     )
+
+
+@main.command()
+def mcp():
+    """Expose the current instance's LaminHub MCP tools over stdio."""
+    from lamin_cli._mcp import run_mcp_proxy
+
+    run_mcp_proxy()
 
 
 main.add_command(settings)
