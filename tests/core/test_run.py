@@ -750,6 +750,15 @@ def _invoke(*args):
     return CliRunner().invoke(main, ["run", *args])
 
 
+def _plain(output: str) -> str:
+    """Error text without the styling and line wrapping of rich-click's error box.
+
+    GitHub Actions forces a color terminal, so rich-click adds ANSI codes there.
+    """
+    output = re.sub(r"\x1b\[[0-9;]*m", "", output)
+    return " ".join(re.sub(r"[│╭╮╰╯─]", " ", output).split())
+
+
 def test_only_arguments_after_the_separator_reach_the_target(captured):
     result = _invoke("--project", "p", "train.py", "--", "--project", "q", "--gpu", "0")
     assert result.exit_code == 0, result.output
@@ -810,19 +819,19 @@ def test_credentials_via_reaches_the_request_and_needs_credentials_access(captur
     assert captured[0][1].credentials_via == "file"
     result = _invoke("--credentials-via", "file", "s.py")
     assert result.exit_code != 0
-    assert "only applies when --access allows credentials" in result.output
+    assert "only applies when --access allows credentials" in _plain(result.output)
 
 
 def test_access_misuse_is_rejected(captured):
     result = _invoke("--presign-expiry", "60", "s.py")
     assert result.exit_code != 0
-    assert "only applies when --access allows presigned" in result.output
+    assert "only applies when --access allows presigned" in _plain(result.output)
     result = _invoke("--access", "credentials", "--where", "modal", "s.py")
     assert result.exit_code != 0
-    assert "--where local" in result.output
+    assert "--where local" in _plain(result.output)
     result = _invoke("--access", "mount,local", "s.py")
     assert result.exit_code != 0
-    assert "Unknown access method" in result.output
+    assert "Unknown access method" in _plain(result.output)
     assert not captured
 
 
