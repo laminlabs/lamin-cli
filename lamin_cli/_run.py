@@ -20,8 +20,23 @@ from lamindb_setup import logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from lamin_cli.mount._credentials import RefreshedCredentialsFile
+
 WHERE_ENV = "LAMIN_RUN_WHERE"
 DEFAULT_WHERE = "local"
+# how a `lamin://` argument reaches the target, tried in the order the user lists
+# them for each URI: a path in a mount (or local storage), a path in the cache, a
+# presigned URL, or an unsigned storage URL with credentials for the target
+ACCESS_METHODS = ("mount", "cache", "presigned", "credentials")
+ACCESS_ENV = "LAMIN_RUN_ACCESS"
+# a target that opens its arguments as files breaks on a URL, so URLs are opt-in
+DEFAULT_ACCESS: tuple[str, ...] = ("mount", "cache")
+DEFAULT_PRESIGN_EXPIRY = 3600
+# how credentials reach the target with --access credentials: environment variables
+# fixed at launch, a shared credentials file kept fresh by lamin, or an AWS config
+# whose `credential_process` makes the AWS SDKs fetch fresh credentials themselves
+CREDENTIALS_VIA = ("env", "file", "process")
+_AWS_SECRET_ENV = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN")
 SCRIPT_SUFFIXES = {".py", ".pyw", ".sh", ".bash", ".zsh", ".r", ".R", ".Rmd", ".qmd"}
 
 # lamindb run status codes, see `Run.status`
@@ -49,6 +64,9 @@ class RunRequest:
     space: str | None = None
     upload_outputs: bool = False
     dry_run: bool = False
+    access: tuple[str, ...] = DEFAULT_ACCESS
+    presign_expiry: int = DEFAULT_PRESIGN_EXPIRY
+    credentials_via: str = "env"
 
 
 @dataclass(frozen=True)
@@ -114,18 +132,293 @@ def dispatch(where: str, request: RunRequest) -> int:
     return EXECUTORS[validate_where(where)].run(request)
 
 
+# -- access --------------------------------------------------------------------
+
+
+def _access_setting_path() -> Path:
+    from lamindb_setup.core._settings_store import settings_dir
+
+    return Path(settings_dir) / "run-access.txt"
+
+
+def parse_access(value: str) -> tuple[str, ...]:
+    """Parse an ordered, comma-separated list of access methods."""
+    methods = tuple(part.strip() for part in value.split(",") if part.strip())
+    if not methods:
+        raise RunError(
+            f"No access method given. Choose from: {', '.join(ACCESS_METHODS)}."
+        )
+    unknown = [method for method in methods if method not in ACCESS_METHODS]
+    if unknown:
+        raise RunError(
+            f"Unknown access method(s) {', '.join(map(repr, unknown))}. Choose from:"
+            f" {', '.join(ACCESS_METHODS)}."
+        )
+    duplicated = sorted({method for method in methods if methods.count(method) > 1})
+    if duplicated:
+        raise RunError(f"Access method(s) listed twice: {', '.join(duplicated)}.")
+    return methods
+
+
+def read_access_setting() -> str | None:
+    path = _access_setting_path()
+    if not path.exists():
+        return None
+    value = path.read_text().strip()
+    return value or None
+
+
+def write_access_setting(value: str | None) -> None:
+    path = _access_setting_path()
+    if value is None:
+        path.unlink(missing_ok=True)
+        return
+    methods = parse_access(value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(",".join(methods) + "\n")
+
+
+def resolve_access(flag: str | None) -> tuple[tuple[str, ...], str]:
+    """Pick the access methods: flag, then environment, then setting, then default."""
+    for value, source in (
+        (flag, "--access"),
+        (os.environ.get(ACCESS_ENV) or None, ACCESS_ENV),
+        (read_access_setting(), "lamin settings run-access"),
+    ):
+        if value is not None:
+            try:
+                return parse_access(value), source
+            except RunError as error:
+                raise RunError(f"{error} (from {source})") from None
+    return DEFAULT_ACCESS, "default"
+
+
 # -- argument translation ------------------------------------------------------
 
 
 @dataclass
 class Translation:
-    """How a `lamin://` argument was turned into a local path."""
+    """How a `lamin://` argument was turned into a local path or a URL."""
 
     uri: str
     local_path: Path
-    via: Literal["mount", "local", "cache"]
+    via: Literal["mount", "local", "cache", "presigned", "credentials"]
     artifact: object = field(repr=False, default=None)
     in_current_instance: bool = True
+    # what replaces the URI when that is a URL rather than a path (`local_path` then
+    # holds a `str`); for a presigned URL it differs from what may be shown or logged
+    display: str | None = None
+    # credentials handed to the target through its environment, never through argv
+    env: dict[str, str] = field(default_factory=dict, repr=False)
+    # access methods tried before this one, and why they could not serve the URI
+    skipped: list[tuple[str, str]] = field(default_factory=list)
+
+    @property
+    def shown(self) -> str:
+        """The replacement without any secret, safe to print and log."""
+        return self.display or str(self.local_path)
+
+
+class AccessUnavailable(Exception):
+    """An access method cannot serve a URI, so the next allowed one is tried."""
+
+    def __init__(self, reason: str, routine: bool = False):
+        super().__init__(reason)
+        # an expected miss, e.g. an unmounted storage location, is not worth a note
+        self.routine = routine
+
+
+def _with_subpath(local_path: Path, resolved, uri: str) -> Path:
+    if resolved.subpath is None:
+        return local_path
+    local_path = local_path / resolved.subpath
+    if not local_path.exists():
+        raise RunError(f"{resolved.subpath} does not exist in {uri}.")
+    return local_path
+
+
+def _translation(uri: str, resolved, **kwargs) -> Translation:
+    return Translation(
+        uri=uri,
+        artifact=resolved.artifact,
+        in_current_instance=resolved.in_current_instance,
+        **kwargs,
+    )
+
+
+def _access_mount(uri: str, resolved, remount: bool, note) -> Translation:
+    """A path in a mount of the storage location, or in local storage itself."""
+    from lamin_cli.mount._lookup import (
+        LocalPathError,
+        NotMounted,
+        location_from_artifact,
+        resolve_local_path,
+    )
+
+    location = location_from_artifact(resolved.artifact)
+    try:
+        local_path = resolve_local_path(location, remount=remount, note=note)
+    except NotMounted:
+        raise AccessUnavailable("the storage location is not mounted", True) from None
+    except LocalPathError as error:
+        raise AccessUnavailable(str(error)) from None
+    return _translation(
+        uri,
+        resolved,
+        local_path=_with_subpath(local_path, resolved, uri),
+        via="local" if location.mount is None else "mount",
+    )
+
+
+def _access_cache(uri: str, resolved) -> Translation:
+    """A path in the cache, downloading the artifact if it is not there yet."""
+    try:
+        # inputs are linked explicitly once the run exists, see _link_inputs
+        local_path = Path(str(resolved.artifact.cache(is_run_input=False)))
+    except Exception as error:
+        raise AccessUnavailable(f"could not download it: {error}") from error
+    return _translation(
+        uri,
+        resolved,
+        local_path=_with_subpath(local_path, resolved, uri),
+        via="cache",
+    )
+
+
+def _remote_path(resolved):
+    path = resolved.artifact.path
+    if resolved.subpath is not None:
+        path = path / str(resolved.subpath)
+    return path
+
+
+def _access_presigned(uri: str, resolved, expiry: int, sign: bool) -> Translation:
+    """A time-limited https URL that carries its own authorization."""
+    artifact = resolved.artifact
+    protocol = artifact.storage.type
+    if protocol == "local":
+        raise AccessUnavailable("local storage has no URL")
+    if resolved.subpath is None and artifact.n_files is not None:
+        raise AccessUnavailable("it is a folder, and only files can be presigned")
+    path = _remote_path(resolved)
+    unsigned = str(path)
+    if not sign:
+        placeholder = f"<presigned URL for {unsigned}>"
+        return _translation(
+            uri, resolved, local_path=placeholder, via="presigned", display=placeholder
+        )
+    if not hasattr(path.fs, "sign"):
+        raise AccessUnavailable(f"{protocol} storage cannot presign URLs")
+    if resolved.subpath is not None and path.is_dir():
+        raise AccessUnavailable(
+            "it is a folder inside the artifact, and only files can be presigned"
+        )
+    try:
+        url = path.fs.sign(unsigned, expiration=expiry)
+    except Exception as error:
+        hint = (
+            " (signing on GCS needs service account credentials with a private key)"
+            if protocol == "gs"
+            else ""
+        )
+        raise AccessUnavailable(f"signing failed: {error}{hint}") from error
+    return _translation(
+        uri, resolved, local_path=url, via="presigned", display=unsigned
+    )
+
+
+def _access_credentials(
+    uri: str, resolved, sign: bool, chosen_env: dict[str, str]
+) -> Translation:
+    """The unsigned storage URL, with credentials for the target's environment.
+
+    An AWS identity or a GCS token is per process, so a URI whose credentials differ
+    from those of an earlier input cannot use this method.
+    """
+    from lamin_cli.mount import _credentials
+
+    artifact = resolved.artifact
+    protocol = artifact.storage.type
+    if protocol == "local":
+        raise AccessUnavailable("local storage has no URL")
+    if protocol not in {"s3", "gs"}:
+        raise AccessUnavailable(f"only s3 and gs are supported, not {protocol}")
+    path = _remote_path(resolved)
+    env: dict[str, str] = {}
+    if sign and protocol == "gs":
+        try:
+            env = _credentials.gcs_access_token_env(path)
+        except Exception as error:
+            raise AccessUnavailable(
+                f"could not get GCS credentials: {error}"
+            ) from error
+    elif sign and not _credentials.is_anonymous(path):
+        env = _credentials.credential_env(path, protocol)
+        if not env:
+            credentials = _credentials.fetch_aws_credentials(artifact.storage.root)
+            if credentials:
+                env = {
+                    "AWS_ACCESS_KEY_ID": str(credentials["key"]),
+                    "AWS_SECRET_ACCESS_KEY": str(credentials["secret"]),
+                }
+                if credentials.get("token"):
+                    env["AWS_SESSION_TOKEN"] = str(credentials["token"])
+        endpoint = _credentials.endpoint_url(path)
+        if endpoint:
+            env["AWS_ENDPOINT_URL"] = endpoint
+    clashing = sorted(
+        name for name, value in env.items() if chosen_env.get(name, value) != value
+    )
+    if clashing:
+        raise AccessUnavailable(
+            "it needs other credentials than an earlier input, and one process"
+            f" holds one identity ({', '.join(clashing)})"
+        )
+    return _translation(uri, resolved, local_path=str(path), via="credentials", env=env)
+
+
+def resolve_uri(
+    uri: str,
+    access: tuple[str, ...] = DEFAULT_ACCESS,
+    *,
+    remount: bool = False,
+    note: Callable[[str], None] | None = None,
+    expiry: int = DEFAULT_PRESIGN_EXPIRY,
+    sign: bool = True,
+    chosen_env: dict[str, str] | None = None,
+) -> Translation:
+    """Resolve a URI with the first allowed access method that can serve it.
+
+    `chosen_env` holds the credentials earlier inputs already put into the target's
+    environment. With `sign=False` nothing is signed and no credentials are fetched,
+    which is what a dry run needs; it then cannot detect clashing credentials.
+    """
+    from lamin_cli._uri import resolve_lamin_uri
+
+    resolved = resolve_lamin_uri(uri)
+    reasons: list[tuple[str, AccessUnavailable]] = []
+    for method in access:
+        try:
+            if method == "mount":
+                translation = _access_mount(uri, resolved, remount, note)
+            elif method == "cache":
+                translation = _access_cache(uri, resolved)
+            elif method == "presigned":
+                translation = _access_presigned(uri, resolved, expiry, sign)
+            else:
+                translation = _access_credentials(uri, resolved, sign, chosen_env or {})
+        except AccessUnavailable as reason:
+            reasons.append((method, reason))
+            continue
+        translation.skipped = [
+            (name, str(reason)) for name, reason in reasons if not reason.routine
+        ]
+        return translation
+    details = "".join(f"\n  {name}: {reason}" for name, reason in reasons)
+    raise RunError(
+        f"No allowed access method can serve {uri} (--access"
+        f" {','.join(access)}):{details}"
+    )
 
 
 def resolve_uri_to_local_path(
@@ -137,54 +430,152 @@ def resolve_uri_to_local_path(
     location is read in place, staleness is detected and refreshed, and only when the
     storage location is not mounted at all does it fall back to the cache.
     """
-    from lamin_cli._uri import resolve_lamin_uri
-    from lamin_cli.mount._lookup import (
-        NotMounted,
-        location_from_artifact,
-        resolve_local_path,
+    return resolve_uri(uri, DEFAULT_ACCESS, remount=remount, note=note)
+
+
+def merge_credential_env(translations) -> dict[str, str]:
+    """Combine the credentials of all translations, refusing to mix identities."""
+    merged: dict[str, str] = {}
+    for translation in translations:
+        for name, value in translation.env.items():
+            if merged.setdefault(name, value) != value:
+                raise RunError(
+                    "The lamin:// URIs need different credentials for the same"
+                    f" environment variable ({name}), which one process cannot hold."
+                    " Allow presigned or mount in --access instead."
+                )
+    return merged
+
+
+@dataclass
+class ManagedCredentials:
+    """Credentials delivered other than through fixed environment variables."""
+
+    # replaces the AWS_* secrets of the environment when non-empty
+    env: dict[str, str] = field(default_factory=dict)
+    file: RefreshedCredentialsFile | None = None
+
+    def stop(self) -> None:
+        if self.file is not None:
+            self.file.stop()
+
+
+def _credential_roots(translations) -> list[str]:
+    """Storage roots read with AWS credentials; gs tokens always use the environment."""
+    return list(
+        dict.fromkeys(
+            t.artifact.storage.root
+            for t in translations
+            if "AWS_ACCESS_KEY_ID" in t.env
+        )
     )
 
-    resolved = resolve_lamin_uri(uri)
-    location = location_from_artifact(resolved.artifact)
-    try:
-        local_path = resolve_local_path(location, remount=remount, note=note)
-        via: Literal["mount", "local", "cache"] = (
-            "local" if location.mount is None else "mount"
+
+def validate_credentials_via(translations, via: str) -> None:
+    """Reject, before a run exists, a delivery the credentials cannot support.
+
+    Credentials are per provider: s3 and gs inputs can be mixed, with gs tokens always
+    passed through the environment. Only one s3 identity fits in one process though,
+    which `merge_credential_env` enforces.
+    """
+    if via == "env":
+        return
+    from lamin_cli.mount._credentials import fetch_aws_credentials
+
+    roots = _credential_roots(translations)
+    gs = [t for t in translations if t.artifact.storage.type == "gs"]
+    if gs and not roots:
+        raise RunError(
+            f"--credentials-via {via} only supports s3 storage, but {gs[0].uri} is in"
+            " gs storage. GCS tokens are only passed through the environment."
         )
-    except NotMounted:
-        # inputs are linked explicitly once the run exists, see _link_inputs
-        local_path = Path(str(resolved.artifact.cache(is_run_input=False)))
-        via = "cache"
-    if resolved.subpath is not None:
-        local_path = local_path / resolved.subpath
-        if not local_path.exists():
-            raise RunError(f"{resolved.subpath} does not exist in {uri}.")
-    return Translation(
-        uri=uri,
-        local_path=local_path,
-        via=via,
-        artifact=resolved.artifact,
-        in_current_instance=resolved.in_current_instance,
+    if via == "process":
+        for root in roots:
+            if fetch_aws_credentials(root) is None:
+                raise RunError(
+                    "--credentials-via process needs credentials that LaminHub can"
+                    f" reissue, which {root} does not have. Use --credentials-via env"
+                    " or file."
+                )
+
+
+def start_managed_credentials(
+    translations, via: str, note: Callable[[str], None] | None = None
+) -> ManagedCredentials:
+    """Set up how the target gets its credentials, beyond plain environment variables.
+
+    `file` writes a shared credentials file that a thread refreshes for the life of
+    the run. `process` writes an AWS config whose `credential_process` re-runs lamin
+    for fresh credentials; it holds no secrets. Either way the target's environment
+    names the profile instead of carrying the secrets.
+    """
+    from lamin_cli.mount._credentials import (
+        PROFILE_NAME,
+        RefreshedCredentialsFile,
+        write_profile_config,
     )
+
+    merged = merge_credential_env(translations)
+    roots = _credential_roots(translations)
+    if via == "env" or "AWS_ACCESS_KEY_ID" not in merged or not roots:
+        return ManagedCredentials()
+    endpoint = merged.get("AWS_ENDPOINT_URL")
+    env = {"AWS_PROFILE": PROFILE_NAME}
+    if endpoint:
+        env["AWS_ENDPOINT_URL"] = endpoint
+    if via == "file":
+        file = RefreshedCredentialsFile(
+            roots[0],
+            {
+                "key": merged["AWS_ACCESS_KEY_ID"],
+                "secret": merged["AWS_SECRET_ACCESS_KEY"],
+                "token": merged.get("AWS_SESSION_TOKEN"),
+            },
+            note,
+        )
+        file.start()
+        env["AWS_SHARED_CREDENTIALS_FILE"] = str(file.path)
+        return ManagedCredentials(env=env, file=file)
+    env["AWS_CONFIG_FILE"] = str(write_profile_config(roots[0], endpoint))
+    # a stray `lamin` profile in the user's own file would otherwise win
+    env["AWS_SHARED_CREDENTIALS_FILE"] = os.devnull
+    return ManagedCredentials(env=env)
 
 
 def translate_argv(
-    argv: list[str], remount: bool = False, note: Callable[[str], None] | None = None
+    argv: list[str],
+    remount: bool = False,
+    note: Callable[[str], None] | None = None,
+    access: tuple[str, ...] = DEFAULT_ACCESS,
+    expiry: int = DEFAULT_PRESIGN_EXPIRY,
+    sign: bool = True,
 ) -> tuple[list[str], list[Translation]]:
-    """Replace `lamin://` URIs in an argument vector with local paths.
+    """Replace `lamin://` URIs in an argument vector with local paths or URLs.
 
     Both bare arguments and `--flag=lamin://...` are translated. Everything else is
-    passed through untouched.
+    passed through untouched. Each URI gets the first method in `access` that can
+    serve it, see `resolve_uri`. URIs are resolved in argument order, so with
+    `credentials` the first input decides which identity the process holds.
     """
     from lamin_cli._uri import is_lamin_uri
 
     translated: list[str] = []
     translations: list[Translation] = []
     cache: dict[str, Translation] = {}
+    chosen_env: dict[str, str] = {}
 
     def resolve(uri: str) -> str:
         if uri not in cache:
-            cache[uri] = resolve_uri_to_local_path(uri, remount=remount, note=note)
+            cache[uri] = resolve_uri(
+                uri,
+                access,
+                remount=remount,
+                note=note,
+                expiry=expiry,
+                sign=sign,
+                chosen_env=chosen_env,
+            )
+            chosen_env.update(cache[uri].env)
             translations.append(cache[uri])
         return str(cache[uri].local_path)
 
@@ -198,6 +589,14 @@ def translate_argv(
             continue
         translated.append(arg)
     return translated, translations
+
+
+def describe_translation(translation: Translation) -> str:
+    """One line on how a URI was resolved, without secrets."""
+    line = f"{translation.uri} -> {translation.shown} (via {translation.via})"
+    for method, reason in translation.skipped:
+        line += f"\n  skipped {method}: {reason}"
+    return line
 
 
 def child_environment(run_uid: str, project: str | None, translations) -> dict:
@@ -214,6 +613,7 @@ def child_environment(run_uid: str, project: str | None, translations) -> dict:
         "LAMIN_MOUNTS": json.dumps(
             {record.storage_root: record.mountpoint for record in _registry.prune()}
         ),
+        **merge_credential_env(translations),
     }
     if project is not None:
         env["LAMIN_CURRENT_PROJECT"] = project
@@ -568,9 +968,16 @@ def _prepare_run(request: RunRequest):
     project_record = _resolve_project(request)
     branch, space = _resolve_branch_and_space(request)
 
-    target_args, translations = translate_argv(request.args, request.remount, _note)
+    target_args, translations = translate_argv(
+        request.args,
+        request.remount,
+        _note,
+        request.access,
+        request.presign_expiry,
+    )
+    validate_credentials_via(translations, request.credentials_via)
     for translation in translations:
-        _note(f"{translation.uri} -> {translation.local_path} (via {translation.via})")
+        _note(describe_translation(translation))
     child_argv = [*command_for(target), *target_args]
 
     transform, tool_version = _prepare_transform(target, kind, branch, space)
@@ -618,19 +1025,26 @@ def run_local(request: RunRequest) -> int:
         if Path(target).suffix in {".py", ".pyw"}:
             _track_child_python_environment(run)
 
-    env = {
-        **os.environ,
-        **child_environment(run.uid, request.project, translations),
-    }
-    env.setdefault("PYTHONUNBUFFERED", "1")
-
     previous_run = ln.context.run
     ln.context._run = run
     # started outside the redirection, so that it tees the real stdout
     ln.context._stream_tracker.start(run)
     _lamin_logs_to_stderr()
     returncode = STATUS_ERRORED
+    credentials = ManagedCredentials()
     try:
+        credentials = start_managed_credentials(
+            translations, request.credentials_via, _note
+        )
+        env = {
+            **os.environ,
+            **child_environment(run.uid, request.project, translations),
+        }
+        if credentials.env:
+            for name in _AWS_SECRET_ENV:
+                env.pop(name, None)
+            env.update(credentials.env)
+        env.setdefault("PYTHONUNBUFFERED", "1")
         try:
             returncode = run_teed(child_argv, env)
         except FileNotFoundError:
@@ -650,6 +1064,7 @@ def run_local(request: RunRequest) -> int:
         else:
             _note(f"{Path(target).name} exited with code {returncode}")
     finally:
+        credentials.stop()
         run._status_code = status_code_for(returncode)
         run.finished_at = datetime.now(timezone.utc)
         ln.context._stream_tracker.finish()
@@ -681,8 +1096,19 @@ def run_dry(request: RunRequest) -> int:
     project_record = _resolve_project(request)
     branch, space = _resolve_branch_and_space(request)
 
-    target_args, translations = translate_argv(request.args, request.remount, _note)
+    target_args, translations = translate_argv(
+        request.args,
+        request.remount,
+        _note,
+        request.access,
+        request.presign_expiry,
+        sign=False,
+    )
     child_argv = [*command_for(target), *target_args]
+    if request.credentials_via != "env" and any(
+        t.via == "credentials" for t in translations
+    ):
+        _note(f"would deliver credentials via {request.credentials_via}")
 
     _note(f"would run: {shlex.join(child_argv)}")
     _note(f"branch: {branch.name!r} | space: {space.name!r}")
@@ -710,14 +1136,11 @@ def run_dry(request: RunRequest) -> int:
 
     for translation in translations:
         if translation.in_current_instance:
-            _note(
-                f"input: {translation.uri} -> {translation.local_path}"
-                f" (via {translation.via})"
-            )
+            _note(f"input: {describe_translation(translation)}")
         else:
             _note(
-                f"input: {translation.uri} -> {translation.local_path}"
-                f" (via {translation.via}, in another instance, would NOT be linked)"
+                f"input: {describe_translation(translation)}"
+                "\n  in another instance, would NOT be linked"
             )
 
     output_paths = collect_output_paths(

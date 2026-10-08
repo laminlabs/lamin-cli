@@ -1450,6 +1450,8 @@ class _RunCommand(_CommandBase):  # type: ignore[misc,valid-type]
             raise
 
 
+from lamin_cli._run import CREDENTIALS_VIA as RUN_CREDENTIALS_VIA
+from lamin_cli._run import DEFAULT_PRESIGN_EXPIRY
 from lamin_cli._run import EXECUTORS as RUN_EXECUTORS
 
 _MODAL_ONLY = ("image_url", "packages", "cpu", "gpu")
@@ -1461,6 +1463,9 @@ _MODAL_ONLY = ("image_url", "packages", "cpu", "gpu")
 @click.option("--where", type=click.Choice(list(RUN_EXECUTORS)), default=None, help="Where to run. Defaults to $LAMIN_RUN_WHERE, then `lamin settings run-where`, then local.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid to link the run to. On Modal, also names the app.")
 @click.option("--register-output", "register_outputs", multiple=True, type=str, help="Register a file the target writes as an output artifact. Repeatable.")
+@click.option("--access", type=str, default=None, help="Ordered, comma-separated access methods for `lamin://` URIs in the arguments; each URI gets the first that can serve it: `mount` (path in a mount or local storage), `cache` (path in the cache, downloading), `presigned` (https URL), `credentials` (storage URL plus credentials). Defaults to $LAMIN_RUN_ACCESS, then `lamin settings run-access`, then mount,cache.")
+@click.option("--presign-expiry", type=click.IntRange(min=1), default=DEFAULT_PRESIGN_EXPIRY, show_default=True, help="Seconds a presigned URL stays valid. Only when --access allows presigned.")
+@click.option("--credentials-via", type=click.Choice(list(RUN_CREDENTIALS_VIA)), default="env", show_default=True, help="How credentials reach the target when --access allows credentials: `env` (environment variables, fixed at launch), `file` (an AWS credentials file that lamin keeps fresh), `process` (an AWS config whose credential_process fetches fresh credentials; AWS SDKs only). Use file or process for long runs. s3 only for file and process.")
 @click.option("--remount", is_flag=True, default=False, help="Remount a storage location if it serves stale metadata for an input.")
 @click.option("--image-url", type=str, default=None, help="Modal only: a URL to the base docker image.")
 @click.option("--packages", type=str, default=None, help="Modal only: a comma-separated list of additional packages.")
@@ -1478,6 +1483,9 @@ def run(
     where: str | None,
     project: str | None,
     register_outputs: tuple[str, ...],
+    access: str | None,
+    presign_expiry: int,
+    credentials_via: str,
     remount: bool,
     image_url: str | None,
     packages: str | None,
@@ -1500,6 +1508,45 @@ def run(
     lamin run --register-output out.bam align.sh -- --out out.bam
     lamin run --where modal --project my_project my_script.py
     lamin run --dry-run align.sh -- --out out.bam
+    ```
+
+    `--access` lists, in order, which methods may hand an input to the target. Each
+    URI gets the first one that can serve it, and the log shows which one did and why
+    earlier ones could not:
+
+    - `mount`: a path inside a mount of its storage location, or in local storage
+    - `cache`: a path in the cache, downloading the artifact if needed
+    - `presigned`: a time-limited https URL (see `--presign-expiry`); files only
+    - `credentials`: the unsigned storage URL, e.g. `s3://bucket/key` or
+      `gs://bucket/key`, with credentials for the target: `AWS_*` variables (s3) or
+      an access token in `CLOUDSDK_AUTH_ACCESS_TOKEN` and `GOOGLE_OAUTH_ACCESS_TOKEN`
+      (gs)
+
+    The default is `mount,cache`, so a target always gets local paths unless URLs are
+    allowed. If no allowed method can serve a URI, nothing runs and the error lists
+    why each failed. The list is as much about what to forbid as about order:
+    `mount,presigned` never downloads, `mount,cache` never hands out URLs. Set a
+    default with `$LAMIN_RUN_ACCESS` or `lamin settings run-access`.
+
+    A process holds one AWS identity and one GCS token, so `credentials` serves
+    inputs in argument order until one needs other credentials than an earlier one;
+    that input falls through to the next allowed method. Mounts and presigned URLs
+    carry per-location authorization, so allow one of them when inputs live in
+    storage locations with different credentials.
+
+    Environment variables are fixed when the target starts. For long runs on s3, pass
+    `--credentials-via file`: lamin writes an AWS credentials file, refreshes it from
+    LaminHub while the target runs, and points `AWS_SHARED_CREDENTIALS_FILE` at it,
+    which helps tools that re-read it. AWS SDKs (boto3, aws cli) cache what they
+    read, so use `--credentials-via process` for them instead: `AWS_CONFIG_FILE` then
+    names a profile whose `credential_process` runs lamin to fetch fresh credentials
+    whenever the SDK needs them. Tools with their own S3 client that read neither
+    need `env`, or a mount (`lamin settings mount`).
+
+    ```
+    lamin run --access mount,presigned samtools -- view lamin://acme/data/artifact/key/a.bam
+    lamin run --access credentials aws -- s3 cp lamin://acme/data/artifact/3TrLu3AbQx9dZq2K -
+    lamin run --access mount,presigned,credentials,cache tool.sh -- lamin://... lamin://...
     ```
 
     URIs take two forms. The uid form matches nf-lamin; the key form accepts
@@ -1531,11 +1578,19 @@ def run(
 
     → Python/R alternative: no equivalent
     """
-    from lamin_cli._run import RunError, RunRequest, dispatch, resolve_where
+    from lamin_cli._run import (
+        DEFAULT_ACCESS,
+        RunError,
+        RunRequest,
+        dispatch,
+        resolve_access,
+        resolve_where,
+    )
     from lamin_cli._uri import InvalidLaminUri, UnresolvableLaminUri
 
     try:
         where_value, source = resolve_where(where)
+        access_methods, _ = resolve_access(access)
     except RunError as error:
         raise click.ClickException(str(error)) from None
 
@@ -1551,6 +1606,12 @@ def run(
             f" {where_value} (from {source}). If meant for the target, pass it after"
             f" `--`: lamin run {target} -- {modal_only[0]} ..."
         )
+    if access is not None and where_value != "local":
+        raise click.ClickException("--access only supports --where local.")
+    if "presigned" not in access_methods and presign_expiry != DEFAULT_PRESIGN_EXPIRY:
+        raise click.ClickException("--presign-expiry only applies when --access allows presigned.")
+    if "credentials" not in access_methods and credentials_via != "env":
+        raise click.ClickException("--credentials-via only applies when --access allows credentials.")
     if dry_run and where_value == "modal":
         raise click.ClickException("--dry-run only supports --where local.")
 
@@ -1568,6 +1629,9 @@ def run(
         space=space,
         upload_outputs=upload_outputs,
         dry_run=dry_run,
+        access=access_methods,
+        presign_expiry=presign_expiry,
+        credentials_via=credentials_via,
     )
     try:
         if dry_run:

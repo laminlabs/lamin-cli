@@ -23,6 +23,7 @@ def settings(ctx):
     - `space` → current {attr}`~lamindb.setup.core.SetupSettings.space`
     - `mount` → read-only mounts of storage locations, used by `lamin run` to read inputs in place
     - `run-where` → default place for `lamin run` (overridden by `$LAMIN_RUN_WHERE` and `--where`)
+    - `run-access` → default access methods for inputs of `lamin run` (overridden by `$LAMIN_RUN_ACCESS` and `--access`)
 
     You can display your current settings by running: `lamin info`
 
@@ -54,6 +55,10 @@ def settings(ctx):
     lamin settings run-where get
     lamin settings run-where set modal
     lamin settings run-where unset
+    # run-access
+    lamin settings run-access get
+    lamin settings run-access set mount,presigned,credentials
+    lamin settings run-access unset
     ```
 
     → Python/R alternative: {attr}`~lamindb.setup.core.SetupSettings.dev_dir`, {attr}`~lamindb.setup.core.SetupSettings.cache_dir`, {attr}`~lamindb.setup.core.SetupSettings.modules`, {attr}`~lamindb.setup.core.SetupSettings.branch`, and {attr}`~lamindb.setup.core.SetupSettings.space`
@@ -172,6 +177,51 @@ def run_where_unset():
 
 
 settings.add_command(run_where_group)
+
+
+# -----------------------------------------------------------------------------
+# run-access group (pattern: lamin settings run-access get/set)
+# -----------------------------------------------------------------------------
+
+
+@click.group("run-access")
+def run_access_group():
+    """Get or set how `lamin run` hands inputs to the target by default."""
+
+
+@run_access_group.command("get")
+def run_access_get():
+    """Show the default access methods and where that default comes from."""
+    from lamin_cli._run import RunError, resolve_access
+
+    try:
+        methods, source = resolve_access(None)
+    except RunError as error:
+        raise click.ClickException(str(error)) from None
+    click.echo(f"{','.join(methods)} (from {source})")
+
+
+@run_access_group.command("set")
+@click.argument("value", type=str)
+def run_access_set(value: str):
+    """Set the default access methods, in order, e.g. `mount,presigned,credentials`."""
+    from lamin_cli._run import RunError, write_access_setting
+
+    try:
+        write_access_setting(value)
+    except RunError as error:
+        raise click.ClickException(str(error)) from None
+
+
+@run_access_group.command("unset")
+def run_access_unset():
+    """Unset the default access methods, falling back to `mount,cache`."""
+    from lamin_cli._run import write_access_setting
+
+    write_access_setting(None)
+
+
+settings.add_command(run_access_group)
 
 
 # -----------------------------------------------------------------------------
