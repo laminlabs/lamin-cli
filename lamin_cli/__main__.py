@@ -1620,7 +1620,12 @@ def notion():
     "--depth",
     type=click.IntRange(0),
     default=0,
-    help="How many levels of child pages and databases to walk. 0 syncs only this page.",
+    show_default=True,
+    help=(
+        "How many levels of child pages and databases to walk. "
+        "0 syncs only this page: a database id syncs its record type, "
+        "and 1 also syncs its pages."
+    ),
 )
 def notion_sync(
     notion_uuid: str,
