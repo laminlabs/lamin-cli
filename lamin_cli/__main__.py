@@ -1126,7 +1126,7 @@ def track(ctx: click.Context):
     The `lamindb` [skill](https://github.com/laminlabs/lamindb/tree/main/lamindb/.agents) ships with the package. After installing `lamindb`, run `uvx library-skills --skill lamindb` so your agent can read it. It will call:
 
     ```
-    lamin track claude   # or: lamin track copilot, or: lamin track cursor
+    lamin track claude   # or: lamin track copilot, lamin track cursor, or lamin track codex
     # work with the agent
     lamin finish
     ```
@@ -1213,10 +1213,33 @@ def track_cursor_command(name: str | None) -> None:
     return track_cursor_session(name=name)
 
 
+@track.command("codex")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    help="One-sentence name for this agent session.",
+)
+def track_codex_command(name: str | None) -> None:
+    """Start or resume tracking a Codex session in LaminDB.
+
+    Creates a Codex run, or resumes the existing run for a follow-up in the
+    same conversation. Writes the active run UID to `.codex/` so that
+    `lamin finish` can close the active tracking cycle.
+
+    On `lamin finish`, records `n_steps`, `n_tool_calls`, and `n_tokens` on
+    `run.extra_data`. `n_tokens` is the sum of each rollout file's final
+    cumulative `total_tokens`.
+    """
+    from lamin_cli.agents.codex import track_codex_session
+
+    return track_codex_session(name=name)
+
+
 def _finish_tracked_session() -> None:
     """Finish a tracked session.
 
-    This can be a shell script run, a Claude Code, Copilot, or Cursor session.
+    This can be a shell script run, or a Claude Code, Copilot, Cursor, or Codex session.
     """
     if os.environ.get("CURSOR_AGENT"):
         from lamin_cli.agents.cursor import finish_cursor_session
@@ -1231,6 +1254,11 @@ def _finish_tracked_session() -> None:
     if _session_id_from_env():
         from lamin_cli.agents.copilot import finish_copilot_session
         return finish_copilot_session()
+
+    from lamin_cli.agents.codex import _thread_id_from_env
+    if _thread_id_from_env():
+        from lamin_cli.agents.codex import finish_codex_session
+        return finish_codex_session()
 
     from lamin_cli._context import finish as finish_
     return finish_()
@@ -1250,7 +1278,7 @@ def track_finish_command() -> None:
 def finish():
     """Finish a tracked session.
 
-    This can be a shell script run, a Claude Code, Copilot, or Cursor session.
+    This can be a shell script run, or a Claude Code, Copilot, Cursor, or Codex session.
 
     → Python/R alternative: {func}`~lamindb.finish` for (non-shell) scripts or notebooks
     """
