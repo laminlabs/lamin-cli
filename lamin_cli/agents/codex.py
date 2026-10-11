@@ -243,23 +243,11 @@ def _append_item(entries: list[dict], item: dict, counts: dict[str, int]) -> Non
     )
 
 
-def _token_total(payload: dict) -> int | None:
-    info = payload.get("info")
-    if not isinstance(info, dict):
-        return None
-    usage = info.get("total_token_usage")
-    if not isinstance(usage, dict):
-        return None
-    total = usage.get("total_tokens")
-    return total if isinstance(total, int) else None
-
-
 def _load_transcript(thread_id: str) -> tuple[list[dict], dict[str, int], Path | None]:
     entries: list[dict] = []
-    counts = {"n_tokens": 0, "n_steps": 0, "n_tool_calls": 0}
+    counts = {"n_steps": 0, "n_tool_calls": 0}
     paths = _rollout_paths(thread_id)
     for path in paths:
-        file_tokens: int | None = None
         with path.open() as handle:
             for line in handle:
                 line = line.strip()
@@ -270,20 +258,11 @@ def _load_transcript(thread_id: str) -> tuple[list[dict], dict[str, int], Path |
                 except json.JSONDecodeError:
                     continue
                 payload = entry.get("payload")
-                if not isinstance(payload, dict):
-                    continue
-                if entry.get("type") == "event_msg" and payload.get("type") == "token_count":
-                    total = _token_total(payload)
-                    if total is not None:
-                        file_tokens = total
-                    continue
-                if payload.get("type") != "item_completed":
+                if not isinstance(payload, dict) or payload.get("type") != "item_completed":
                     continue
                 item = payload.get("item")
                 if isinstance(item, dict):
                     _append_item(entries, item, counts)
-        if file_tokens is not None:
-            counts["n_tokens"] += file_tokens
     newest = paths[-1] if paths else None
     return entries, counts, newest
 

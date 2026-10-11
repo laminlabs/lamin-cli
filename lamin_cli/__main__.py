@@ -1227,9 +1227,7 @@ def track_codex_command(name: str | None) -> None:
     same conversation. Writes the active run UID to `.codex/` so that
     `lamin finish` can close the active tracking cycle.
 
-    On `lamin finish`, records `n_steps`, `n_tool_calls`, and `n_tokens` on
-    `run.extra_data`. `n_tokens` is the sum of each rollout file's final
-    cumulative `total_tokens`.
+    On `lamin finish`, records `n_steps` and `n_tool_calls` on `run.extra_data`.
     """
     from lamin_cli.agents.codex import track_codex_session
 

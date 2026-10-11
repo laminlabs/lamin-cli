@@ -71,13 +71,6 @@ def _sample_rollouts(root: Path) -> None:
                 },
             },
             {"type": "compacted", "payload": {"message": "old history should stay out"}},
-            {
-                "type": "event_msg",
-                "payload": {
-                    "type": "token_count",
-                    "info": {"total_token_usage": {"total_tokens": 10}},
-                },
-            },
         ],
     )
     _write_rollout(
@@ -118,20 +111,6 @@ def _sample_rollouts(root: Path) -> None:
                     "aggregated_output": "/work",
                 }
             ),
-            {
-                "type": "event_msg",
-                "payload": {
-                    "type": "token_count",
-                    "info": {"total_token_usage": {"total_tokens": 4}},
-                },
-            },
-            {
-                "type": "event_msg",
-                "payload": {
-                    "type": "token_count",
-                    "info": {"total_token_usage": {"total_tokens": 7}},
-                },
-            },
             _event(
                 {
                     "type": "CommandExecution",
@@ -178,7 +157,7 @@ def test_rollouts_join_in_time_order_without_hidden_text(tmp_path):
         "pwd",
         "lamin finish",
     ]
-    assert counts == {"n_tokens": 17, "n_steps": 1, "n_tool_calls": 2}
+    assert counts == {"n_steps": 1, "n_tool_calls": 2}
     assert newest is not None
     assert newest.name.startswith("rollout-2026-10-07")
     rendered = "\n".join(json.dumps(entry) for entry in entries)
@@ -211,7 +190,7 @@ def test_finish_report_spans_every_rollout_file(tmp_path):
     assert "/work" in report
     assert "secret developer prompt" not in report
     assert "other chat" not in report
-    assert run.extra_data["n_tokens"] == 17
+    assert run.extra_data["n_steps"] == 1
     assert run.extra_data["n_tool_calls"] == 2
 
     codex.track_codex_session(name="same chat again")
