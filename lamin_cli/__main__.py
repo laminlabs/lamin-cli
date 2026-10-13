@@ -296,14 +296,16 @@ def init(
 @main.command()
 @click.argument("instance", type=str)
 @click.option("--here", is_flag=True, default=False, help="Connect in the current directory without changing the global default instance.")
+@click.option("--use_proxy_db", is_flag=True, help="Use the proxy database connection specified in the hub.")
 # fmt: on
-def connect(instance: str, here: bool):
+def connect(instance: str, here: bool, use_proxy_db: bool):
     """Set the default database for this directory.
 
     This command updates your local configuration to target the specified instance:
     all subsequent CLI commands and Python/R sessions will auto-connect to this instance.
 
     You can pass a slug (`account/name`) or URL (`https://lamin.ai/account/name`).
+    Pass `--use_proxy_db` to connect through the database proxy specified in the hub.
 
     ```
     # set a default database for the current directory (recommended)
@@ -312,11 +314,13 @@ def connect(instance: str, here: bool):
     lamin connect laminlabs/cellxgene
     # use a URL instead of a slug
     lamin connect https://lamin.ai/laminlabs/cellxgene
+    # connect through the database proxy specified in the hub
+    lamin connect laminlabs/cellxgene --use_proxy_db
     ```
 
     → Python/R alternative: create a database object via {class}`~lamindb.DB` or set the default database of your Python/R session via {func}`~lamindb.connect`
     """
-    return connect_(instance, here=here)
+    return connect_(instance, here=here, use_proxy_db=use_proxy_db)
 
 
 @main.command()
