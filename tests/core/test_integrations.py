@@ -12,11 +12,14 @@ def test_notion_sync_forwards_args(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_objects_from_notion(*, notion_uuid, token=None, apply=False, depth=0):
+    def fake_sync_objects_from_notion(
+        *, notion_uuid, token=None, apply=False, depth=0, space=None
+    ):
         calls["token"] = token
         calls["notion_uuid"] = notion_uuid
         calls["apply"] = apply
         calls["depth"] = depth
+        calls["space"] = space
         return DummyReport()
 
     monkeypatch.setattr(
@@ -35,6 +38,8 @@ def test_notion_sync_forwards_args(monkeypatch):
             "--apply",
             "--depth",
             "5",
+            "--space",
+            "team-space",
         ],
     )
 
@@ -44,6 +49,7 @@ def test_notion_sync_forwards_args(monkeypatch):
         "notion_uuid": "page-a",
         "apply": True,
         "depth": 5,
+        "space": "team-space",
     }
     assert result.output == ""
 
@@ -55,11 +61,14 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
         def as_dict(self):
             return {"created": 1, "updated": 2}
 
-    def fake_sync_objects_from_notion(*, notion_uuid, token=None, apply=False, depth=0):
+    def fake_sync_objects_from_notion(
+        *, notion_uuid, token=None, apply=False, depth=0, space=None
+    ):
         calls["token"] = token
         calls["notion_uuid"] = notion_uuid
         calls["apply"] = apply
         calls["depth"] = depth
+        calls["space"] = space
         return DummyReport()
 
     monkeypatch.setattr(
@@ -71,6 +80,7 @@ def test_notion_sync_defaults_to_dry_run(monkeypatch):
     assert result.exit_code == 0, result.output
     assert calls["apply"] is False
     assert calls["depth"] == 0
+    assert calls["space"] is None
 
 
 def test_notion_sync_accepts_zero_depth(monkeypatch):
@@ -80,7 +90,9 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
         def as_dict(self):
             return {"created": 0, "updated": 0}
 
-    def fake_sync_objects_from_notion(*, notion_uuid, token=None, apply=False, depth=0):
+    def fake_sync_objects_from_notion(
+        *, notion_uuid, token=None, apply=False, depth=0, space=None
+    ):
         calls["notion_uuid"] = notion_uuid
         calls["depth"] = depth
         return DummyReport()
@@ -168,3 +180,15 @@ def test_notion_sync_requires_notion_uuid():
 
     assert result.exit_code != 0
     assert "NOTION_UUID" in result.output
+
+
+def test_notion_sync_unknown_space():
+    missing = "missing-notion-space"
+    result = CliRunner().invoke(
+        main,
+        ["integrations", "notion", "sync", "page-a", "--space", missing],
+    )
+
+    assert result.exit_code != 0
+    assert missing in result.output
+    assert "Traceback" not in result.output
