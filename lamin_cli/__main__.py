@@ -1684,7 +1684,7 @@ def integrations():
 
     ```
     lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27
-    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 1 --apply
+    lamin integrations notion sync db7c1d2ec3a6495e859f8d21d533dd27 --depth 1 --space my-space --apply
     ```
 
     → Python/R alternative: {func}`~lamindb.integrations.notion.sync_objects_from_notion`
@@ -1721,21 +1721,33 @@ def notion():
         "and 1 also syncs its pages."
     ),
 )
+@click.option(
+    "--space",
+    type=str,
+    default=None,
+    help="A space name or uid. Defaults to the current space.",
+)
 def notion_sync(
     notion_uuid: str,
     token: str | None,
     apply: bool,
     depth: int,
+    space: str | None,
 ) -> None:
     """Sync a Notion page or database into LaminDB records."""
+    from lamindb.errors import InvalidArgument
     from lamindb.integrations.notion import sync_objects_from_notion
 
-    sync_objects_from_notion(
-        token=token,
-        notion_uuid=notion_uuid,
-        apply=apply,
-        depth=depth,
-    )
+    try:
+        sync_objects_from_notion(
+            token=token,
+            notion_uuid=notion_uuid,
+            apply=apply,
+            depth=depth,
+            space=space,
+        )
+    except InvalidArgument as error:
+        raise click.ClickException(str(error)) from None
 
 
 main.add_command(settings)
