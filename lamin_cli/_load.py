@@ -9,7 +9,12 @@ import click
 from lamindb_setup import logger
 
 from ._context import get_current_run_file
-from ._notes import is_path_within, parse_note_target, resolve_note_record
+from ._notes import (
+    is_path_within,
+    parse_note_target,
+    resolve_note_record,
+    upsert_lamindb_record_uid,
+)
 from ._save import (
     infer_registry_from_path,
     parse_title_r_notebook,
@@ -200,7 +205,10 @@ def load(
                 if response != "y":
                     raise SystemExit("Aborted.")
 
-            target_path.write_text(readme_block.content, encoding="utf-8")
+            target_path.write_text(
+                upsert_lamindb_record_uid(readme_block.content or "", note_record.uid),
+                encoding="utf-8",
+            )
             logger.important(f"note is here: {target_path}")
             return target_path
         case "transform":

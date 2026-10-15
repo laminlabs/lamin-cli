@@ -1,11 +1,197 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import click
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+LAMINDB_KEY = "lamindb"
+LAMINDB_UID_FIELD = "uid"
+_LEGACY_RECORD_UID_KEYS = {"lamindb_record_uid", "lamin_record_uid"}
+_LAMINDB_UID_BLOCK = f"{LAMINDB_KEY}:\n  {LAMINDB_UID_FIELD}: {{uid}}"
+
+# Closing fence must start a line so a `---` inside a value is not the end.
+_FRONT_MATTER_RE = re.compile(r"\A---[ \t]*\r?\n((?:.*\r?\n)*?)---[ \t]*(?:\r?\n|$)")
+
+
+def _split_front_matter(content: str) -> tuple[str, str] | None:
+    match = _FRONT_MATTER_RE.match(content)
+    if match is None:
+        return None
+    return match.group(1), content[match.end() :]
+
+
+def _unquote_scalar(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _front_matter_key(line: str) -> str | None:
+    if line == "" or line[0].isspace() or line.startswith("#"):
+        return None
+    key, separator, _value = line.partition(":")
+    if separator != ":":
+        return None
+    return key.strip()
+
+
+def _scalar(line: str, label: str) -> str:
+    value = _unquote_scalar(line.partition(":")[2].strip())
+    if value == "":
+        raise click.ClickException(f"{label} in front matter is empty.")
+    return value
+
+
+def _nested_key(line: str) -> str | None:
+    if line == "" or not line[0].isspace() or line.lstrip().startswith("#"):
+        return None
+    stripped = line.strip()
+    key, separator, _value = stripped.partition(":")
+    if separator != ":" or key == "" or " " in key:
+        return None
+    return key
+
+
+def parse_lamindb_record_uid(content: str) -> str | None:
+    """Return `lamindb.uid` from leading YAML front matter.
+
+    Also reads flat `lamindb_record_uid` and `lamin_record_uid` keys.
+    Returns None when the file has no front matter or the key is absent.
+    Raises ClickException when the key is present with an empty value.
+    """
+    split = _split_front_matter(content)
+    if split is None:
+        return None
+    block, _rest = split
+    legacy_value: str | None = None
+    nested_value: str | None = None
+    saw_nested_uid = False
+    in_lamindb = False
+    for line in block.splitlines():
+        key = _front_matter_key(line)
+        if key is not None:
+            in_lamindb = key == LAMINDB_KEY and line.partition(":")[2].strip() == ""
+            if key in _LEGACY_RECORD_UID_KEYS and legacy_value is None:
+                legacy_value = _scalar(line, key)
+            continue
+        if in_lamindb and _nested_key(line) == LAMINDB_UID_FIELD:
+            nested_value = _scalar(line, f"{LAMINDB_KEY}.{LAMINDB_UID_FIELD}")
+            saw_nested_uid = True
+    if saw_nested_uid:
+        return nested_value
+    return legacy_value
+
+
+def _with_blank_line_before_body(front_matter: str, body: str) -> str:
+    if body == "" or body.startswith(("\n", "\r")):
+        return f"---\n{front_matter}\n---\n{body}"
+    return f"---\n{front_matter}\n---\n\n{body}"
+
+
+def _uid_line(uid: str) -> str:
+    return f"  {LAMINDB_UID_FIELD}: {uid}"
+
+
+def _upsert_front_matter_lines(lines: list[str], uid: str) -> list[str]:
+    """Write `lamindb.uid` and drop flat legacy uid keys."""
+    new_lines: list[str] = []
+    wrote_uid = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        key = _front_matter_key(line)
+        if key in _LEGACY_RECORD_UID_KEYS:
+            i += 1
+            continue
+        if key == LAMINDB_KEY and line.partition(":")[2].strip() == "":
+            new_lines.append(f"{LAMINDB_KEY}:")
+            i += 1
+            replaced = False
+            while i < len(lines) and _front_matter_key(lines[i]) is None:
+                if _nested_key(lines[i]) == LAMINDB_UID_FIELD:
+                    if not replaced:
+                        new_lines.append(_uid_line(uid))
+                        replaced = True
+                        wrote_uid = True
+                    i += 1
+                    continue
+                new_lines.append(lines[i])
+                i += 1
+            if not replaced:
+                new_lines.append(_uid_line(uid))
+                wrote_uid = True
+            continue
+        new_lines.append(line)
+        i += 1
+    if not wrote_uid:
+        new_lines.extend((f"{LAMINDB_KEY}:", _uid_line(uid)))
+    return new_lines
+
+
+def upsert_lamindb_record_uid(content: str, uid: str) -> str:
+    """Insert or replace `lamindb.uid` in leading YAML front matter."""
+    block_text = _LAMINDB_UID_BLOCK.format(uid=uid)
+    split = _split_front_matter(content)
+    if split is None:
+        if content == "":
+            return f"---\n{block_text}\n---\n"
+        return _with_blank_line_before_body(block_text, content)
+
+    block, rest = split
+    new_lines = _upsert_front_matter_lines(block.splitlines(), uid)
+    # The matcher consumes the newline that closes the fence. `rest` is whatever
+    # followed that newline, including a blank line before the body.
+    return _with_blank_line_before_body("\n".join(new_lines), rest)
+
+
+def _strip_front_matter_lines(lines: list[str]) -> list[str]:
+    """Drop `lamindb.uid` and flat legacy uid keys. Keep every other field."""
+    kept: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        key = _front_matter_key(line)
+        if key in _LEGACY_RECORD_UID_KEYS:
+            i += 1
+            continue
+        if key == LAMINDB_KEY and line.partition(":")[2].strip() == "":
+            i += 1
+            children: list[str] = []
+            while i < len(lines) and _front_matter_key(lines[i]) is None:
+                if _nested_key(lines[i]) != LAMINDB_UID_FIELD:
+                    children.append(lines[i])
+                i += 1
+            if any(child.strip() for child in children):
+                kept.append(f"{LAMINDB_KEY}:")
+                kept.extend(children)
+            continue
+        kept.append(line)
+        i += 1
+    return kept
+
+
+def strip_lamindb_record_uid(content: str) -> str:
+    """Remove `lamindb.uid` from leading front matter before storing a note.
+
+    Other front matter, including other `lamindb` fields, stays. When that
+    leaves the front matter empty, the whole block is removed.
+    """
+    split = _split_front_matter(content)
+    if split is None:
+        return content
+    block, rest = split
+    kept = _strip_front_matter_lines(block.splitlines())
+    if not any(line.strip() for line in kept):
+        if rest.startswith("\r\n"):
+            return rest[2:]
+        if rest.startswith(("\n", "\r")):
+            return rest[1:]
+        return rest
+    return "---\n" + "\n".join(kept) + "\n---\n" + rest
 
 
 def parse_note_target(

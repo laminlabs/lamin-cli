@@ -11,7 +11,13 @@ from lamindb_setup import logger
 from lamindb_setup.core.hashing import hash_file
 
 from lamin_cli._context import get_current_run_file
-from lamin_cli._notes import extract_note_target_from_path, resolve_note_record
+from lamin_cli._notes import (
+    extract_note_target_from_path,
+    parse_lamindb_record_uid,
+    resolve_note_record,
+    strip_lamindb_record_uid,
+    upsert_lamindb_record_uid,
+)
 
 
 def parse_store_kwargs(
@@ -171,6 +177,44 @@ def parse_plan_markdown(content: str) -> str | None:
     return overview or None
 
 
+def _note_record_for_save(ln, *, content: str, type_chain: list[str], note_name: str):
+    """Resolve the note record, preferring `lamindb.uid` over the filename."""
+    record_uid = parse_lamindb_record_uid(content)
+    if record_uid is None:
+        note_record = resolve_note_record(
+            ln=ln,
+            type_chain=type_chain,
+            note_name=note_name,
+            create_if_missing=True,
+        )
+        assert note_record is not None
+        return note_record
+
+    note_record = ln.Record.filter(uid=record_uid).one_or_none()
+    if note_record is None:
+        raise click.ClickException(
+            f"Record with uid '{record_uid}' from lamindb.uid does not exist."
+        )
+    if note_record.name == note_name:
+        return note_record
+
+    conflict = (
+        ln.Record.filter(name=note_name, type=note_record.type)
+        .exclude(uid=note_record.uid)
+        .first()
+    )
+    if conflict is not None:
+        raise click.ClickException(
+            f"Cannot rename record '{note_record.name}' to '{note_name}': "
+            "a record with that name already exists under the same type."
+        )
+    previous_name = note_record.name
+    note_record.name = note_name
+    note_record.save()
+    logger.important(f"renamed record: {previous_name} → {note_name}")
+    return note_record
+
+
 def _save_note_markdown(
     ppath: Path,
     *,
@@ -181,19 +225,17 @@ def _save_note_markdown(
 
     from lamin_cli._annotate import _add_block
 
-    note_record = resolve_note_record(
-        ln=ln,
-        type_chain=type_chain,
-        note_name=note_name,
-        create_if_missing=True,
+    content = ppath.read_text(encoding="utf-8")
+    note_record = _note_record_for_save(
+        ln, content=content, type_chain=type_chain, note_name=note_name
     )
-    assert note_record is not None
-
-    content = ppath.read_text()
+    local_content = upsert_lamindb_record_uid(content, note_record.uid)
+    if local_content != content:
+        ppath.write_text(local_content, encoding="utf-8")
     block = _add_block(
         note_record,
         "record",
-        content,
+        strip_lamindb_record_uid(local_content),
         kind="readme",
     )
     logger.important(f"saved note content: RecordBlock('{block.uid}')")
