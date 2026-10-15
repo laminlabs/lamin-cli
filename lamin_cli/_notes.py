@@ -1,11 +1,103 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import click
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+LAMINDB_RECORD_UID_KEY = "lamindb_record_uid"
+_LEGACY_RECORD_UID_KEY = "lamin_record_uid"
+_RECORD_UID_KEYS = {LAMINDB_RECORD_UID_KEY, _LEGACY_RECORD_UID_KEY}
+
+# Closing fence must start a line so a `---` inside a value is not the end.
+_FRONT_MATTER_RE = re.compile(r"\A---[ \t]*\r?\n((?:.*\r?\n)*?)---[ \t]*(?:\r?\n|$)")
+
+
+def _split_front_matter(content: str) -> tuple[str, str] | None:
+    match = _FRONT_MATTER_RE.match(content)
+    if match is None:
+        return None
+    return match.group(1), content[match.end() :]
+
+
+def _unquote_scalar(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _front_matter_key(line: str) -> str | None:
+    if line == "" or line[0].isspace() or line.startswith("#"):
+        return None
+    key, separator, _value = line.partition(":")
+    if separator != ":":
+        return None
+    return key.strip()
+
+
+def _record_uid_value(line: str) -> str:
+    value = _unquote_scalar(line.partition(":")[2].strip())
+    if value == "":
+        raise click.ClickException(
+            f"{_front_matter_key(line)} in front matter is empty."
+        )
+    return value
+
+
+def parse_lamindb_record_uid(content: str) -> str | None:
+    """Return the record uid from leading YAML front matter.
+
+    Reads `lamindb_record_uid`, and `lamin_record_uid` when that is the only key.
+    Returns None when the file has no front matter or the key is absent.
+    Raises ClickException when the key is present with an empty value.
+    """
+    split = _split_front_matter(content)
+    if split is None:
+        return None
+    block, _rest = split
+    legacy_value: str | None = None
+    for line in block.splitlines():
+        key = _front_matter_key(line)
+        if key == LAMINDB_RECORD_UID_KEY:
+            return _record_uid_value(line)
+        if key == _LEGACY_RECORD_UID_KEY and legacy_value is None:
+            legacy_value = _record_uid_value(line)
+    return legacy_value
+
+
+def _with_blank_line_before_body(front_matter: str, body: str) -> str:
+    if body == "" or body.startswith(("\n", "\r")):
+        return f"---\n{front_matter}\n---\n{body}"
+    return f"---\n{front_matter}\n---\n\n{body}"
+
+
+def upsert_lamindb_record_uid(content: str, uid: str) -> str:
+    """Insert or replace `lamindb_record_uid` in leading YAML front matter."""
+    line = f"{LAMINDB_RECORD_UID_KEY}: {uid}"
+    split = _split_front_matter(content)
+    if split is None:
+        if content == "":
+            return f"---\n{line}\n---\n"
+        return _with_blank_line_before_body(line, content)
+
+    block, rest = split
+    replaced = False
+    new_lines: list[str] = []
+    for existing in block.splitlines():
+        if _front_matter_key(existing) in _RECORD_UID_KEYS:
+            if not replaced:
+                new_lines.append(line)
+                replaced = True
+            continue
+        new_lines.append(existing)
+    if not replaced:
+        new_lines.append(line)
+    # The matcher consumes the newline that closes the fence. `rest` is whatever
+    # followed that newline, including a blank line before the body.
+    return _with_blank_line_before_body("\n".join(new_lines), rest)
 
 
 def parse_note_target(

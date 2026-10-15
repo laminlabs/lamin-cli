@@ -62,6 +62,10 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert readmes.count() == 2
         assert "Second version" in readmes.last().content
         assert readmes.last().is_latest
+        saved_text = note_path.read_text()
+        assert saved_text.count("lamindb_record_uid:") == 1
+        assert f"lamindb_record_uid: {note_record.uid}" in saved_text
+        assert f"lamindb_record_uid: {note_record.uid}" in readmes.last().content
     finally:
         ln.setup.switch("main")
         run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
@@ -948,4 +952,257 @@ def test_load_readme_without_dev_dir_writes_to_cwd_root():
             if block is not None:
                 block.delete(permanent=True)
         ln.setup.switch("main")
+        branch.delete(permanent=True)
+
+
+def test_lamindb_record_uid_front_matter_helpers():
+    import click
+    from lamin_cli._notes import parse_lamindb_record_uid, upsert_lamindb_record_uid
+
+    body = "# Title\n\nbody with\n---\nnot front matter\n"
+    stamped = upsert_lamindb_record_uid(body, "uid123")
+    assert stamped == f"---\nlamindb_record_uid: uid123\n---\n\n{body}"
+    assert parse_lamindb_record_uid(stamped) == "uid123"
+    assert upsert_lamindb_record_uid(stamped, "uid123") == stamped
+
+    existing = "---\ntitle: Hello\n---\n\n# Body\n"
+    assert (
+        upsert_lamindb_record_uid(existing, "abc")
+        == "---\ntitle: Hello\nlamindb_record_uid: abc\n---\n\n# Body\n"
+    )
+    assert (
+        upsert_lamindb_record_uid("---\n---\n# Body\n", "z")
+        == "---\nlamindb_record_uid: z\n---\n\n# Body\n"
+    )
+    legacy = "---\nlamin_record_uid: olduid\n---\n# Body\n"
+    assert parse_lamindb_record_uid(legacy) == "olduid"
+    rewritten = upsert_lamindb_record_uid(legacy, "olduid")
+    assert "lamin_record_uid:" not in rewritten
+    assert rewritten.startswith("---\nlamindb_record_uid: olduid\n---\n\n# Body\n")
+
+    quoted = '---\nlamindb_record_uid: "abc"\nlamindb_record_uid: older\n---\n# Body\n'
+    assert parse_lamindb_record_uid(quoted) == "abc"
+    replaced = upsert_lamindb_record_uid(quoted, "def")
+    assert replaced.count("lamindb_record_uid:") == 1
+    assert parse_lamindb_record_uid(replaced) == "def"
+
+    try:
+        parse_lamindb_record_uid("---\nlamindb_record_uid:\n---\n# x\n")
+    except click.ClickException as error:
+        assert "empty" in str(error)
+    else:
+        raise AssertionError("empty lamindb_record_uid should fail")
+
+
+def test_save_renamed_markdown_note_updates_existing_record():
+    unique = time.time_ns()
+    topic = f"cli-note-uid-topic-{unique}"
+    note_name = "original-note"
+    renamed_name = "renamed-note"
+    branch = ln.Branch(name=f"cli_notes_uid_branch_{unique}").save()
+    type_record = ln.Record(name=topic, is_type=True).save()
+    notes_root = Path(__file__).parent / f"notes_uid_{unique}"
+    note_dir = notes_root / topic
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / f"{note_name}.md"
+    note_path.write_text("---\ntitle: Keep me\n---\n# Original\n\nhello\n")
+    note_record = None
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        note_record = ln.Record.filter(
+            name=note_name, type=type_record, branch=branch
+        ).one()
+        saved = note_path.read_text()
+        assert "title: Keep me" in saved
+        assert saved.index("title:") < saved.index("lamindb_record_uid:")
+        assert f"lamindb_record_uid: {note_record.uid}" in saved
+
+        renamed_path = note_dir / f"{renamed_name}.md"
+        note_path.rename(renamed_path)
+        renamed_path.write_text(saved.replace("# Original", "# Renamed"))
+        result = run_lamin("save", str(renamed_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "renamed record" in result.stdout
+
+        note_record.refresh_from_db()
+        assert note_record.name == renamed_name
+        assert (
+            ln.Record.filter(
+                name=note_name, type=type_record, branch=branch
+            ).one_or_none()
+            is None
+        )
+        assert ln.Record.filter(type=type_record, branch=branch).count() == 1
+        assert f"lamindb_record_uid: {note_record.uid}" in renamed_path.read_text()
+        latest = (
+            note_record.ablocks.filter(kind="readme").order_by("-created_at").first()
+        )
+        assert latest is not None
+        assert "# Renamed" in latest.content
+        assert f"lamindb_record_uid: {note_record.uid}" in latest.content
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        if note_record is not None and (
+            ln.Record.filter(uid=note_record.uid).one_or_none() is not None
+        ):
+            note_record.refresh_from_db()
+            note_record.delete(permanent=True)
+        if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
+            type_record.refresh_from_db()
+            type_record.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_save_markdown_note_unknown_record_uid_errors():
+    unique = time.time_ns()
+    topic = f"cli-note-missing-uid-topic-{unique}"
+    note_name = "missing-uid-note"
+    branch = ln.Branch(name=f"cli_notes_missing_uid_branch_{unique}").save()
+    type_record = ln.Record(name=topic, is_type=True).save()
+    notes_root = Path(__file__).parent / f"notes_missing_uid_{unique}"
+    note_dir = notes_root / topic
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / f"{note_name}.md"
+    note_path.write_text("---\nlamindb_record_uid: missinguid0000\n---\n# Missing\n")
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 1
+        assert "does not exist" in result.stderr
+        assert (
+            ln.Record.filter(
+                name=note_name, type=type_record, branch=branch
+            ).one_or_none()
+            is None
+        )
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
+            type_record.refresh_from_db()
+            type_record.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_save_markdown_note_rename_conflict_errors():
+    unique = time.time_ns()
+    topic = f"cli-note-conflict-topic-{unique}"
+    branch = ln.Branch(name=f"cli_notes_conflict_branch_{unique}").save()
+    type_record = ln.Record(name=topic, is_type=True).save()
+    notes_root = Path(__file__).parent / f"notes_conflict_{unique}"
+    note_dir = notes_root / topic
+    note_dir.mkdir(parents=True, exist_ok=True)
+    path_a = note_dir / "note-a.md"
+    path_b = note_dir / "note-b.md"
+    path_a.write_text("# Note A\n")
+    path_b.write_text("# Note B\n")
+    note_a = None
+    note_b = None
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        for path in (path_a, path_b):
+            result = run_lamin("save", str(path), cwd=notes_root)
+            assert result.returncode == 0, (
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+        note_a = ln.Record.filter(name="note-a", type=type_record, branch=branch).one()
+        note_b = ln.Record.filter(name="note-b", type=type_record, branch=branch).one()
+
+        path_b.write_text(path_a.read_text())
+        result = run_lamin("save", str(path_b), cwd=notes_root)
+        assert result.returncode == 1
+        assert "Cannot rename record" in result.stderr
+        note_a.refresh_from_db()
+        assert note_a.name == "note-a"
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        for note_record in (note_a, note_b):
+            if note_record is not None and (
+                ln.Record.filter(uid=note_record.uid).one_or_none() is not None
+            ):
+                note_record.refresh_from_db()
+                note_record.delete(permanent=True)
+        if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
+            type_record.refresh_from_db()
+            type_record.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_load_markdown_note_inserts_record_uid_when_missing():
+    from lamin_cli._annotate import _add_block
+
+    unique = time.time_ns()
+    topic = f"cli-note-load-uid-topic-{unique}"
+    note_name = "load-uid-note"
+    branch = ln.Branch(name=f"cli_notes_load_uid_branch_{unique}").save()
+    type_record = ln.Record(name=topic, is_type=True).save()
+    notes_root = Path(__file__).parent / f"notes_load_uid_{unique}"
+    note_dir = notes_root / topic
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / f"{note_name}.md"
+    note_path.write_text("# Load me\n\nstill here\n")
+    note_record = None
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        note_record = ln.Record.filter(
+            name=note_name, type=type_record, branch=branch
+        ).one()
+        legacy = _add_block(
+            note_record,
+            "record",
+            "# Load me\n\nstill here\n",
+            kind="readme",
+        )
+
+        note_path.unlink()
+        load_result = run_lamin("load", f"{topic}/{note_name}.md", cwd=notes_root)
+        assert load_result.returncode == 0, (
+            f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
+        )
+        loaded = note_path.read_text()
+        assert loaded.count("lamindb_record_uid:") == 1
+        assert f"lamindb_record_uid: {note_record.uid}" in loaded
+        assert "still here" in loaded
+        legacy.refresh_from_db()
+        assert "lamindb_record_uid" not in legacy.content
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        if note_record is not None and (
+            ln.Record.filter(uid=note_record.uid).one_or_none() is not None
+        ):
+            note_record.refresh_from_db()
+            note_record.delete(permanent=True)
+        if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
+            type_record.refresh_from_db()
+            type_record.delete(permanent=True)
         branch.delete(permanent=True)
