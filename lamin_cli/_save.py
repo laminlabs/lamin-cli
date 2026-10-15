@@ -178,7 +178,7 @@ def parse_plan_markdown(content: str) -> str | None:
 
 
 def _note_record_for_save(ln, *, content: str, type_chain: list[str], note_name: str):
-    """Resolve the note record, preferring `lamindb_record_uid` over the filename."""
+    """Resolve the note record, preferring `lamindb.uid` over the filename."""
     record_uid = parse_lamindb_record_uid(content)
     if record_uid is None:
         note_record = resolve_note_record(
@@ -193,7 +193,7 @@ def _note_record_for_save(ln, *, content: str, type_chain: list[str], note_name:
     note_record = ln.Record.filter(uid=record_uid).one_or_none()
     if note_record is None:
         raise click.ClickException(
-            f"Record with uid '{record_uid}' from lamindb_record_uid does not exist."
+            f"Record with uid '{record_uid}' from lamindb.uid does not exist."
         )
     if note_record.name == note_name:
         return note_record

@@ -63,9 +63,9 @@ def test_save_markdown_note_creates_record_and_recordblock():
         assert "Second version" in readmes.last().content
         assert readmes.last().is_latest
         saved_text = note_path.read_text()
-        assert saved_text.count("lamindb_record_uid:") == 1
-        assert f"lamindb_record_uid: {note_record.uid}" in saved_text
-        assert "lamindb_record_uid" not in readmes.last().content
+        assert saved_text.count("\n  uid:") == 1
+        assert f"uid: {note_record.uid}" in saved_text
+        assert "lamindb:" not in readmes.last().content
         assert readmes.last().content.startswith("# Second version")
     finally:
         ln.setup.switch("main")
@@ -966,46 +966,60 @@ def test_lamindb_record_uid_front_matter_helpers():
 
     body = "# Title\n\nbody with\n---\nnot front matter\n"
     stamped = upsert_lamindb_record_uid(body, "uid123")
-    assert stamped == f"---\nlamindb_record_uid: uid123\n---\n\n{body}"
+    assert stamped == f"---\nlamindb:\n  uid: uid123\n---\n\n{body}"
     assert parse_lamindb_record_uid(stamped) == "uid123"
     assert upsert_lamindb_record_uid(stamped, "uid123") == stamped
 
     existing = "---\ntitle: Hello\n---\n\n# Body\n"
     assert (
         upsert_lamindb_record_uid(existing, "abc")
-        == "---\ntitle: Hello\nlamindb_record_uid: abc\n---\n\n# Body\n"
+        == "---\ntitle: Hello\nlamindb:\n  uid: abc\n---\n\n# Body\n"
     )
     assert (
         upsert_lamindb_record_uid("---\n---\n# Body\n", "z")
-        == "---\nlamindb_record_uid: z\n---\n\n# Body\n"
+        == "---\nlamindb:\n  uid: z\n---\n\n# Body\n"
     )
     legacy = "---\nlamin_record_uid: olduid\n---\n# Body\n"
     assert parse_lamindb_record_uid(legacy) == "olduid"
     rewritten = upsert_lamindb_record_uid(legacy, "olduid")
-    assert "lamin_record_uid:" not in rewritten
-    assert rewritten.startswith("---\nlamindb_record_uid: olduid\n---\n\n# Body\n")
+    assert "lamin_record_uid" not in rewritten
+    assert rewritten.startswith("---\nlamindb:\n  uid: olduid\n---\n\n# Body\n")
 
-    quoted = '---\nlamindb_record_uid: "abc"\nlamindb_record_uid: older\n---\n# Body\n'
-    assert parse_lamindb_record_uid(quoted) == "abc"
-    replaced = upsert_lamindb_record_uid(quoted, "def")
-    assert replaced.count("lamindb_record_uid:") == 1
+    flat = '---\nlamindb_record_uid: "abc"\n---\n# Body\n'
+    assert parse_lamindb_record_uid(flat) == "abc"
+    replaced = upsert_lamindb_record_uid(flat, "def")
+    assert "lamindb_record_uid" not in replaced
+    assert "\n  uid: def\n" in replaced
     assert parse_lamindb_record_uid(replaced) == "def"
 
+    nested = "---\nlamindb:\n  source: notion\n  uid: abc\n---\n# Body\n"
+    assert parse_lamindb_record_uid(nested) == "abc"
+    updated = upsert_lamindb_record_uid(nested, "def")
+    assert "source: notion" in updated
+    assert updated.index("source:") < updated.index("uid:")
+    assert parse_lamindb_record_uid(updated) == "def"
+
     try:
-        parse_lamindb_record_uid("---\nlamindb_record_uid:\n---\n# x\n")
+        parse_lamindb_record_uid("---\nlamindb:\n  uid:\n---\n# x\n")
     except click.ClickException as error:
         assert "empty" in str(error)
     else:
-        raise AssertionError("empty lamindb_record_uid should fail")
+        raise AssertionError("empty lamindb.uid should fail")
 
-    only_uid = "---\nlamindb_record_uid: uid123\n---\n\nIntro:\n"
+    only_uid = "---\nlamindb:\n  uid: uid123\n---\n\nIntro:\n"
     assert strip_lamindb_record_uid(only_uid) == "Intro:\n"
     assert (
         strip_lamindb_record_uid("---\nlamin_record_uid: old\n---\nBody\n") == "Body\n"
     )
-    with_metadata = "---\ntitle: Hello\nlamindb_record_uid: uid123\n---\n\n# Body\n"
+    with_metadata = "---\ntitle: Hello\nlamindb:\n  uid: uid123\n---\n\n# Body\n"
     assert (
         strip_lamindb_record_uid(with_metadata) == "---\ntitle: Hello\n---\n\n# Body\n"
+    )
+    with_lamindb_field = (
+        "---\nlamindb:\n  uid: uid123\n  source: notion\n---\n\n# Body\n"
+    )
+    assert strip_lamindb_record_uid(with_lamindb_field) == (
+        "---\nlamindb:\n  source: notion\n---\n\n# Body\n"
     )
     assert strip_lamindb_record_uid("# No front matter\n") == "# No front matter\n"
 
@@ -1037,8 +1051,8 @@ def test_save_renamed_markdown_note_updates_existing_record():
         ).one()
         saved = note_path.read_text()
         assert "title: Keep me" in saved
-        assert saved.index("title:") < saved.index("lamindb_record_uid:")
-        assert f"lamindb_record_uid: {note_record.uid}" in saved
+        assert saved.index("title:") < saved.index("lamindb:")
+        assert f"uid: {note_record.uid}" in saved
 
         renamed_path = note_dir / f"{renamed_name}.md"
         note_path.rename(renamed_path)
@@ -1058,14 +1072,14 @@ def test_save_renamed_markdown_note_updates_existing_record():
             is None
         )
         assert ln.Record.filter(type=type_record, branch=branch).count() == 1
-        assert f"lamindb_record_uid: {note_record.uid}" in renamed_path.read_text()
+        assert f"uid: {note_record.uid}" in renamed_path.read_text()
         latest = (
             note_record.ablocks.filter(kind="readme").order_by("-created_at").first()
         )
         assert latest is not None
         assert "# Renamed" in latest.content
         assert "title: Keep me" in latest.content
-        assert "lamindb_record_uid" not in latest.content
+        assert "lamindb:" not in latest.content
     finally:
         ln.setup.switch("main")
         run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
@@ -1092,7 +1106,7 @@ def test_save_markdown_note_unknown_record_uid_errors():
     note_dir = notes_root / topic
     note_dir.mkdir(parents=True, exist_ok=True)
     note_path = note_dir / f"{note_name}.md"
-    note_path.write_text("---\nlamindb_record_uid: missinguid0000\n---\n# Missing\n")
+    note_path.write_text("---\nlamindb:\n  uid: missinguid0000\n---\n# Missing\n")
     try:
         ln.setup.switch(branch.name)
         set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
@@ -1204,11 +1218,11 @@ def test_load_markdown_note_inserts_record_uid_when_missing():
             f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
         )
         loaded = note_path.read_text()
-        assert loaded.count("lamindb_record_uid:") == 1
-        assert f"lamindb_record_uid: {note_record.uid}" in loaded
+        assert loaded.count("\n  uid:") == 1
+        assert f"uid: {note_record.uid}" in loaded
         assert "still here" in loaded
         legacy.refresh_from_db()
-        assert "lamindb_record_uid" not in legacy.content
+        assert "lamindb:" not in legacy.content
     finally:
         ln.setup.switch("main")
         run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
