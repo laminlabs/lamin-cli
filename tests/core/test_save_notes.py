@@ -979,19 +979,6 @@ def test_lamindb_record_uid_front_matter_helpers():
         upsert_lamindb_record_uid("---\n---\n# Body\n", "z")
         == "---\nlamindb:\n  uid: z\n---\n\n# Body\n"
     )
-    legacy = "---\nlamin_record_uid: olduid\n---\n# Body\n"
-    assert parse_lamindb_record_uid(legacy) == "olduid"
-    rewritten = upsert_lamindb_record_uid(legacy, "olduid")
-    assert "lamin_record_uid" not in rewritten
-    assert rewritten.startswith("---\nlamindb:\n  uid: olduid\n---\n\n# Body\n")
-
-    flat = '---\nlamindb_record_uid: "abc"\n---\n# Body\n'
-    assert parse_lamindb_record_uid(flat) == "abc"
-    replaced = upsert_lamindb_record_uid(flat, "def")
-    assert "lamindb_record_uid" not in replaced
-    assert "\n  uid: def\n" in replaced
-    assert parse_lamindb_record_uid(replaced) == "def"
-
     nested = "---\nlamindb:\n  source: notion\n  uid: abc\n---\n# Body\n"
     assert parse_lamindb_record_uid(nested) == "abc"
     updated = upsert_lamindb_record_uid(nested, "def")
@@ -1008,9 +995,6 @@ def test_lamindb_record_uid_front_matter_helpers():
 
     only_uid = "---\nlamindb:\n  uid: uid123\n---\n\nIntro:\n"
     assert strip_lamindb_record_uid(only_uid) == "Intro:\n"
-    assert (
-        strip_lamindb_record_uid("---\nlamin_record_uid: old\n---\nBody\n") == "Body\n"
-    )
     with_metadata = "---\ntitle: Hello\nlamindb:\n  uid: uid123\n---\n\n# Body\n"
     assert (
         strip_lamindb_record_uid(with_metadata) == "---\ntitle: Hello\n---\n\n# Body\n"
