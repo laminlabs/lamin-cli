@@ -15,6 +15,7 @@ from lamin_cli._notes import (
     extract_note_target_from_path,
     parse_lamindb_record_uid,
     resolve_note_record,
+    strip_lamindb_record_uid,
     upsert_lamindb_record_uid,
 )
 
@@ -228,12 +229,13 @@ def _save_note_markdown(
     note_record = _note_record_for_save(
         ln, content=content, type_chain=type_chain, note_name=note_name
     )
-    content = upsert_lamindb_record_uid(content, note_record.uid)
-    ppath.write_text(content, encoding="utf-8")
+    local_content = upsert_lamindb_record_uid(content, note_record.uid)
+    if local_content != content:
+        ppath.write_text(local_content, encoding="utf-8")
     block = _add_block(
         note_record,
         "record",
-        content,
+        strip_lamindb_record_uid(local_content),
         kind="readme",
     )
     logger.important(f"saved note content: RecordBlock('{block.uid}')")

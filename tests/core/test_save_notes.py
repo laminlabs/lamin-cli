@@ -65,7 +65,8 @@ def test_save_markdown_note_creates_record_and_recordblock():
         saved_text = note_path.read_text()
         assert saved_text.count("lamindb_record_uid:") == 1
         assert f"lamindb_record_uid: {note_record.uid}" in saved_text
-        assert f"lamindb_record_uid: {note_record.uid}" in readmes.last().content
+        assert "lamindb_record_uid" not in readmes.last().content
+        assert readmes.last().content.startswith("# Second version")
     finally:
         ln.setup.switch("main")
         run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
@@ -957,7 +958,11 @@ def test_load_readme_without_dev_dir_writes_to_cwd_root():
 
 def test_lamindb_record_uid_front_matter_helpers():
     import click
-    from lamin_cli._notes import parse_lamindb_record_uid, upsert_lamindb_record_uid
+    from lamin_cli._notes import (
+        parse_lamindb_record_uid,
+        strip_lamindb_record_uid,
+        upsert_lamindb_record_uid,
+    )
 
     body = "# Title\n\nbody with\n---\nnot front matter\n"
     stamped = upsert_lamindb_record_uid(body, "uid123")
@@ -992,6 +997,17 @@ def test_lamindb_record_uid_front_matter_helpers():
         assert "empty" in str(error)
     else:
         raise AssertionError("empty lamindb_record_uid should fail")
+
+    only_uid = "---\nlamindb_record_uid: uid123\n---\n\nIntro:\n"
+    assert strip_lamindb_record_uid(only_uid) == "Intro:\n"
+    assert (
+        strip_lamindb_record_uid("---\nlamin_record_uid: old\n---\nBody\n") == "Body\n"
+    )
+    with_metadata = "---\ntitle: Hello\nlamindb_record_uid: uid123\n---\n\n# Body\n"
+    assert (
+        strip_lamindb_record_uid(with_metadata) == "---\ntitle: Hello\n---\n\n# Body\n"
+    )
+    assert strip_lamindb_record_uid("# No front matter\n") == "# No front matter\n"
 
 
 def test_save_renamed_markdown_note_updates_existing_record():
@@ -1048,7 +1064,8 @@ def test_save_renamed_markdown_note_updates_existing_record():
         )
         assert latest is not None
         assert "# Renamed" in latest.content
-        assert f"lamindb_record_uid: {note_record.uid}" in latest.content
+        assert "title: Keep me" in latest.content
+        assert "lamindb_record_uid" not in latest.content
     finally:
         ln.setup.switch("main")
         run_lamin("settings", "dev-dir", "unset", cwd=notes_root)

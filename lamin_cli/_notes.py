@@ -100,6 +100,30 @@ def upsert_lamindb_record_uid(content: str, uid: str) -> str:
     return _with_blank_line_before_body("\n".join(new_lines), rest)
 
 
+def strip_lamindb_record_uid(content: str) -> str:
+    """Remove record-uid keys from leading front matter.
+
+    Other front matter keys are left in place. When the uid key is the only
+    field, the whole front matter block is removed.
+    """
+    split = _split_front_matter(content)
+    if split is None:
+        return content
+    block, rest = split
+    kept = [
+        line
+        for line in block.splitlines()
+        if _front_matter_key(line) not in _RECORD_UID_KEYS
+    ]
+    if not any(line.strip() for line in kept):
+        if rest.startswith("\r\n"):
+            return rest[2:]
+        if rest.startswith(("\n", "\r")):
+            return rest[1:]
+        return rest
+    return "---\n" + "\n".join(kept) + "\n---\n" + rest
+
+
 def parse_note_target(
     target: str, *, allow_extensionless_single: bool = False
 ) -> tuple[list[str], str] | None:
