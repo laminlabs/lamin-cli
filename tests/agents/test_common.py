@@ -160,10 +160,10 @@ def test_wait_stops_when_no_reply_precedes_finish(tmp_path):
         lambda: [_bash_entry("echo hi"), _bash_entry("lamin finish")],
         lambda entries: _common.contains_finish_invocation(entries, _SHELL_TOOL_NAMES),
         transcript_path=_fresh_transcript_path(tmp_path),
+        budget_seconds=0.3,
         preceding_reply_fn=lambda entries: _common.reply_precedes_finish(
             entries, _SHELL_TOOL_NAMES
         ),
-        preceding_reply_grace_seconds=0.3,
         poll_interval_seconds=0.05,
     )
     elapsed = time.monotonic() - start

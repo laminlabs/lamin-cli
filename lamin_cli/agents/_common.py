@@ -264,10 +264,6 @@ _RECENT_ENTRIES_WINDOW = 3
 # straight to reading once, matching the pre-existing instant behavior.
 _LIVENESS_WINDOW_SECONDS = 60.0
 
-# After the finish command is on disk, the reply written just before it can
-# still be missing. Wait this long for that reply, then render anyway.
-_PRECEDING_REPLY_GRACE_SECONDS = 2.0
-
 
 def _is_finish_invocation(cmd: str) -> bool:
     """Detect an actual `lamin finish` invocation.
@@ -388,7 +384,6 @@ def wait_for_finish_invocation(
     poll_interval_seconds: float = 0.3,
     liveness_window_seconds: float = _LIVENESS_WINDOW_SECONDS,
     preceding_reply_fn: Callable[[_T], bool] | None = None,
-    preceding_reply_grace_seconds: float = _PRECEDING_REPLY_GRACE_SECONDS,
 ) -> _T:
     try:
         recently_active = (
@@ -400,18 +395,12 @@ def wait_for_finish_invocation(
         return read_fn()
 
     deadline = time.monotonic() + budget_seconds
-    finish_seen_at: float | None = None
     while True:
         result = read_fn()
-        if is_done_fn(result):
-            reply_ready = preceding_reply_fn is None or preceding_reply_fn(result)
-            if reply_ready:
-                return result
-            if finish_seen_at is None:
-                finish_seen_at = time.monotonic()
-            if time.monotonic() - finish_seen_at >= preceding_reply_grace_seconds:
-                return result
-        elif time.monotonic() >= deadline:
+        reply_ready = preceding_reply_fn is None or preceding_reply_fn(result)
+        if is_done_fn(result) and reply_ready:
+            return result
+        if time.monotonic() >= deadline:
             return result
         time.sleep(poll_interval_seconds)
 
