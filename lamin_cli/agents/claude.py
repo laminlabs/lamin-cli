@@ -242,6 +242,9 @@ def finish_claudecode_session() -> None:
             is_done_fn=lambda entries: _common.contains_finish_invocation(
                 entries, _SHELL_TOOL_NAMES
             ),
+            preceding_reply_fn=lambda entries: _common.reply_precedes_finish(
+                entries, _SHELL_TOOL_NAMES
+            ),
             transcript_path=transcript_path,
         )
         html_doc = _common.render_transcript_html(

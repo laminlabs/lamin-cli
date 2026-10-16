@@ -509,6 +509,9 @@ def finish_cursor_session() -> None:
                 is_done_fn=lambda parsed: _common.contains_finish_invocation(
                     parsed, _SHELL_TOOL_NAMES
                 ),
+                preceding_reply_fn=lambda parsed: _common.reply_precedes_finish(
+                    parsed, _SHELL_TOOL_NAMES
+                ),
                 transcript_path=_cursor_db_path(),
             )
             html_doc = _common.render_transcript_html(

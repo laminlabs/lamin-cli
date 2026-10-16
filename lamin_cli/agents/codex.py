@@ -313,6 +313,9 @@ def finish_codex_session() -> None:
             is_done_fn=lambda result: _common.contains_finish_invocation(
                 result[0], _SHELL_TOOL_NAMES
             ),
+            preceding_reply_fn=lambda result: _common.reply_precedes_finish(
+                result[0], _SHELL_TOOL_NAMES
+            ),
             transcript_path=paths[-1],
         )
         html_doc = _common.render_transcript_html(

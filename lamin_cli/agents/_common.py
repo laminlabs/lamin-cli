@@ -313,6 +313,69 @@ def contains_finish_invocation(
     return False
 
 
+def _message_blocks(msg: dict) -> list[dict]:
+    content = msg.get("content")
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    if not isinstance(content, list):
+        return []
+    return [block for block in content if isinstance(block, dict)]
+
+
+def _is_reply_text(block: dict) -> bool:
+    if block.get("type") != "text":
+        return False
+    text = block.get("text")
+    return isinstance(text, str) and bool(text.strip())
+
+
+def reply_precedes_finish(
+    entries: list[dict], shell_tool_names: frozenset[str]
+) -> bool:
+    """Whether assistant text, not another tool call, sits before `lamin finish`."""
+    if not entries:
+        return False
+    window_start = max(0, len(entries) - _RECENT_ENTRIES_WINDOW)
+    found: tuple[int, int] | None = None
+    for msg_index in range(len(entries) - 1, window_start - 1, -1):
+        blocks = _message_blocks(entries[msg_index])
+        for block_index, block in enumerate(blocks):
+            if block.get("type") != "tool_use":
+                continue
+            if block.get("name") not in shell_tool_names:
+                continue
+            tool_input = block.get("input")
+            cmd = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+            if isinstance(cmd, str) and _is_finish_invocation(cmd):
+                found = (msg_index, block_index)
+                break
+        if found is not None:
+            break
+    if found is None:
+        return False
+    msg_index, block_index = found
+
+    def meaningful(blocks: list[dict]) -> list[dict]:
+        return [
+            block
+            for block in blocks
+            if block.get("type") not in {"thinking", "reasoning", "tool_result"}
+        ]
+
+    source = entries[msg_index]
+    preceding = meaningful(_message_blocks(source)[:block_index])
+    if not preceding:
+        if msg_index == 0:
+            return False
+        source = entries[msg_index - 1]
+        preceding = meaningful(_message_blocks(source))
+    if source.get("role") not in {"assistant", None}:
+        return False
+    if not preceding:
+        return False
+    return _is_reply_text(preceding[-1])
+
+
 def wait_for_finish_invocation(
     read_fn: Callable[[], _T],
     is_done_fn: Callable[[_T], bool],
@@ -320,6 +383,7 @@ def wait_for_finish_invocation(
     budget_seconds: float = 8.0,
     poll_interval_seconds: float = 0.3,
     liveness_window_seconds: float = _LIVENESS_WINDOW_SECONDS,
+    preceding_reply_fn: Callable[[_T], bool] | None = None,
 ) -> _T:
     try:
         recently_active = (
@@ -333,7 +397,8 @@ def wait_for_finish_invocation(
     deadline = time.monotonic() + budget_seconds
     while True:
         result = read_fn()
-        if is_done_fn(result):
+        reply_ready = preceding_reply_fn is None or preceding_reply_fn(result)
+        if is_done_fn(result) and reply_ready:
             return result
         if time.monotonic() >= deadline:
             return result
