@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import lamindb as ln
+import pytest
 
 
 def run_lamin(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -16,13 +17,20 @@ def run_lamin(*args: str, cwd: Path | None = None) -> subprocess.CompletedProces
     )
 
 
-def test_save_markdown_note_creates_record_and_recordblock():
-    topic = "cli-note-topic"
-    note_name = "cli-note"
-    branch = ln.Branch(name="cli_notes_branch").save()
-    type_record = ln.Record(name=topic, is_type=True).save()
+@pytest.mark.parametrize("is_frame", [False, True])
+def test_save_markdown_note_creates_record_and_recordblock(is_frame: bool):
+    suffix = "_frame" if is_frame else ""
+    topic = f"cli-note-topic{suffix}"
+    note_name = f"cli-note{suffix}"
+    branch = ln.Branch(name=f"cli_notes_branch{suffix}").save()
+    schema = (
+        ln.Schema(name=f"cli-note-schema{suffix}", itype=ln.Feature).save()
+        if is_frame
+        else None
+    )
+    type_record = ln.Record(name=topic, is_type=True, schema=schema).save()
 
-    notes_root = Path(__file__).parent / "notes"
+    notes_root = Path(__file__).parent / f"notes{suffix}"
     note_dir = notes_root / topic
     note_dir.mkdir(parents=True, exist_ok=True)
     note_path = note_dir / f"{note_name}.md"
@@ -45,7 +53,7 @@ def test_save_markdown_note_creates_record_and_recordblock():
             .first()
         )
         assert note_record is not None
-        assert note_record.is_type is True
+        assert note_record.is_type is not is_frame
         assert note_record.branch == branch
         readmes = note_record.ablocks.filter(kind="readme").order_by("created_at")
         assert readmes.count() == 1
@@ -83,6 +91,8 @@ def test_save_markdown_note_creates_record_and_recordblock():
         if ln.Record.filter(uid=type_record.uid).one_or_none() is not None:
             type_record.refresh_from_db()
             type_record.delete(permanent=True)
+        if schema is not None and ln.Schema.filter(uid=schema.uid).one_or_none():
+            schema.delete(permanent=True)
         branch.delete(permanent=True)
 
 
