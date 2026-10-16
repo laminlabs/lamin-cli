@@ -298,6 +298,7 @@ def test_save_markdown_note_at_dev_dir_root_creates_record_and_recordblock():
         )
         note_record = ln.Record.filter(name=note_name, type=None, branch=branch).first()
         assert note_record is not None
+        assert note_record.is_type is True
         readmes = note_record.ablocks.filter(kind="readme").order_by("created_at")
         assert readmes.count() == 1
         assert "Root note" in readmes.first().content

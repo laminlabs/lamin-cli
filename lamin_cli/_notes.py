@@ -250,12 +250,12 @@ def resolve_note_record(
     parent_type = resolve_note_type_parent(ln, type_chain)
     note_record = ln.Record.filter(name=note_name, type=parent_type).one_or_none()
     if note_record is None and create_if_missing:
-        # Pages keep notes in the type hierarchy. A record frame only accepts
-        # data records as rows (`record_type_is_valid_fk`).
+        # Root notes and notes under a page stay in the type hierarchy.
+        # A record frame only accepts data records as rows.
         note_record = ln.Record(
             name=note_name,
             type=parent_type,
-            is_type=not parent_type.is_frame,
+            is_type=parent_type is None or not parent_type.is_frame,
         ).save()
     return note_record
 
