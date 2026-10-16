@@ -154,6 +154,23 @@ def test_contains_finish_invocation_finds_it_within_recent_window():
     assert _common.contains_finish_invocation(entries, _SHELL_TOOL_NAMES)
 
 
+def test_wait_stops_when_no_reply_precedes_finish(tmp_path):
+    start = time.monotonic()
+    result = _common.wait_for_finish_invocation(
+        lambda: [_bash_entry("echo hi"), _bash_entry("lamin finish")],
+        lambda entries: _common.contains_finish_invocation(entries, _SHELL_TOOL_NAMES),
+        transcript_path=_fresh_transcript_path(tmp_path),
+        preceding_reply_fn=lambda entries: _common.reply_precedes_finish(
+            entries, _SHELL_TOOL_NAMES
+        ),
+        preceding_reply_grace_seconds=0.3,
+        poll_interval_seconds=0.05,
+    )
+    elapsed = time.monotonic() - start
+    assert 0.25 < elapsed < 0.8
+    assert result[-1]["content"][0]["input"]["command"] == "lamin finish"
+
+
 def test_wait_for_finish_invocation_retries_until_found(tmp_path):
     calls = {"n": 0}
 

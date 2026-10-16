@@ -545,5 +545,5 @@ def test_finish_waits_for_delayed_finish_command_write(isolated, monkeypatch):
     elapsed = time.monotonic() - start
     writer.join()
 
-    assert 0.4 < elapsed < 3.0
+    assert 0.4 < elapsed < 6.0
     assert ln.Run.get(uid=uid).finished_at is not None

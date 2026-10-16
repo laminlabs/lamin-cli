@@ -463,6 +463,9 @@ def finish_copilot_session() -> None:
             is_done_fn=lambda result: _common.contains_finish_invocation(
                 result[1], _SHELL_TOOL_NAMES
             ),
+            preceding_reply_fn=lambda result: _common.reply_precedes_finish(
+                result[1], _SHELL_TOOL_NAMES
+            ),
             transcript_path=transcript_path,
         )
         report_ids, share_ids = _report_session_ids(session_id, run.uid)
