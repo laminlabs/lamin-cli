@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import html
+import json
 import re
 import shlex
+import shutil
+import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -223,21 +226,45 @@ def get_mapped_run(ln: object, mapping_file: Path, transform_uid: str):
     return run
 
 
+def write_transcript_report(directory: Path, html_doc: str, entries: list) -> None:
+    """Write the human page and the machine-readable transcript side by side."""
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "index.html").write_text(html_doc, encoding="utf-8")
+    with (directory / "trace.jsonl").open("w", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _report_is_folder(report: object) -> bool:
+    return getattr(report, "n_files", None) is not None
+
+
 def save_or_replace_report(
-    run: object, report_path: Path, *, description: str, ln: object
+    run: object, html_doc: str, entries: list, *, description: str, ln: object
 ) -> None:
-    """Attach the first report and replace its content on later finishes."""
-    if run.report is None:  # type: ignore[attr-defined]
+    """Attach the transcript folder, or replace it on a later finish.
+
+    A report saved by an older client is one HTML file. Replacing a file with
+    a folder is rejected, so that run gets a new folder artifact. A folder
+    report is replaced in place.
+    """
+    directory = Path(tempfile.mkdtemp())
+    try:
+        write_transcript_report(directory, html_doc, entries)
+        report = getattr(run, "report", None)
+        if report is not None and _report_is_folder(report):
+            report.replace(directory, run=False)
+            report.save()
+            return
         artifact = ln.Artifact(  # type: ignore[attr-defined]
-            report_path,
+            directory,
             description=description,
             kind="__lamindb_run__",
             run=False,
         ).save()
         run.report = artifact  # type: ignore[attr-defined]
-    else:
-        run.report.replace(report_path, run=False)  # type: ignore[attr-defined]
-        run.report.save()  # type: ignore[attr-defined]
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 # --- finish transcript wait ---

@@ -6,7 +6,6 @@ import re
 import shlex
 import sqlite3
 import sys
-import tempfile
 import time
 import traceback
 from datetime import datetime, timezone
@@ -520,19 +519,13 @@ def finish_cursor_session() -> None:
                 skill_marker="Base directory for this skill:",
                 shell_tool_names=_SHELL_TOOL_NAMES,
             )
-            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False)
-            tmp_path = Path(tmp.name)
-            try:
-                tmp.write(html_doc)
-                tmp.close()
-                _common.save_or_replace_report(
-                    run,
-                    tmp_path,
-                    description="Cursor session transcript (rendered)",
-                    ln=ln,
-                )
-            finally:
-                tmp_path.unlink(missing_ok=True)
+            _common.save_or_replace_report(
+                run,
+                html_doc,
+                entries,
+                description="Cursor session transcript (rendered)",
+                ln=ln,
+            )
             _common.stamp_transforms(
                 run,
                 entries,

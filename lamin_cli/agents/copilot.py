@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -482,19 +481,13 @@ def finish_copilot_session() -> None:
             shell_tool_names=_SHELL_TOOL_NAMES,
         )
 
-        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False)
-        tmp_path = Path(tmp.name)
-        try:
-            tmp.write(html_doc)
-            tmp.close()
-            _common.save_or_replace_report(
-                run,
-                tmp_path,
-                description="Copilot session transcript (rendered)",
-                ln=ln,
-            )
-        finally:
-            tmp_path.unlink(missing_ok=True)
+        _common.save_or_replace_report(
+            run,
+            html_doc,
+            entries,
+            description="Copilot session transcript (rendered)",
+            ln=ln,
+        )
 
         _common.stamp_transforms(
             run,
