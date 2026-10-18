@@ -240,7 +240,7 @@ def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
     assert run.report.uid == report_uid
     assert run.report.hash != first_hash
     assert run.extra_data["n_tokens"] == 50
-    assert "do a follow-up" in run.report.path.read_text()
+    assert "do a follow-up" in (run.report.path / "index.html").read_text()
     assert run.transform.runs.count() == 1
 
 
@@ -514,7 +514,7 @@ def test_child_finish_joins_parent_chat_and_parent_updates_same_run(
     finish_copilot_session()
 
     run = ln.Run.get(uid=uid)
-    first_report = run.report.path.read_text()
+    first_report = (run.report.path / "index.html").read_text()
     assert "PARENT TASK UNIQUE" in first_report
     assert "CHILD TASK UNIQUE" in first_report
     assert "UNRELATED TASK UNIQUE" not in first_report
@@ -542,7 +542,7 @@ def test_child_finish_joins_parent_chat_and_parent_updates_same_run(
     finish_copilot_session()
 
     run = ln.Run.get(uid=uid)
-    later_report = run.report.path.read_text()
+    later_report = (run.report.path / "index.html").read_text()
     assert run.report.hash != first_hash
     assert "PARENT TASK UNIQUE" in later_report
     assert "PARENT FOLLOW UP UNIQUE" in later_report

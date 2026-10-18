@@ -183,7 +183,7 @@ def test_finish_report_spans_every_rollout_file(tmp_path):
     assert not codex._run_uid_file(THREAD).exists()
     run = ln.Run.get(uid=uid)
     assert run.finished_at is not None
-    report = run.report.path.read_text()
+    report = (run.report.path / "index.html").read_text()
     assert report.index("first question") < report.index("later question")
     assert "checking the routes" in report
     assert "pwd" in report
