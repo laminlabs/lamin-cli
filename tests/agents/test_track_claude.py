@@ -205,7 +205,7 @@ def test_follow_up_reuses_run_and_replaces_report(tmp_path):
     assert run.finished_at is not None
     assert run.report.uid == report_uid
     assert run.report.hash != first_hash
-    assert "do a follow-up" in run.report.path.read_text()
+    assert "do a follow-up" in (run.report.path / "index.html").read_text()
     assert run.transform.runs.count() == 1
 
 

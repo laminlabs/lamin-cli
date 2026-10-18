@@ -214,7 +214,7 @@ def test_full_track_finish_flow(isolated, monkeypatch):
     run = ln.Run.get(uid=uid)
     assert run.finished_at is not None
     assert run.report is not None
-    report = run.report.path.read_text()
+    report = (run.report.path / "index.html").read_text()
     assert "Create a FASTA file." in report
     assert "raw shell output" in report
     assert ln.Transform.get(key="analysis.py").run.uid == uid
@@ -250,7 +250,7 @@ def test_follow_up_reuses_run_and_replaces_report(isolated, monkeypatch):
     assert run.finished_at is not None
     assert run.report.uid == report_uid
     assert run.report.hash != first_hash
-    report = run.report.path.read_text()
+    report = (run.report.path / "index.html").read_text()
     assert "Follow-up task" in report
     assert "updated output" in report
     assert run.transform.runs.count() == 1
@@ -276,7 +276,7 @@ def test_parallel_sessions_never_cross_match(isolated, monkeypatch):
     with sqlite3.connect(db) as conn:
         _add_finish_command(conn, "chat-b", "finish-b")
     cursor.finish_cursor_session()
-    report_b = ln.Run.get(uid=uid_b).report.path.read_text()
+    report_b = (ln.Run.get(uid=uid_b).report.path / "index.html").read_text()
     assert "output B" in report_b
     assert "output A" not in report_b
 
@@ -284,7 +284,7 @@ def test_parallel_sessions_never_cross_match(isolated, monkeypatch):
     with sqlite3.connect(db) as conn:
         _add_finish_command(conn, "chat-a", "finish-a")
     cursor.finish_cursor_session()
-    report_a = ln.Run.get(uid=uid_a).report.path.read_text()
+    report_a = (ln.Run.get(uid=uid_a).report.path / "index.html").read_text()
     assert "output A" in report_a
     assert "output B" not in report_a
 
