@@ -531,7 +531,7 @@ def render_transcript_html(
     entries: list[dict],
     *,
     is_bookkeeping_bash_cmd: Callable[[str], bool],
-    skill_marker: str,
+    skill_marker: str | None,
     shell_tool_names: frozenset[str] = frozenset({"Bash"}),
 ) -> str:
     def content_has_marker(content: object, marker: str) -> bool:
@@ -549,7 +549,8 @@ def render_transcript_html(
     filtered = [
         msg
         for msg in entries
-        if not content_has_marker(msg.get("content"), skill_marker)
+        if skill_marker is None
+        or not content_has_marker(msg.get("content"), skill_marker)
     ]
 
     bookkeeping_ids: set[str] = {
