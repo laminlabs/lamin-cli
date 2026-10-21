@@ -1238,11 +1238,25 @@ def track_codex_command(name: str | None) -> None:
     return track_codex_session(name=name)
 
 
+@track.command("agentcore")
+@click.option("--name", required=True, help="One-sentence name for this chat's task.")
+def track_agentcore_command(name: str) -> None:
+    """Start or resume tracking inside LaminHub's AgentCore Python runtime."""
+    from lamin_cli.agents.agentcore import track_agentcore_session
+
+    return track_agentcore_session(name=name)
+
+
 def _finish_tracked_session() -> None:
     """Finish a tracked session.
 
-    This can be a shell script run, or a Claude Code, Copilot, Cursor, or Codex session.
+    This can be a shell script or a supported agent session, including AgentCore.
     """
+    from lamin_cli.agents import agentcore
+
+    if agentcore.has_context():
+        return agentcore.finish_agentcore_session()
+
     if os.environ.get("CURSOR_AGENT"):
         from lamin_cli.agents.cursor import finish_cursor_session
         return finish_cursor_session()
