@@ -13,7 +13,10 @@ from lamindb_setup.core.hashing import hash_file
 from lamin_cli._context import get_current_run_file
 from lamin_cli._notes import (
     extract_note_target_from_path,
+    is_project_note_target,
     parse_lamindb_record_uid,
+    project_type_chain,
+    resolve_note_project,
     resolve_note_record,
     strip_lamindb_record_uid,
     upsert_lamindb_record_uid,
@@ -177,47 +180,56 @@ def parse_plan_markdown(content: str) -> str | None:
     return overview or None
 
 
-def _note_record_for_save(ln, *, content: str, type_chain: list[str], note_name: str):
-    """Resolve the note record, preferring `lamindb.uid` over the filename."""
+def _note_for_save(
+    ln,
+    *,
+    registry: str,
+    content: str,
+    type_chain: list[str],
+    note_name: str,
+):
+    """Resolve the note, preferring `lamindb.uid` over the filename."""
+    kind = "project" if registry == "project" else "record"
+    model = ln.Project if registry == "project" else ln.Record
+    resolve = resolve_note_project if registry == "project" else resolve_note_record
     record_uid = parse_lamindb_record_uid(content)
     if record_uid is None:
-        note_record = resolve_note_record(
+        note = resolve(
             ln=ln,
             type_chain=type_chain,
             note_name=note_name,
             create_if_missing=True,
         )
-        assert note_record is not None
-        return note_record
+        assert note is not None
+        return note
 
-    note_record = ln.Record.filter(uid=record_uid).one_or_none()
-    if note_record is None:
+    note = model.filter(uid=record_uid).one_or_none()
+    if note is None:
         raise click.ClickException(
-            f"Record with uid '{record_uid}' from lamindb.uid does not exist."
+            f"{kind.capitalize()} with uid '{record_uid}' from lamindb.uid does not exist."
         )
-    if note_record.name == note_name:
-        return note_record
+    if note.name == note_name:
+        return note
 
     conflict = (
-        ln.Record.filter(name=note_name, type=note_record.type)
-        .exclude(uid=note_record.uid)
-        .first()
+        model.filter(name=note_name, type=note.type).exclude(uid=note.uid).first()
     )
     if conflict is not None:
         raise click.ClickException(
-            f"Cannot rename record '{note_record.name}' to '{note_name}': "
-            "a record with that name already exists under the same type."
+            f"Cannot rename {kind} '{note.name}' to '{note_name}': "
+            f"a {kind} with that name already exists under the same type."
         )
-    previous_name = note_record.name
-    note_record.name = note_name
-    note_record.save()
-    logger.important(f"renamed record: {previous_name} → {note_name}")
-    return note_record
+    previous_name = note.name
+    note.name = note_name
+    note.save()
+    logger.important(f"renamed {kind}: {previous_name} → {note_name}")
+    return note
 
 
 def _save_note_markdown(
     ppath: Path,
     *,
+    registry: str,
     type_chain: list[str],
     note_name: str,
 ) -> None:
@@ -226,30 +238,42 @@ def _save_note_markdown(
     from lamin_cli._annotate import _add_block
 
     content = ppath.read_text(encoding="utf-8")
-    note_record = _note_record_for_save(
-        ln, content=content, type_chain=type_chain, note_name=note_name
+    note = _note_for_save(
+        ln,
+        registry=registry,
+        content=content,
+        type_chain=type_chain,
+        note_name=note_name,
     )
-    local_content = upsert_lamindb_record_uid(content, note_record.uid)
+    local_content = upsert_lamindb_record_uid(content, note.uid)
     if local_content != content:
         ppath.write_text(local_content, encoding="utf-8")
     block = _add_block(
-        note_record,
-        "record",
+        note,
+        registry,
         strip_lamindb_record_uid(local_content),
         kind="readme",
     )
-    logger.important(f"saved note content: RecordBlock('{block.uid}')")
+    block_label = "ProjectBlock" if registry == "project" else "RecordBlock"
+    logger.important(f"saved note content: {block_label}('{block.uid}')")
     if ln.setup.settings.instance.is_remote:
         slug = ln.setup.settings.instance.slug
         ui_url = ln.setup.settings.instance.ui_url
-        logger.important(f"go to: {ui_url}/{slug}/record/{note_record.uid}")
+        logger.important(f"go to: {ui_url}/{slug}/{registry}/{note.uid}")
 
 
-def _resolve_note_target_or_raise(ppath: Path) -> tuple[list[str], str]:
+def _resolve_note_target_or_raise(
+    ppath: Path, *, registry: str
+) -> tuple[list[str], str]:
     note_target = extract_note_target_from_path(
         ppath, dev_dir=ln_setup.settings.dev_dir
     )
     if note_target is None:
+        if registry == "project":
+            raise click.ClickException(
+                "To save as project, pass a markdown path under dev-dir in the form "
+                "Projects/<note>.md or Projects/<type>/<note>.md."
+            )
         raise click.ClickException(
             "To save as record, pass a markdown path under dev-dir in the form "
             "<topic>/<subtopic>/.../<note>.md or <note>.md."
@@ -368,35 +392,45 @@ def save(
         branch_record = ln_setup.settings.branch
 
     is_cloud_path = not isinstance(ppath, LocalPathClasses)
+    # Markdown under <dev-dir>/Projects/ is a project. Other dev-dir notes are records.
     if (
         isinstance(ppath, LocalPathClasses)
         and key is None
         and not saving_plan
         and not user_passed_registry
         and ppath.name != "README.md"
-        and extract_note_target_from_path(
+    ):
+        note_target = extract_note_target_from_path(
             Path(ppath), dev_dir=ln_setup.settings.dev_dir
         )
-        is not None
-    ):
-        registry = "record"
+        if note_target is not None:
+            registry = "project" if is_project_note_target(note_target[0]) else "record"
 
     if store_kwargs is not None and registry != "artifact":
         raise click.ClickException(
             "--store-kwargs and --batch-size are only supported when saving artifacts"
         )
 
-    if registry == "record":
+    if registry in {"record", "project"}:
         if ppath.suffix.lower() != ".md":
             raise click.ClickException(
-                "Saving as registry='record' requires a .md file."
+                f"Saving as registry='{registry}' requires a .md file."
             )
         if key is not None:
             logger.warning(
-                "key is ignored for records, record identity comes from path"
+                f"key is ignored for {registry}s, {registry} identity comes from path"
             )
-        type_chain, note_name = _resolve_note_target_or_raise(Path(ppath))
-        _save_note_markdown(Path(ppath), type_chain=type_chain, note_name=note_name)
+        type_chain, note_name = _resolve_note_target_or_raise(
+            Path(ppath), registry=registry
+        )
+        if registry == "project":
+            type_chain = project_type_chain(type_chain)
+        _save_note_markdown(
+            Path(ppath),
+            registry=registry,
+            type_chain=type_chain,
+            note_name=note_name,
+        )
         return None
 
     if registry == "artifact":
@@ -644,5 +678,5 @@ def save(
         return return_code
     else:
         raise click.ClickException(
-            "Allowed values for '--registry' are: 'artifact', 'transform', 'record'"
+            "Allowed values for '--registry' are: 'artifact', 'transform', 'record', 'project'"
         )

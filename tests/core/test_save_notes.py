@@ -1232,3 +1232,144 @@ def test_load_markdown_note_inserts_record_uid_when_missing():
             type_record.refresh_from_db()
             type_record.delete(permanent=True)
         branch.delete(permanent=True)
+
+
+def test_save_and_load_markdown_note_in_projects_folder_creates_project():
+    unique = time.time_ns()
+    note_name = f"Cure51 data sharing {unique}"
+    renamed_name = f"Cure51 data sharing renamed {unique}"
+    branch = ln.Branch(name=f"cli_project_notes_branch_{unique}").save()
+    record_type = ln.Record(name="Projects", is_type=True).save()
+    notes_root = Path(__file__).parent / f"notes_projects_{unique}"
+    projects_dir = notes_root / "Projects"
+    projects_dir.mkdir(parents=True, exist_ok=True)
+    note_path = projects_dir / f"{note_name}.md"
+    note_path.write_text("# First version\n\nhello\n")
+    project = None
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "ProjectBlock" in result.stdout
+
+        project = ln.Project.filter(name=note_name, type=None, branch=branch).one()
+        assert project.is_type is False
+        assert (
+            ln.Record.filter(
+                name=note_name, type=record_type, branch=branch
+            ).one_or_none()
+            is None
+        )
+        readmes = project.ablocks.filter(kind="readme").order_by("created_at")
+        assert readmes.count() == 1
+        assert readmes.first().content.startswith("# First version")
+        assert "lamindb:" not in readmes.first().content
+        saved_text = note_path.read_text()
+        assert f"uid: {project.uid}" in saved_text
+
+        note_path.write_text(saved_text.replace("# First version", "# Second version"))
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        readmes = project.ablocks.filter(kind="readme").order_by("created_at")
+        assert readmes.count() == 2
+        assert "Second version" in readmes.last().content
+        assert readmes.last().is_latest
+
+        renamed_path = projects_dir / f"{renamed_name}.md"
+        note_path.rename(renamed_path)
+        result = run_lamin("save", str(renamed_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "renamed project" in result.stdout
+        project.refresh_from_db()
+        assert project.name == renamed_name
+
+        renamed_path.unlink()
+        load_result = run_lamin("load", f"Projects/{renamed_name}.md", cwd=notes_root)
+        assert load_result.returncode == 0, (
+            f"stdout: {load_result.stdout}\nstderr: {load_result.stderr}"
+        )
+        loaded = renamed_path.read_text()
+        assert f"uid: {project.uid}" in loaded
+        assert "Second version" in loaded
+        assert "lamindb:" not in readmes.last().content
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        if project is not None and (
+            ln.Project.filter(uid=project.uid, branch=branch).one_or_none() is not None
+        ):
+            project.refresh_from_db()
+            project.delete(permanent=True)
+        if ln.Record.filter(uid=record_type.uid).one_or_none() is not None:
+            record_type.refresh_from_db()
+            record_type.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_save_markdown_note_under_project_type():
+    unique = time.time_ns()
+    note_name = f"typed-project-note-{unique}"
+    branch = ln.Branch(name=f"cli_project_type_notes_branch_{unique}").save()
+    project_type = ln.Project(name=f"Program{unique}", is_type=True).save()
+    notes_root = Path(__file__).parent / f"notes_project_type_{unique}"
+    note_path = notes_root / "Projects" / project_type.name / f"{note_name}.md"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text("# Typed project\n\ncontent\n")
+    project = None
+    try:
+        ln.setup.switch(branch.name)
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 0, (
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        project = ln.Project.filter(
+            name=note_name, type=project_type, branch=branch
+        ).one()
+        assert project.is_type is False
+        readme = project.ablocks.filter(kind="readme").one()
+        assert "Typed project" in readme.content
+    finally:
+        ln.setup.switch("main")
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)
+        if project is not None and (
+            ln.Project.filter(uid=project.uid, branch=branch).one_or_none() is not None
+        ):
+            project.refresh_from_db()
+            project.delete(permanent=True)
+        if ln.Project.filter(uid=project_type.uid).one_or_none() is not None:
+            project_type.refresh_from_db()
+            project_type.delete(permanent=True)
+        branch.delete(permanent=True)
+
+
+def test_save_markdown_note_missing_project_type_errors():
+    unique = time.time_ns()
+    notes_root = Path(__file__).parent / f"notes_missing_project_type_{unique}"
+    note_path = notes_root / "Projects" / f"MissingType{unique}" / "note.md"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text("# Missing project type\n")
+    try:
+        set_dev_dir = run_lamin("settings", "dev-dir", "set", str(notes_root))
+        assert set_dev_dir.returncode == 0, set_dev_dir.stderr
+        result = run_lamin("save", str(note_path), cwd=notes_root)
+        assert result.returncode == 1
+        assert f"Project type 'MissingType{unique}' not found" in result.stderr
+    finally:
+        run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
+        if notes_root.exists():
+            shutil.rmtree(notes_root)

@@ -663,7 +663,7 @@ def load(entity: str | None = None, uid: str | None = None, key: str | None = No
     lamin load --key myanalyses/analysis.ipynb --with-env
     # notes via name and topic/type hierarchy
     lamin load README.md
-    lamin load my-topic/my-note.md
+    lamin load My-topic/my-note.md
     # anything via URL
     lamin load https://lamin.ai/account/instance/artifact/e2G7k9EVul4JbfsE
     # anything via registry and --uid
@@ -989,9 +989,9 @@ def update(
 @click.option("--branch", type=str, default=None, help="A valid branch name or uid.")
 @click.option(
     "--registry",
-    type=click.Choice(["artifact", "transform", "record"]),
+    type=click.Choice(["artifact", "transform", "record", "project"]),
     default=None,
-    help="Either 'artifact', 'transform', or 'record'. If not passed, chooses based on path suffix.",
+    help="Either 'artifact', 'transform', 'record', or 'project'. If not passed, chooses based on path.",
 )
 @click.option(
     "--batch-size",
@@ -1014,11 +1014,11 @@ def save(
     project: str,
     space: str,
     branch: str,
-    registry: Literal["artifact", "transform", "record"] | None,
+    registry: Literal["artifact", "transform", "record", "project"] | None,
     batch_size: int | None,
     store_kwargs: str | None,
 ):
-    """Save a file or folder as an artifact, transform, or record.
+    """Save a file or folder as an artifact, transform, record, or project.
 
     Save a **dataset** or **model** as {class}`~lamindb.Artifact`:
 
@@ -1044,6 +1044,13 @@ def save(
     lamin save my_script.py --key my_scripts/my_script.py
     ```
 
+    Save a **markdown note** in `Projects/` as {class}`~lamindb.Project`:
+
+    ```
+    lamin save Projects/my-project.md
+    lamin save Projects/my-type/my-project.md  # `my-type` is an existing project type
+    ```
+
     Save a **markdown note** as {class}`~lamindb.Record`:
 
     ```
@@ -1058,7 +1065,7 @@ def save(
 
     The `save` command defaults to saving
     `.py`, `.ipynb`, `.R`, `.Rmd`, and `.qmd` files as {class}`~lamindb.Transform`
-    and - if ommitting `--key` - `.md` files as {class}`~lamindb.Record`.
+    and - if ommitting `--key` - `.md` files as {class}`~lamindb.Record` or {class}`~lamindb.Project`.
     You can enforce saving a file as an {class}`~lamindb.Artifact` by passing `--registry artifact`.
 
     You can pass a project to `--project` to label the artifact by project.
