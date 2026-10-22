@@ -10,8 +10,12 @@ from lamindb_setup import logger
 
 from ._context import get_current_run_file
 from ._notes import (
+    PROJECTS_FOLDER,
     is_path_within,
+    is_project_note_target,
     parse_note_target,
+    project_type_chain,
+    resolve_note_project,
     resolve_note_record,
     upsert_lamindb_record_uid,
 )
@@ -21,6 +25,35 @@ from ._save import (
     resolve_store_kwargs,
 )
 from .urls import decompose_url
+
+
+def _write_note_file(
+    *,
+    content: str,
+    uid: str,
+    note_name: str,
+    relative_parents: list[str],
+    active_dev_dir: Path | None,
+) -> Path:
+    cwd = Path.cwd().resolve()
+    filename = f"{note_name}.md"
+    if active_dev_dir is not None and is_path_within(cwd, active_dev_dir):
+        target_path = active_dev_dir.joinpath(*relative_parents, filename)
+    else:
+        target_path = cwd / filename
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if target_path.exists():
+        response = input(f"! {target_path} exists: replace? (y/n)")
+        if response != "y":
+            raise SystemExit("Aborted.")
+
+    target_path.write_text(
+        upsert_lamindb_record_uid(content or "", uid),
+        encoding="utf-8",
+    )
+    logger.important(f"note is here: {target_path}")
+    return target_path
 
 
 def load(
@@ -65,7 +98,7 @@ def load(
     if entity is not None and uid is None and key is None:
         note_target = parse_note_target(entity)
         if note_target is not None:
-            entity = "record"
+            entity = "project" if is_project_note_target(note_target[0]) else "record"
 
     if entity is None:
         if key is None:
@@ -76,7 +109,7 @@ def load(
     if entity.startswith("https://") and "lamin" in entity:
         url = entity
         instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact", "transform", "collection", "record"}:
+    elif entity not in {"artifact", "transform", "collection", "record", "project"}:
         raise SystemExit(
             "Entity has to be a laminhub URL or 'artifact', 'collection', or 'transform'"
         )
@@ -188,29 +221,61 @@ def load(
                 raise click.ClickException(
                     f"Record note '{note_name}' has no readme block to load."
                 )
-
-            cwd = Path.cwd().resolve()
-            if active_dev_dir is not None and is_path_within(cwd, active_dev_dir):
-                target_path = (
-                    active_dev_dir / Path(*type_chain) / f"{note_name}.md"
-                    if type_chain
-                    else active_dev_dir / f"{note_name}.md"
-                )
-            else:
-                target_path = cwd / f"{note_name}.md"
-
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            if target_path.exists():
-                response = input(f"! {target_path} exists: replace? (y/n)")
-                if response != "y":
-                    raise SystemExit("Aborted.")
-
-            target_path.write_text(
-                upsert_lamindb_record_uid(readme_block.content or "", note_record.uid),
-                encoding="utf-8",
+            return _write_note_file(
+                content=readme_block.content or "",
+                uid=note_record.uid,
+                note_name=note_name,
+                relative_parents=type_chain,
+                active_dev_dir=active_dev_dir,
             )
-            logger.important(f"note is here: {target_path}")
-            return target_path
+        case "project":
+            if note_target is not None:
+                type_chain, note_name = note_target
+                project = resolve_note_project(
+                    ln=ln,
+                    type_chain=project_type_chain(type_chain),
+                    note_name=note_name,
+                    create_if_missing=False,
+                )
+                if project is None:
+                    note_path = (
+                        "/".join([*type_chain, note_name]) if type_chain else note_name
+                    )
+                    raise click.ClickException(
+                        f"Project note '{note_path}' does not exist. Save it first with `lamin save`."
+                    )
+                relative_parents = type_chain
+            elif uid is not None:
+                projects = ln.Project.objects.filter(uid__startswith=uid)
+                if (n_projects := len(projects)) == 0:
+                    raise click.ClickException(
+                        f"Project with uid={uid} does not exist."
+                    )
+                if n_projects > 1:
+                    projects = projects.order_by("-created_at")
+                project = projects.first()
+                type_chain = _note_type_chain_from_record(project)
+                note_name = project.name
+                relative_parents = [PROJECTS_FOLDER, *type_chain]
+            else:
+                raise click.ClickException(
+                    "For project note loads, pass a note target like "
+                    "Projects/<note>.md or Projects/<type>/<note>.md."
+                )
+            readme_block = (
+                project.ablocks.filter(kind="readme").order_by("-created_at").first()
+            )
+            if readme_block is None:
+                raise click.ClickException(
+                    f"Project note '{note_name}' has no readme block to load."
+                )
+            return _write_note_file(
+                content=readme_block.content or "",
+                uid=project.uid,
+                note_name=note_name,
+                relative_parents=relative_parents,
+                active_dev_dir=active_dev_dir,
+            )
         case "transform":
             if query_by_uid:
                 # we don't use .get here because DoesNotExist is hard to catch

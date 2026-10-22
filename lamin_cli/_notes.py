@@ -219,11 +219,30 @@ def extract_note_target_from_path(
     return parse_note_target(relative_path.as_posix(), allow_extensionless_single=True)
 
 
-def resolve_note_type_parent(ln, type_chain: list[str]):
+PROJECTS_FOLDER = "Projects"
+
+
+def is_projects_folder(name: str) -> bool:
+    return name.casefold() == PROJECTS_FOLDER.casefold()
+
+
+def is_project_note_target(type_chain: list[str]) -> bool:
+    """True when the note lives under the dev-dir `Projects` folder."""
+    return bool(type_chain) and is_projects_folder(type_chain[0])
+
+
+def project_type_chain(type_chain: list[str]) -> list[str]:
+    """Project type path with the leading `Projects` folder removed."""
+    if is_project_note_target(type_chain):
+        return type_chain[1:]
+    return list(type_chain)
+
+
+def _resolve_type_parent(model, type_chain: list[str], *, kind: str):
     parent_type = None
     resolved_path: list[str] = []
     for type_name in type_chain:
-        type_record = ln.Record.filter(
+        type_record = model.filter(
             name__iexact=type_name,
             is_type=True,
             type=parent_type,
@@ -232,12 +251,34 @@ def resolve_note_type_parent(ln, type_chain: list[str]):
             parent_label = "/".join(resolved_path) if resolved_path else "<root>"
             expected_path = "/".join([*resolved_path, type_name])
             raise click.ClickException(
-                f"Record type '{type_name}' not found under '{parent_label}'. "
+                f"{kind} type '{type_name}' not found under '{parent_label}'. "
                 f"Expected hierarchy segment '{expected_path}'. Create it first."
             )
         parent_type = type_record
         resolved_path.append(type_name)
     return parent_type
+
+
+def resolve_note_type_parent(ln, type_chain: list[str]):
+    return _resolve_type_parent(ln.Record, type_chain, kind="Record")
+
+
+def resolve_project_type_parent(ln, type_chain: list[str]):
+    return _resolve_type_parent(ln.Project, type_chain, kind="Project")
+
+
+def resolve_note_project(
+    *,
+    ln,
+    type_chain: list[str],
+    note_name: str,
+    create_if_missing: bool = False,
+):
+    parent_type = resolve_project_type_parent(ln, type_chain)
+    project = ln.Project.filter(name=note_name, type=parent_type).one_or_none()
+    if project is None and create_if_missing:
+        project = ln.Project(name=note_name, type=parent_type).save()
+    return project
 
 
 def resolve_note_record(
