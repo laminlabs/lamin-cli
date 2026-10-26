@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import traceback
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -298,7 +298,7 @@ def finish_codex_session() -> None:
                 "(is CODEX_THREAD_ID the chat that was tracked?)"
             )
             run._status_code = 0  # completed
-            run.finished_at = datetime.now(UTC)
+            run.finished_at = datetime.now(timezone.utc)
             run.save()
             run_uid_file.unlink()
             return
@@ -335,7 +335,7 @@ def finish_codex_session() -> None:
         _common.stamp_transforms(run, entries, ln)
         run.extra_data = {**(run.extra_data or {}), **counts}
         run._status_code = 0  # completed
-        run.finished_at = datetime.now(UTC)
+        run.finished_at = datetime.now(timezone.utc)
         run.save()
         run_uid_file.unlink()
         _common.info(f"finished tracking Codex session: {run.uid}")

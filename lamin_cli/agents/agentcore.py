@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import click
@@ -154,7 +154,7 @@ def finish_agentcore_session() -> None:
     )
     _common.stamp_transforms(run, context.entries, ln)
     run._status_code = 0
-    run.finished_at = datetime.now(UTC)
+    run.finished_at = datetime.now(timezone.utc)
     run.save()
     os.environ.pop("LAMIN_INITIATED_BY_RUN_UID", None)
     _common.info(f"finished tracking AgentCore session: {run.uid}")
