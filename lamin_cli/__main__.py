@@ -1248,7 +1248,7 @@ def track_codex_command(name: str | None) -> None:
 @track.command("agentcore")
 @click.option("--name", required=True, help="One-sentence name for this chat's task.")
 def track_agentcore_command(name: str) -> None:
-    """Start or resume tracking inside LaminHub's AgentCore Python runtime."""
+    """Start or resume tracking an AgentCore chat."""
     from lamin_cli.agents.agentcore import track_agentcore_session
 
     return track_agentcore_session(name=name)
