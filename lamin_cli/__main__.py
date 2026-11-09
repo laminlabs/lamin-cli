@@ -1493,7 +1493,7 @@ _MODAL_ONLY = ("image_url", "packages", "cpu", "gpu")
 @click.option("--where", type=click.Choice(list(RUN_EXECUTORS)), default=None, help="Where to run. Defaults to $LAMIN_RUN_WHERE, then `lamin settings run-where`, then local.")
 @click.option("--project", type=str, default=None, help="A valid project name or uid to link the run to. On Modal, also names the app.")
 @click.option("--register-output", "register_outputs", multiple=True, type=str, help="Register a file the target writes as an output artifact. Repeatable.")
-@click.option("--access", type=str, default=None, help="Ordered, comma-separated access methods for `lamin://` URIs in the arguments; each URI gets the first that can serve it: `mount` (path in a mount or local storage), `cache` (path in the cache, downloading), `presigned` (https URL), `credentials` (storage URL plus credentials). Defaults to $LAMIN_RUN_ACCESS, then `lamin settings run-access`, then mount,cache.")
+@click.option("--access", type=str, default=None, help="Ordered, comma-separated access methods for `lamin://` URIs in the arguments; each URI gets the first that can serve it: `mount` (path in a mount or local storage), `cache` (path in the cache, downloading), `presigned` (https URL), `credentials` (storage URL plus credentials; reuses AWS credentials for the same Hub-managed root). Defaults to $LAMIN_RUN_ACCESS, then `lamin settings run-access`, then mount,cache.")
 @click.option("--presign-expiry", type=click.IntRange(min=1), default=DEFAULT_PRESIGN_EXPIRY, show_default=True, help="Seconds a presigned URL stays valid. Only when --access allows presigned.")
 @click.option("--credentials-via", type=click.Choice(list(RUN_CREDENTIALS_VIA)), default="env", show_default=True, help="How credentials reach the target when --access allows credentials: `env` (environment variables, fixed at launch), `file` (an AWS credentials file that lamin keeps fresh), `process` (an AWS config whose credential_process fetches fresh credentials; AWS SDKs only). Use file or process for long runs. s3 only for file and process.")
 @click.option("--remount", is_flag=True, default=False, help="Remount a storage location if it serves stale metadata for an input.")
@@ -1562,7 +1562,9 @@ def run(
     inputs in argument order until one needs other credentials than an earlier one;
     that input falls through to the next allowed method. Mounts and presigned URLs
     carry per-location authorization, so allow one of them when inputs live in
-    storage locations with different credentials.
+    storage locations with different credentials. For Hub-managed S3 paths, lamin
+    reuses one credential set when Hub resolves them to the same managed root;
+    sharing a bucket or an artifact storage root alone is not sufficient.
 
     Environment variables are fixed when the target starts. For long runs on s3, pass
     `--credentials-via file`: lamin writes an AWS credentials file, refreshes it from
@@ -1571,7 +1573,8 @@ def run(
     read, so use `--credentials-via process` for them instead: `AWS_CONFIG_FILE` then
     names a profile whose `credential_process` runs lamin to fetch fresh credentials
     whenever the SDK needs them. Tools with their own S3 client that read neither
-    need `env`, or a mount (`lamin settings mount`).
+    need `env`, or a mount (`lamin settings mount`). Refreshable delivery requires
+    the S3 inputs to share one credential root.
 
     ```
     lamin run --access mount,presigned samtools -- view lamin://acme/data/artifact/key/a.bam

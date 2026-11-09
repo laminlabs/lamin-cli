@@ -210,6 +210,7 @@ class Translation:
     display: str | None = None
     # credentials handed to the target through its environment, never through argv
     env: dict[str, str] = field(default_factory=dict, repr=False)
+    aws_credential_root: str | None = None
     # access methods tried before this one, and why they could not serve the URI
     skipped: list[tuple[str, str]] = field(default_factory=list)
 
@@ -328,12 +329,16 @@ def _access_presigned(uri: str, resolved, expiry: int, sign: bool) -> Translatio
 
 
 def _access_credentials(
-    uri: str, resolved, sign: bool, chosen_env: dict[str, str]
+    uri: str,
+    resolved,
+    sign: bool,
+    chosen_env: dict[str, str],
+    chosen_aws_credentials: dict[str, dict[str, str]],
 ) -> Translation:
     """The unsigned storage URL, with credentials for the target's environment.
 
-    An AWS identity or a GCS token is per process, so a URI whose credentials differ
-    from those of an earlier input cannot use this method.
+    AWS credentials obtained from LaminHub are reused only when it identifies the
+    same managed root for both paths. Other credentials still have to match.
     """
     from lamin_cli.mount import _credentials
 
@@ -345,6 +350,7 @@ def _access_credentials(
         raise AccessUnavailable(f"only s3 and gs are supported, not {protocol}")
     path = _remote_path(resolved)
     env: dict[str, str] = {}
+    aws_root = None
     if sign and protocol == "gs":
         try:
             env = _credentials.gcs_access_token_env(path)
@@ -352,29 +358,61 @@ def _access_credentials(
             raise AccessUnavailable(
                 f"could not get GCS credentials: {error}"
             ) from error
-    elif sign and not _credentials.is_anonymous(path):
-        env = _credentials.credential_env(path, protocol)
-        if not env:
-            credentials = _credentials.fetch_aws_credentials(artifact.storage.root)
-            if credentials:
-                env = {
-                    "AWS_ACCESS_KEY_ID": str(credentials["key"]),
-                    "AWS_SECRET_ACCESS_KEY": str(credentials["secret"]),
-                }
-                if credentials.get("token"):
-                    env["AWS_SESSION_TOKEN"] = str(credentials["token"])
+    elif sign:
+        if not _credentials.is_anonymous(path):
+            env = _credentials.credential_env(path, protocol)
+            if not env:
+                from lamindb_setup.core._hub_core import access_aws
+
+                try:
+                    info = access_aws(str(path))
+                except Exception as error:
+                    raise AccessUnavailable(
+                        f"could not get AWS credentials: {error}"
+                    ) from error
+                credentials = info.get("credentials")
+                if credentials:
+                    env = {
+                        "AWS_ACCESS_KEY_ID": str(credentials["key"]),
+                        "AWS_SECRET_ACCESS_KEY": str(credentials["secret"]),
+                    }
+                    if credentials.get("token"):
+                        env["AWS_SESSION_TOKEN"] = str(credentials["token"])
+                    accessibility = info.get("accessibility") or {}
+                    root = accessibility.get("storage_root")
+                    if accessibility.get("is_managed") and root:
+                        root = root.rstrip("/")
+                        if str(path) == root or str(path).startswith(root + "/"):
+                            aws_root = root
+                            if root in chosen_aws_credentials:
+                                env = chosen_aws_credentials[root].copy()
         endpoint = _credentials.endpoint_url(path)
         if endpoint:
             env["AWS_ENDPOINT_URL"] = endpoint
     clashing = sorted(
         name for name, value in env.items() if chosen_env.get(name, value) != value
     )
+    if (
+        protocol == "s3"
+        and "AWS_ACCESS_KEY_ID" in chosen_env
+        and "AWS_ACCESS_KEY_ID" in env
+        and chosen_env.get("AWS_ENDPOINT_URL") != env.get("AWS_ENDPOINT_URL")
+        and "AWS_ENDPOINT_URL" not in clashing
+    ):
+        clashing.append("AWS_ENDPOINT_URL")
     if clashing:
         raise AccessUnavailable(
             "it needs other credentials than an earlier input, and one process"
             f" holds one identity ({', '.join(clashing)})"
         )
-    return _translation(uri, resolved, local_path=str(path), via="credentials", env=env)
+    return _translation(
+        uri,
+        resolved,
+        local_path=str(path),
+        via="credentials",
+        env=env,
+        aws_credential_root=aws_root,
+    )
 
 
 def resolve_uri(
@@ -386,12 +424,14 @@ def resolve_uri(
     expiry: int = DEFAULT_PRESIGN_EXPIRY,
     sign: bool = True,
     chosen_env: dict[str, str] | None = None,
+    chosen_aws_credentials: dict[str, dict[str, str]] | None = None,
 ) -> Translation:
     """Resolve a URI with the first allowed access method that can serve it.
 
     `chosen_env` holds the credentials earlier inputs already put into the target's
-    environment. With `sign=False` nothing is signed and no credentials are fetched,
-    which is what a dry run needs; it then cannot detect clashing credentials.
+    environment. `chosen_aws_credentials` reuses one AWS session per Hub-managed root.
+    With `sign=False` nothing is signed and no credentials are fetched, which is what
+    a dry run needs; it then cannot detect clashing credentials.
     """
     from lamin_cli._uri import resolve_lamin_uri
 
@@ -406,7 +446,13 @@ def resolve_uri(
             elif method == "presigned":
                 translation = _access_presigned(uri, resolved, expiry, sign)
             else:
-                translation = _access_credentials(uri, resolved, sign, chosen_env or {})
+                translation = _access_credentials(
+                    uri,
+                    resolved,
+                    sign,
+                    chosen_env or {},
+                    chosen_aws_credentials or {},
+                )
         except AccessUnavailable as reason:
             reasons.append((method, reason))
             continue
@@ -464,7 +510,7 @@ def _credential_roots(translations) -> list[str]:
     """Storage roots read with AWS credentials; gs tokens always use the environment."""
     return list(
         dict.fromkeys(
-            t.artifact.storage.root
+            t.aws_credential_root or t.artifact.storage.root
             for t in translations
             if "AWS_ACCESS_KEY_ID" in t.env
         )
@@ -488,6 +534,12 @@ def validate_credentials_via(translations, via: str) -> None:
         raise RunError(
             f"--credentials-via {via} only supports s3 storage, but {gs[0].uri} is in"
             " gs storage. GCS tokens are only passed through the environment."
+        )
+    if len(roots) > 1:
+        raise RunError(
+            f"--credentials-via {via} cannot refresh credentials for multiple S3"
+            " roots with one profile. Use --credentials-via env or allow another"
+            " access method."
         )
     if via == "process":
         for root in roots:
@@ -563,6 +615,7 @@ def translate_argv(
     translations: list[Translation] = []
     cache: dict[str, Translation] = {}
     chosen_env: dict[str, str] = {}
+    chosen_aws_credentials: dict[str, dict[str, str]] = {}
 
     def resolve(uri: str) -> str:
         if uri not in cache:
@@ -574,9 +627,24 @@ def translate_argv(
                 expiry=expiry,
                 sign=sign,
                 chosen_env=chosen_env,
+                chosen_aws_credentials=chosen_aws_credentials,
             )
-            chosen_env.update(cache[uri].env)
-            translations.append(cache[uri])
+            translation = cache[uri]
+            if (
+                translation.via == "credentials"
+                and translation.aws_credential_root is not None
+            ):
+                root = translation.aws_credential_root
+                chosen_aws_credentials.setdefault(
+                    root,
+                    {
+                        name: translation.env[name]
+                        for name in _AWS_SECRET_ENV
+                        if name in translation.env
+                    },
+                )
+            chosen_env.update(translation.env)
+            translations.append(translation)
         return str(cache[uri].local_path)
 
     for arg in argv:

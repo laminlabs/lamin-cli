@@ -583,6 +583,162 @@ def test_inputs_sharing_credentials_share_the_process(monkeypatch):
     assert [t.via for t in translations] == ["credentials", "credentials"]
 
 
+def _managed_s3_input(path, storage_root="s3://bucket"):
+    resolved = _resolved(root=storage_root)
+    resolved.artifact.path = _FakePath(path, {"anon": False})
+    return resolved
+
+
+def _hub_access(monkeypatch, roots):
+    calls = []
+
+    def access(path):
+        calls.append(path)
+        root = roots[path]
+        return {
+            "credentials": {
+                "key": f"KEY{len(calls)}",
+                "secret": "shh",
+                "token": f"T{len(calls)}",
+            },
+            "accessibility": {"is_managed": True, "storage_root": root},
+        }
+
+    monkeypatch.setattr("lamindb_setup.core._hub_core.access_aws", access)
+    return calls
+
+
+@pytest.mark.parametrize("via", ["env", "file", "process"])
+def test_inputs_in_the_same_hub_root_reuse_aws_credentials(monkeypatch, tmp_path, via):
+    first, second, third = f"{URI}/a", f"{URI}/b", f"lamin://acme/data/artifact/{UID20}"
+    paths = ["s3://bucket/project/a", "s3://bucket/project/b", "s3://bucket/project/c"]
+    calls = _hub_access(monkeypatch, dict.fromkeys(paths, "s3://bucket/project/"))
+    _fake_resolved(
+        monkeypatch,
+        by_uri={
+            first: _managed_s3_input(paths[0]),
+            second: _managed_s3_input(paths[1], "s3://bucket/project"),
+            third: _managed_s3_input(paths[2]),
+        },
+    )
+    argv, translations = _translate(first, second, third, access="credentials")
+    assert argv == paths
+    assert calls == paths
+    assert [t.via for t in translations] == ["credentials"] * 3
+    assert [t.env["AWS_ACCESS_KEY_ID"] for t in translations] == ["KEY1"] * 3
+    assert [t.env["AWS_SESSION_TOKEN"] for t in translations] == ["T1"] * 3
+    assert _run._credential_roots(translations) == ["s3://bucket/project"]
+    from lamin_cli.mount import _credentials
+
+    monkeypatch.setattr(
+        _credentials, "fetch_aws_credentials", lambda root: {"key": "k"}
+    )
+    monkeypatch.setattr("lamindb_setup.core._settings_store.settings_dir", tmp_path)
+    _run.validate_credentials_via(translations, via)
+    managed = _run.start_managed_credentials(translations, via)
+    try:
+        if via == "file":
+            assert managed.file.storage_root == "s3://bucket/project"
+        elif via == "process":
+            assert (
+                "--root s3://bucket/project"
+                in Path(managed.env["AWS_CONFIG_FILE"]).read_text()
+            )
+    finally:
+        managed.stop()
+
+
+@pytest.mark.parametrize(
+    "roots",
+    [
+        ("s3://bucket/a", "s3://bucket/b"),
+        ("s3://bucket/a", "s3://bucket/a/nested"),
+        (None, None),
+        ("s3://bucket/other", "s3://bucket/other"),
+    ],
+)
+def test_different_or_unverified_hub_roots_do_not_reuse_credentials(monkeypatch, roots):
+    first, second = f"{URI}/a", f"{URI}/b"
+    paths = ["s3://bucket/a/one", "s3://bucket/a/nested/two"]
+    _hub_access(monkeypatch, dict(zip(paths, roots, strict=True)))
+    _fake_resolved(
+        monkeypatch,
+        by_uri=dict(zip((first, second), map(_managed_s3_input, paths), strict=True)),
+    )
+    _, translations = _translate(first, second, access="credentials,presigned")
+    assert [t.via for t in translations] == ["credentials", "presigned"]
+    with pytest.raises(_run.RunError, match="credentials: it needs other"):
+        _translate(first, second, access="credentials")
+
+
+def test_explicit_credentials_are_not_reused_by_storage_root(monkeypatch):
+    first, second = f"{URI}/a", f"{URI}/b"
+    _fake_resolved(
+        monkeypatch,
+        by_uri={
+            first: _resolved(root="s3://bucket", key="KEY1"),
+            second: _resolved(root="s3://bucket", key="KEY2"),
+        },
+    )
+    _, translations = _translate(first, second, access="credentials,presigned")
+    assert [t.via for t in translations] == ["credentials", "presigned"]
+
+
+def test_unmanaged_hub_results_do_not_enable_reuse(monkeypatch):
+    first, second = f"{URI}/a", f"{URI}/b"
+    paths = ["s3://bucket/a", "s3://bucket/b"]
+    calls = []
+
+    def access(path):
+        calls.append(path)
+        return {
+            "credentials": {"key": f"KEY{len(calls)}", "secret": "shh"},
+            "accessibility": {"is_managed": False, "storage_root": "s3://bucket"},
+        }
+
+    monkeypatch.setattr("lamindb_setup.core._hub_core.access_aws", access)
+    _fake_resolved(
+        monkeypatch,
+        by_uri=dict(zip((first, second), map(_managed_s3_input, paths), strict=True)),
+    )
+    _, translations = _translate(first, second, access="credentials,presigned")
+    assert [t.via for t in translations] == ["credentials", "presigned"]
+
+
+def test_reused_credentials_cannot_change_endpoint(monkeypatch):
+    first, second = f"{URI}/a", f"{URI}/b"
+    paths = ["s3://bucket/a", "s3://bucket/b"]
+    _hub_access(monkeypatch, dict.fromkeys(paths, "s3://bucket"))
+    a, b = map(_managed_s3_input, paths)
+    b.artifact.path.storage_options["endpoint_url"] = "https://s3.example"
+    _fake_resolved(monkeypatch, by_uri={first: a, second: b})
+    _, translations = _translate(first, second, access="credentials,presigned")
+    assert [t.via for t in translations] == ["credentials", "presigned"]
+    assert "AWS_ENDPOINT_URL" in translations[1].skipped[0][1]
+
+
+def test_hub_failure_falls_back_to_another_access_method(monkeypatch):
+    def fail(path):
+        raise RuntimeError("hub unavailable")
+
+    monkeypatch.setattr("lamindb_setup.core._hub_core.access_aws", fail)
+    _fake_resolved(monkeypatch, by_uri={URI: _managed_s3_input("s3://bucket/a")})
+    _, translations = _translate(URI, access="credentials,presigned")
+    assert translations[0].via == "presigned"
+    assert "hub unavailable" in translations[0].skipped[0][1]
+
+
+def test_multiple_aws_roots_cannot_share_a_refreshable_profile():
+    a = _credential_translation()
+    b = _credential_translation()
+    a.aws_credential_root = "s3://bucket/a"
+    b.aws_credential_root = "s3://bucket/b"
+    _run.validate_credentials_via([a, b], "env")
+    for via in ("file", "process"):
+        with pytest.raises(_run.RunError, match="multiple S3 roots"):
+            _run.validate_credentials_via([a, b], via)
+
+
 def test_dry_run_neither_signs_nor_fetches_credentials(monkeypatch):
     _fake_resolved(monkeypatch)
     argv, _ = _translate(URI, access="presigned", sign=False)
