@@ -128,7 +128,7 @@ def snapshot(upload: bool, track: bool) -> None:
     instance_owner = ln_setup.settings.instance.owner
     instance_name = ln_setup.settings.instance.name
 
-    ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
+    ln_setup.connect(f"{instance_owner}/{instance_name}")
 
     import lamindb as ln
 
@@ -179,7 +179,7 @@ def snapshot(upload: bool, track: bool) -> None:
                 raise click.ClickException(f"Clone verification failed:\n{result.stderr}") from None
 
 
-        ln_setup.connect(f"{instance_owner}/{instance_name}", use_root_db_user=True)
+        ln_setup.connect(f"{instance_owner}/{instance_name}")
         if upload:
             ln_setup.core.upload_sqlite_clone(
                 local_sqlite_path=f"{instance_name}-clone/.lamindb/lamin.db",
