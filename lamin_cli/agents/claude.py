@@ -234,6 +234,7 @@ def finish_claudecode_session() -> None:
             run.save()
             run_uid_file.unlink()
             _transcript_path_file().unlink()
+            _common.log_branch_url(run, ln)
             return
 
         entries = _common.wait_for_finish_invocation(
@@ -280,6 +281,7 @@ def finish_claudecode_session() -> None:
         run_uid_file.unlink()
         _transcript_path_file().unlink()
         _common.info(f"finished tracking Claude Code session: {run.uid}")
+        _common.log_branch_url(run, ln)
     except click.ClickException:
         raise
     except Exception as e:

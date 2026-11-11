@@ -301,6 +301,7 @@ def finish_codex_session() -> None:
             run.finished_at = datetime.now(timezone.utc)
             run.save()
             run_uid_file.unlink()
+            _common.log_branch_url(run, ln)
             return
 
         def _read() -> tuple[list[dict], dict[str, int]]:
@@ -339,6 +340,7 @@ def finish_codex_session() -> None:
         run.save()
         run_uid_file.unlink()
         _common.info(f"finished tracking Codex session: {run.uid}")
+        _common.log_branch_url(run, ln)
     except click.ClickException:
         raise
     except Exception as e:

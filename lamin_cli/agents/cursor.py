@@ -550,6 +550,7 @@ def finish_cursor_session() -> None:
         run.save()
         active_file.unlink()
         _common.info(f"finished tracking Cursor session: {run.uid}")
+        _common.log_branch_url(run, ln)
     except click.ClickException:
         raise
     except Exception as e:

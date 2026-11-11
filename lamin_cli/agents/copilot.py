@@ -451,6 +451,7 @@ def finish_copilot_session() -> None:
             run.finished_at = datetime.now(timezone.utc)
             run.save()
             _unlink_active_files(session_id)
+            _common.log_branch_url(run, ln)
             return
 
         def _read() -> tuple[list[dict], list[dict]]:
@@ -509,6 +510,7 @@ def finish_copilot_session() -> None:
             _write_shared_run_uid(other_id, run.uid, ln)
         _unlink_active_files(session_id)
         _common.info(f"finished tracking Copilot session: {run.uid}")
+        _common.log_branch_url(run, ln)
     except click.ClickException:
         raise
     except Exception as e:
