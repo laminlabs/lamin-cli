@@ -137,6 +137,18 @@ def info(msg: str) -> None:
     click.echo(f"✓ {msg}")
 
 
+def log_branch_url(run, ln) -> None:
+    from lamindb_setup import logger
+
+    if ln.setup.settings.instance.is_remote:
+        branch = run.created_on
+        if branch.name in {"main", "trash", "archive"}:
+            return
+        slug = ln.setup.settings.instance.slug
+        ui_url = ln.setup.settings.instance.ui_url
+        logger.important(f"go to: {ui_url}/{slug}/branch/{branch.uid}")
+
+
 def warn(msg: str) -> None:
     click.echo(f"! {msg}", err=True)
 

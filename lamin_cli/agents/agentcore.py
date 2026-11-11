@@ -158,3 +158,4 @@ def finish_agentcore_session() -> None:
     run.save()
     os.environ.pop("LAMIN_INITIATED_BY_RUN_UID", None)
     _common.info(f"finished tracking AgentCore session: {run.uid}")
+    _common.log_branch_url(run, ln)
