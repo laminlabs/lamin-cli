@@ -238,14 +238,20 @@ def get_mapped_run(ln: object, mapping_file: Path, transform_uid: str):
     return run
 
 
+def _redact_transcript(entries: list) -> list:
+    try:
+        from lamindb.core._secret_redaction import redact
+    except ImportError:
+        return entries  # Older SDKs retain their existing behavior.
+    return redact(entries)
+
+
 def write_transcript_report(directory: Path, html_doc: str, entries: list) -> None:
     """Write the human page and the machine-readable transcript side by side."""
-    from lamindb.core._secret_redaction import redact
-
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "index.html").write_text(html_doc, encoding="utf-8")
     with (directory / "trace.jsonl").open("w", encoding="utf-8") as handle:
-        for entry in redact(entries):
+        for entry in _redact_transcript(entries):
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
@@ -266,17 +272,32 @@ def save_or_replace_report(
     try:
         write_transcript_report(directory, html_doc, entries)
         report = getattr(run, "report", None)
-        from lamindb.core._secret_redaction import _save_run_artifact
-
-        artifact = _save_run_artifact(
+        try:
+            from lamindb.core._secret_redaction import _save_run_artifact
+        except ImportError:
+            pass  # Keep compatibility with SDK versions before the upload helper.
+        else:
+            artifact = _save_run_artifact(
+                directory,
+                description=description,
+                artifact=report
+                if report is not None and _report_is_folder(report)
+                else None,
+            )
+            if artifact is not None:
+                run.report = artifact  # type: ignore[attr-defined]
+            return
+        if report is not None and _report_is_folder(report):
+            report.replace(directory, run=False)
+            report.save()
+            return
+        artifact = ln.Artifact(  # type: ignore[attr-defined]
             directory,
             description=description,
-            artifact=report
-            if report is not None and _report_is_folder(report)
-            else None,
-        )
-        if artifact is not None:
-            run.report = artifact  # type: ignore[attr-defined]
+            kind="__lamindb_run__",
+            run=False,
+        ).save()
+        run.report = artifact  # type: ignore[attr-defined]
     finally:
         shutil.rmtree(directory, ignore_errors=True)
 
@@ -548,9 +569,7 @@ def render_transcript_html(
     skill_marker: str | None,
     shell_tool_names: frozenset[str] = frozenset({"Bash"}),
 ) -> str:
-    from lamindb.core._secret_redaction import redact
-
-    entries = redact(entries)
+    entries = _redact_transcript(entries)
 
     def content_has_marker(content: object, marker: str) -> bool:
         if isinstance(content, str):

@@ -152,6 +152,9 @@ def test_missing_tracking_or_wrong_instance_fails(chat):
 def test_report_redaction_before_rendering(chat, monkeypatch, unsafe_rendering):
     from lamin_cli.agents import _common
 
+    redaction = pytest.importorskip("lamindb.core._secret_redaction")
+    if not hasattr(redaction, "_save_run_artifact"):
+        pytest.skip("requires SDK run attachment redaction")
     agentcore.track_agentcore_session(name="Redacted report")
     run = agentcore.get_agentcore_run()
     before = ln.Artifact.filter(kind="__lamindb_run__").count()
