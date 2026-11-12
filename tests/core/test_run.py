@@ -935,10 +935,8 @@ def test_child_environment_redacts_before_upload(tmp_path, monkeypatch):
 
     import lamindb as ln
     import lamindb_setup as ln_setup
+    from lamindb.core._secret_redaction import redact
 
-    redaction = pytest.importorskip("lamindb.core._secret_redaction")
-    if not hasattr(redaction, "_save_run_artifact"):
-        pytest.skip("requires SDK run attachment redaction")
     secret = "CANARY_ENV_PASSWORD"
     raw = f"pkg @ https://user:{secret}@example.org/pkg\n"
     monkeypatch.setattr(
@@ -960,7 +958,7 @@ def test_child_environment_redacts_before_upload(tmp_path, monkeypatch):
             / f"run_{run.uid}"
             / "run_env_pip.txt"
         )
-        assert original.read_text() == redaction.redact(raw)
+        assert original.read_text() == redact(raw)
     finally:
         run.delete(permanent=True)
         transform.delete(permanent=True)
