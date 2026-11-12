@@ -960,7 +960,7 @@ def test_child_environment_redacts_before_upload(tmp_path, monkeypatch):
             / f"run_{run.uid}"
             / "run_env_pip.txt"
         )
-        assert original.read_text() == raw
+        assert original.read_text() == redaction.redact(raw)
     finally:
         run.delete(permanent=True)
         transform.delete(permanent=True)

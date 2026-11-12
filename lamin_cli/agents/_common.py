@@ -238,12 +238,20 @@ def get_mapped_run(ln: object, mapping_file: Path, transform_uid: str):
     return run
 
 
+def _redact_transcript(entries: list) -> list:
+    try:
+        from lamindb.core._secret_redaction import redact
+    except ImportError:
+        return entries  # Older SDKs retain their existing behavior.
+    return redact(entries)
+
+
 def write_transcript_report(directory: Path, html_doc: str, entries: list) -> None:
     """Write the human page and the machine-readable transcript side by side."""
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "index.html").write_text(html_doc, encoding="utf-8")
     with (directory / "trace.jsonl").open("w", encoding="utf-8") as handle:
-        for entry in entries:
+        for entry in _redact_transcript(entries):
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
@@ -561,6 +569,8 @@ def render_transcript_html(
     skill_marker: str | None,
     shell_tool_names: frozenset[str] = frozenset({"Bash"}),
 ) -> str:
+    entries = _redact_transcript(entries)
+
     def content_has_marker(content: object, marker: str) -> bool:
         if isinstance(content, str):
             return marker in content

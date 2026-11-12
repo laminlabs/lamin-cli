@@ -747,11 +747,10 @@ def _track_child_python_environment(run) -> None:
     env_dir = ln_setup.settings.cache_dir / "environments" / f"run_{run.uid}"
     env_dir.mkdir(parents=True, exist_ok=True)
     env_path = env_dir / "run_env_pip.txt"
-    env_path.write_text(result.stdout)
-
     try:
-        from lamindb.core._secret_redaction import _save_run_artifact
+        from lamindb.core._secret_redaction import _save_run_artifact, redact
     except ImportError:
+        env_path.write_text(result.stdout)
         # reuse an identical, previously uploaded environment rather than duplicating it
         _, env_hash, _ = hash_file(env_path)
         artifact = (
@@ -768,6 +767,7 @@ def _track_child_python_environment(run) -> None:
             )
             artifact.save(upload=True, print_progress=False)
     else:
+        env_path.write_text(redact(result.stdout), encoding="utf-8")
         artifact = _save_run_artifact(env_path, description="requirements.txt")
         if artifact is None:
             return
