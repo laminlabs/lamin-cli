@@ -930,6 +930,44 @@ def test_run_translates_uris_links_inputs_and_registers_outputs(
     _lamin("delete", "artifact", "--uid", output.uid, "--permanent", cwd=tmp_path)
 
 
+def test_child_environment_redacts_before_upload(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import lamindb as ln
+    import lamindb_setup as ln_setup
+
+    redaction = pytest.importorskip("lamindb.core._secret_redaction")
+    if not hasattr(redaction, "_save_run_artifact"):
+        pytest.skip("requires SDK run attachment redaction")
+    secret = "CANARY_ENV_PASSWORD"
+    raw = f"pkg @ https://user:{secret}@example.org/pkg\n"
+    monkeypatch.setattr(
+        _run.subprocess,
+        "run",
+        lambda *a, **kw: SimpleNamespace(returncode=0, stdout=raw),
+    )
+    monkeypatch.setattr(_run, "_active_python_executable", lambda: "python")
+    transform = ln.Transform(key="child-environment-redaction.py").save()
+    run = ln.Run(transform).save()
+    artifact = None
+    try:
+        _run._track_child_python_environment(run)
+        artifact = run.environment
+        assert secret not in artifact.path.read_text()
+        original = (
+            ln_setup.settings.cache_dir
+            / "environments"
+            / f"run_{run.uid}"
+            / "run_env_pip.txt"
+        )
+        assert original.read_text() == redaction.redact(raw)
+    finally:
+        run.delete(permanent=True)
+        transform.delete(permanent=True)
+        if artifact is not None:
+            artifact.delete(permanent=True, storage=True)
+
+
 def test_run_resolves_through_a_registered_mount(
     tmp_path, input_artifact, where_setting
 ):

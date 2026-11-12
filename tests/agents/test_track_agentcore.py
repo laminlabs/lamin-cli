@@ -148,6 +148,40 @@ def test_missing_tracking_or_wrong_instance_fails(chat):
         agentcore.track_agentcore_session(name="no context")
 
 
+@pytest.mark.parametrize("unsafe_rendering", [False, True])
+def test_report_redaction_before_rendering(chat, monkeypatch, unsafe_rendering):
+    from lamin_cli.agents import _common
+
+    redaction = pytest.importorskip("lamindb.core._secret_redaction")
+    if not hasattr(redaction, "_save_run_artifact"):
+        pytest.skip("requires SDK run attachment redaction")
+    agentcore.track_agentcore_session(name="Redacted report")
+    run = agentcore.get_agentcore_run()
+    before = ln.Artifact.filter(kind="__lamindb_run__").count()
+    secret = "ghp_" + "A" * 36
+    messages = [{"role": "assistant", "content": secret + " ordinary result"}]
+    chat(messages)
+    if unsafe_rendering:
+        # The final check still blocks an unsafe renderer's output.
+        monkeypatch.setattr(
+            _common, "render_transcript_html", lambda *a, **kw: f"<p>{secret}</p>"
+        )
+    agentcore.finish_agentcore_session()
+    run.refresh_from_db()
+    assert run.status == "completed"
+    assert messages[0]["content"] == secret + " ordinary result"
+    if unsafe_rendering:
+        assert run.report is None
+        assert ln.Artifact.filter(kind="__lamindb_run__").count() == before
+    else:
+        assert run.report is not None
+        for name in ("index.html", "trace.jsonl"):
+            content = (run.report.path / name).read_text()
+            assert secret not in content
+            assert "ordinary result" in content
+            assert "REDACTED" in content
+
+
 def test_session_and_instance_both_scope_run_identity():
     session, instance = str(uuid4()), str(uuid4())
     base = agentcore._Context(session, instance, [])
