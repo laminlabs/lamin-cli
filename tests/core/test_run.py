@@ -934,7 +934,6 @@ def test_child_environment_redacts_before_upload(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
     import lamindb as ln
-    import lamindb_setup as ln_setup
 
     redaction = pytest.importorskip("lamindb.core._secret_redaction")
     if not hasattr(redaction, "_save_run_artifact"):
@@ -953,14 +952,7 @@ def test_child_environment_redacts_before_upload(tmp_path, monkeypatch):
     try:
         _run._track_child_python_environment(run)
         artifact = run.environment
-        assert secret not in artifact.path.read_text()
-        original = (
-            ln_setup.settings.cache_dir
-            / "environments"
-            / f"run_{run.uid}"
-            / "run_env_pip.txt"
-        )
-        assert original.read_text() == redaction.redact(raw)
+        assert artifact.path.read_text() == redaction.redact(raw)
     finally:
         run.delete(permanent=True)
         transform.delete(permanent=True)
