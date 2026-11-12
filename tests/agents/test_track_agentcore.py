@@ -148,6 +148,21 @@ def test_missing_tracking_or_wrong_instance_fails(chat):
         agentcore.track_agentcore_session(name="no context")
 
 
+def test_unsafe_report_does_not_prevent_finish(chat):
+    redaction = pytest.importorskip("lamindb.core._secret_redaction")
+    if not hasattr(redaction, "_save_run_artifact"):
+        pytest.skip("requires SDK run attachment redaction")
+    agentcore.track_agentcore_session(name="Unsafe report")
+    run = agentcore.get_agentcore_run()
+    before = ln.Artifact.filter(kind="__lamindb_run__").count()
+    chat([{"role": "assistant", "content": "ghp_" + "A" * 36}])
+    agentcore.finish_agentcore_session()
+    run.refresh_from_db()
+    assert run.status == "completed"
+    assert run.report is None
+    assert ln.Artifact.filter(kind="__lamindb_run__").count() == before
+
+
 def test_session_and_instance_both_scope_run_identity():
     session, instance = str(uuid4()), str(uuid4())
     base = agentcore._Context(session, instance, [])

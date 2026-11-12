@@ -264,6 +264,21 @@ def save_or_replace_report(
     try:
         write_transcript_report(directory, html_doc, entries)
         report = getattr(run, "report", None)
+        try:
+            from lamindb.core._secret_redaction import _save_run_artifact
+        except ImportError:
+            pass  # Keep compatibility with SDK versions before the upload helper.
+        else:
+            artifact = _save_run_artifact(
+                directory,
+                description=description,
+                artifact=report
+                if report is not None and _report_is_folder(report)
+                else None,
+            )
+            if artifact is not None:
+                run.report = artifact  # type: ignore[attr-defined]
+            return
         if report is not None and _report_is_folder(report):
             report.replace(directory, run=False)
             report.save()

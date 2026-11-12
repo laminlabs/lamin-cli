@@ -749,21 +749,28 @@ def _track_child_python_environment(run) -> None:
     env_path = env_dir / "run_env_pip.txt"
     env_path.write_text(result.stdout)
 
-    # reuse an identical, previously uploaded environment rather than duplicating it
-    _, env_hash, _ = hash_file(env_path)
-    artifact = (
-        ln.Artifact.filter(hash=env_hash, kind="__lamindb_run__")
-        .exclude(size=0)
-        .one_or_none()
-    )
-    if artifact is None:
-        artifact = ln.Artifact(
-            env_path,
-            description="requirements.txt",
-            kind="__lamindb_run__",
-            run=False,
+    try:
+        from lamindb.core._secret_redaction import _save_run_artifact
+    except ImportError:
+        # reuse an identical, previously uploaded environment rather than duplicating it
+        _, env_hash, _ = hash_file(env_path)
+        artifact = (
+            ln.Artifact.filter(hash=env_hash, kind="__lamindb_run__")
+            .exclude(size=0)
+            .one_or_none()
         )
-        artifact.save(upload=True, print_progress=False)
+        if artifact is None:
+            artifact = ln.Artifact(
+                env_path,
+                description="requirements.txt",
+                kind="__lamindb_run__",
+                run=False,
+            )
+            artifact.save(upload=True, print_progress=False)
+    else:
+        artifact = _save_run_artifact(env_path, description="requirements.txt")
+        if artifact is None:
+            return
     run.environment = artifact
     _note(f"tracked the Python environment ({executable})")
 
