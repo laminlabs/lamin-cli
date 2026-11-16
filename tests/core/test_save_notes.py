@@ -314,7 +314,7 @@ def test_save_markdown_note_at_dev_dir_root_creates_record_and_recordblock():
         branch.delete(permanent=True)
 
 
-def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
+def test_save_readme_in_dev_dir_root_creates_block():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_notes_readme_root_branch_{unique}").save()
     notes_root = Path(__file__).parent / f"notes_readme_root_{unique}"
@@ -343,7 +343,7 @@ def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
         ).first()
         assert readme_record is None
         readme_artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
-        assert readme_artifact is not None
+        assert readme_artifact is None
     finally:
         ln.setup.switch(branch.name)
         run_lamin("settings", "dev-dir", "unset", cwd=notes_root)
@@ -360,7 +360,7 @@ def test_save_readme_in_dev_dir_root_stays_artifact_and_block():
         branch.delete(permanent=True)
 
 
-def test_save_readme_outside_dev_dir_creates_artifact_and_block():
+def test_save_readme_outside_dev_dir_creates_block():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_notes_readme_outside_dev_dir_branch_{unique}").save()
     outside_root = Path(__file__).parent / f"notes_readme_outside_dev_dir_{unique}"
@@ -388,7 +388,7 @@ def test_save_readme_outside_dev_dir_creates_artifact_and_block():
         ).first()
         assert readme_record is None
         readme_artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
-        assert readme_artifact is not None
+        assert readme_artifact is None
     finally:
         ln.setup.switch(branch.name)
         readme_path.unlink(missing_ok=True)
@@ -404,7 +404,7 @@ def test_save_readme_outside_dev_dir_creates_artifact_and_block():
         branch.delete(permanent=True)
 
 
-def test_save_readme_relative_path_in_dev_dir_saves_artifact_and_block():
+def test_save_readme_relative_path_in_dev_dir_saves_block():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_notes_readme_relative_branch_{unique}").save()
     notes_root = Path(__file__).parent / f"notes_readme_relative_{unique}"
@@ -426,7 +426,7 @@ def test_save_readme_relative_path_in_dev_dir_saves_artifact_and_block():
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
         artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
-        assert artifact is not None
+        assert artifact is None
         block = (
             ln.models.Block.filter(key="README.md", branch=branch)
             .order_by("-created_at")
@@ -451,7 +451,7 @@ def test_save_readme_relative_path_in_dev_dir_saves_artifact_and_block():
         branch.delete(permanent=True)
 
 
-def test_save_readme_as_artifact_also_creates_standalone_block():
+def test_save_readme_key_creates_versioned_block():
     unique = time.time_ns()
     branch = ln.Branch(name=f"cli_readme_branch_{unique}").save()
     readme_path = Path(__file__).parent / f"README_{unique}.md"
@@ -473,7 +473,7 @@ def test_save_readme_as_artifact_also_creates_standalone_block():
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
         artifact = ln.Artifact.filter(key="README.md", branch=branch).first()
-        assert artifact is not None
+        assert artifact is None
         block = (
             ln.models.Block.filter(key="README.md", branch=branch)
             .order_by("-created_at")

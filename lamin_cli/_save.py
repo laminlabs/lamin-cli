@@ -281,27 +281,31 @@ def _resolve_note_target_or_raise(
     return note_target
 
 
-def _is_readme_artifact_save(ppath, key: str | None) -> bool:
-    return key == "README.md" or ppath.name == "README.md"
+def _is_instance_readme(ppath, key: str | None) -> bool:
+    """True when this save is the database README, stored as a block."""
+    if key == "README.md":
+        return True
+    return key is None and getattr(ppath, "name", None) == "README.md"
 
 
 def _save_readme_block(
-    ppath: Path,
+    ppath,
     *,
     branch,
     space,
-) -> None:
+):
     import lamindb as ln
 
     content = ppath.read_text(encoding="utf-8")
-    ln.models.Block(
+    block = ln.models.Block(
         key="README.md",
         content=content,
         kind="readme",
         branch=branch,
         space=space,
     ).save()
-    logger.important("saved README block")
+    logger.important(f"saved README block: Block('{block.uid}')")
+    return block
 
 
 def save(
@@ -434,10 +438,20 @@ def save(
         return None
 
     if registry == "artifact":
+        if _is_instance_readme(ppath, key) and not saving_plan:
+            if store_kwargs is not None:
+                raise click.ClickException(
+                    "--store-kwargs and --batch-size are not supported when saving"
+                    " the database README"
+                )
+            block = _save_readme_block(ppath, branch=branch_record, space=space_record)
+            if project is not None:
+                block.projects.add(project_record)
+                logger.important(f"labeled with project: {project_record.name}")
+            return None
+
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
-        if not is_cloud_path and key is None and ppath.name == "README.md":
-            key = "README.md"
         if stem_uid is not None:
             revises = (
                 ln.Artifact.filter(uid__startswith=stem_uid)
@@ -467,12 +481,6 @@ def save(
             space=space_record,
             run=current_run,
         ).save(store_kwargs=store_kwargs or {})
-        if _is_readme_artifact_save(ppath, key):
-            logger.warning(
-                "Saving README as an artifact is transitional and will be phased out; "
-                "README is currently saved as both an Artifact and a Block."
-            )
-            _save_readme_block(ppath, branch=branch_record, space=space_record)
         if plan_tmp_path is not None and Path(plan_tmp_path).exists():
             Path(plan_tmp_path).unlink()
         logger.important(f"saved: {artifact}")
