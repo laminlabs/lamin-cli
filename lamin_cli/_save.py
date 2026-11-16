@@ -410,6 +410,18 @@ def save(
         if note_target is not None:
             registry = "project" if is_project_note_target(note_target[0]) else "record"
 
+    if not saving_plan and _is_instance_readme(ppath, key):
+        if store_kwargs is not None:
+            raise click.ClickException(
+                "--store-kwargs and --batch-size are not supported when saving the"
+                " database README"
+            )
+        block = _save_readme_block(ppath, branch=branch_record, space=space_record)
+        if project is not None:
+            block.projects.add(project_record)
+            logger.important(f"labeled with project: {project_record.name}")
+        return None
+
     if store_kwargs is not None and registry != "artifact":
         raise click.ClickException(
             "--store-kwargs and --batch-size are only supported when saving artifacts"
@@ -438,18 +450,6 @@ def save(
         return None
 
     if registry == "artifact":
-        if _is_instance_readme(ppath, key) and not saving_plan:
-            if store_kwargs is not None:
-                raise click.ClickException(
-                    "--store-kwargs and --batch-size are not supported when saving"
-                    " the database README"
-                )
-            block = _save_readme_block(ppath, branch=branch_record, space=space_record)
-            if project is not None:
-                block.projects.add(project_record)
-                logger.important(f"labeled with project: {project_record.name}")
-            return None
-
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
         if stem_uid is not None:
