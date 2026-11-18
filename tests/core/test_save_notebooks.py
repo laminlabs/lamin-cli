@@ -20,15 +20,20 @@ def _write_notebook(nb: dict, path: Path) -> None:
 
 
 def test_save_not_initialized():
+    space = ln.Space(name="notebook-run-space").save()
+    assert space.id != ln.setup.settings.space.id
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     result = subprocess.run(
-        f"lamin save {notebook_dir / 'not-initialized.ipynb'}",
+        f"lamin save {notebook_dir / 'not-initialized.ipynb'} --space {space.uid}",
         shell=True,
         capture_output=True,
         env=env,
     )
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr.decode()
+    transform = ln.Transform.get(key="not-initialized.ipynb")
+    assert transform.space_id == space.id
+    assert transform.latest_run.space_id == space.id
 
 
 def test_save_non_consecutive():
