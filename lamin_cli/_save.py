@@ -658,7 +658,9 @@ def save(
             if response != "y":
                 return "aborted-save-notebook-created-by-different-user"
         if run is None and transform.type == "notebook":
-            run = ln.Run(transform=transform).save()
+            run = ln.Run(transform=transform)
+            run.space = transform.space
+            run.save()
             logger.important(
                 f"found no run, creating Run('{run.uid}') to display the html"
             )
