@@ -19,9 +19,11 @@ def _write_notebook(nb: dict, path: Path) -> None:
     path.write_text(json.dumps(nb, indent=2) + "\n", encoding="utf-8")
 
 
-def test_save_not_initialized():
+def test_save_not_initialized(tmp_path):
     space = ln.Space(name="notebook-run-space").save()
     assert space.id != ln.setup.settings.space.id
+    storage = ln.Storage(root=tmp_path / "storage").save()
+    ln.Storage.filter(id=storage.id).update(space_id=space.id)
     env = os.environ
     env["LAMIN_TESTING"] = "true"
     result = subprocess.run(
