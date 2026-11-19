@@ -281,31 +281,27 @@ def _resolve_note_target_or_raise(
     return note_target
 
 
-def _is_instance_readme(ppath, key: str | None) -> bool:
-    """True when this save is the database README, stored as a block."""
-    if key == "README.md":
-        return True
-    return key is None and getattr(ppath, "name", None) == "README.md"
+def _is_readme_artifact_save(ppath, key: str | None) -> bool:
+    return key == "README.md" or ppath.name == "README.md"
 
 
 def _save_readme_block(
-    ppath,
+    ppath: Path,
     *,
     branch,
     space,
-):
+) -> None:
     import lamindb as ln
 
     content = ppath.read_text(encoding="utf-8")
-    block = ln.models.Block(
+    ln.models.Block(
         key="README.md",
         content=content,
         kind="readme",
         branch=branch,
         space=space,
     ).save()
-    logger.important(f"saved README block: Block('{block.uid}')")
-    return block
+    logger.important("saved README block")
 
 
 def save(
@@ -410,18 +406,6 @@ def save(
         if note_target is not None:
             registry = "project" if is_project_note_target(note_target[0]) else "record"
 
-    if not saving_plan and _is_instance_readme(ppath, key):
-        if store_kwargs is not None:
-            raise click.ClickException(
-                "--store-kwargs and --batch-size are not supported when saving the"
-                " database README"
-            )
-        block = _save_readme_block(ppath, branch=branch_record, space=space_record)
-        if project is not None:
-            block.projects.add(project_record)
-            logger.important(f"labeled with project: {project_record.name}")
-        return None
-
     if store_kwargs is not None and registry != "artifact":
         raise click.ClickException(
             "--store-kwargs and --batch-size are only supported when saving artifacts"
@@ -450,6 +434,9 @@ def save(
         return None
 
     if registry == "artifact":
+        if not saving_plan and _is_readme_artifact_save(ppath, key):
+            _save_readme_block(ppath, branch=branch_record, space=space_record)
+            return None
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
         if stem_uid is not None:
