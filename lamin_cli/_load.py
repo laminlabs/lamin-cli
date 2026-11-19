@@ -122,35 +122,33 @@ def load(
         if note_target is not None:
             entity = "project" if is_project_note_target(note_target[0]) else "record"
 
-    if uid is None and (key == "README.md" or entity == "README.md"):
-        ln_setup.connect(ln_setup.settings.instance.slug)
-        import lamindb as ln
-
-        store_kwargs = resolve_store_kwargs(store_kwargs, batch_size)
-        if store_kwargs is not None:
-            raise click.ClickException(
-                "--store-kwargs and --batch-size are not supported when loading the"
-                " database README"
-            )
-        return _write_instance_readme(ln, ln_setup.settings.dev_dir)
-
-    if entity is None:
-        if key is None:
-            raise SystemExit("Either entity or key has to be provided.")
-        entity = infer_registry_from_path(key)
-
-    if entity.startswith("https://") and "lamin" in entity:
-        url = entity
-        instance, entity, uid = decompose_url(url)
-    elif entity not in {"artifact", "transform", "collection", "record", "project"}:
-        raise SystemExit(
-            "Entity has to be a laminhub URL or 'artifact', 'collection', or 'transform'"
-        )
-    else:
+    loading_instance_readme = uid is None and (
+        key == "README.md" or entity == "README.md"
+    )
+    if loading_instance_readme:
         instance = ln_setup.settings.instance.slug
+    else:
+        if entity is None:
+            if key is None:
+                raise SystemExit("Either entity or key has to be provided.")
+            entity = infer_registry_from_path(key)
+        if entity.startswith("https://") and "lamin" in entity:
+            url = entity
+            instance, entity, uid = decompose_url(url)
+        elif entity not in {"artifact", "transform", "collection", "record", "project"}:
+            raise SystemExit(
+                "Entity has to be a laminhub URL or 'artifact', 'collection', or"
+                " 'transform'"
+            )
+        else:
+            instance = ln_setup.settings.instance.slug
 
     ln_setup.connect(instance)
     import lamindb as ln
+
+    if loading_instance_readme:
+        return _write_instance_readme(ln, ln_setup.settings.dev_dir)
+    assert entity is not None
 
     store_kwargs = resolve_store_kwargs(store_kwargs, batch_size)
     if store_kwargs is not None and entity not in {"artifact", "collection"}:
