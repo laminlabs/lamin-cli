@@ -434,10 +434,11 @@ def save(
         return None
 
     if registry == "artifact":
+        if not saving_plan and _is_readme_artifact_save(ppath, key):
+            _save_readme_block(ppath, branch=branch_record, space=space_record)
+            return None
         ln.settings.creation.artifact_silence_missing_run_warning = True
         revises = None
-        if not is_cloud_path and key is None and ppath.name == "README.md":
-            key = "README.md"
         if stem_uid is not None:
             revises = (
                 ln.Artifact.filter(uid__startswith=stem_uid)
@@ -467,12 +468,6 @@ def save(
             space=space_record,
             run=current_run,
         ).save(store_kwargs=store_kwargs or {})
-        if _is_readme_artifact_save(ppath, key):
-            logger.warning(
-                "Saving README as an artifact is transitional and will be phased out; "
-                "README is currently saved as both an Artifact and a Block."
-            )
-            _save_readme_block(ppath, branch=branch_record, space=space_record)
         if plan_tmp_path is not None and Path(plan_tmp_path).exists():
             Path(plan_tmp_path).unlink()
         logger.important(f"saved: {artifact}")

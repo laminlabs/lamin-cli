@@ -30,10 +30,11 @@ from .urls import decompose_url
 def _write_note_file(
     *,
     content: str,
-    uid: str,
     note_name: str,
     relative_parents: list[str],
     active_dev_dir: Path | None,
+    uid: str | None = None,
+    label: str = "note",
 ) -> Path:
     cwd = Path.cwd().resolve()
     filename = f"{note_name}.md"
@@ -48,11 +49,11 @@ def _write_note_file(
         if response != "y":
             raise SystemExit("Aborted.")
 
-    target_path.write_text(
-        upsert_lamindb_record_uid(content or "", uid),
-        encoding="utf-8",
-    )
-    logger.important(f"note is here: {target_path}")
+    written = content or ""
+    if uid is not None:
+        written = upsert_lamindb_record_uid(written, uid)
+    target_path.write_text(written, encoding="utf-8")
+    logger.important(f"{label} is here: {target_path}")
     return target_path
 
 
@@ -118,6 +119,24 @@ def load(
 
     ln_setup.connect(instance)
     import lamindb as ln
+
+    if uid is None and key == "README.md":
+        block = (
+            ln.models.Block.filter(key="README.md", is_latest=True)
+            .order_by("-created_at")
+            .first()
+        )
+        if block is None:
+            raise click.ClickException(
+                "README does not exist. Save it first with `lamin save README.md`."
+            )
+        return _write_note_file(
+            content=block.content or "",
+            note_name="README",
+            relative_parents=[],
+            active_dev_dir=ln_setup.settings.dev_dir,
+            label="README",
+        )
 
     store_kwargs = resolve_store_kwargs(store_kwargs, batch_size)
     if store_kwargs is not None and entity not in {"artifact", "collection"}:
@@ -373,23 +392,6 @@ def load(
                     elif i == 5:
                         logger.important(f"  ... {len(cache_path) - 10} more files ...")
             else:
-                if entity == "artifact" and entity_obj.key == "README.md":
-                    # TODO: switch to reading from README block in the future.
-                    # Current behavior is transitional and reads from README artifact cache.
-                    target_root = (
-                        active_dev_dir
-                        if active_dev_dir is not None
-                        else Path.cwd().resolve()
-                    )
-                    target_path = target_root / "README.md"
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                    if target_path.exists():
-                        response = input(f"! {target_path} exists: replace? (y/n)")
-                        if response != "y":
-                            raise SystemExit("Aborted.")
-                    shutil.copyfile(Path(cache_path), target_path)
-                    logger.important(f"README is here: {target_path}")
-                    return target_path
                 logger.important(f"{entity} is here: {cache_path}")
         case _:
             raise AssertionError(f"unknown entity {entity}")
