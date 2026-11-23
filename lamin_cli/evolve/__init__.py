@@ -52,5 +52,38 @@ class _LazyEvolveGroup(Group):
 
 
 evolve = _LazyEvolveGroup(
-    name="evolve", help="Manage schema plans, migrations, and repairs."
+    name="evolve",
+    help="""Manage schema plans, migrations, and repairs.
+
+Use a plan file to describe the schema you want. Validate it offline, then compare
+it with a development instance before applying it. Replace `account/dev` with
+your instance slug.
+
+Examples:
+
+```bash
+# Create a plan, edit its declarations, and validate it offline
+lamin evolve init samples --output-dir plans
+lamin evolve validate plans/plan_samples.py
+
+# Preview changes or rehearse the plan's data migrations
+lamin evolve plan plans/plan_samples.py -i account/dev
+lamin evolve plan plans/plan_samples.py -i account/dev --preview-migrations
+
+# After committing and pushing the plan, apply it and check for remaining changes
+lamin evolve apply plans/plan_samples.py -i account/dev
+lamin evolve plan plans/plan_samples.py -i account/dev --fail-on-diff
+
+# Preview a repair for dangling objects
+lamin evolve repair dangling -i account/dev --dry-run
+
+# Write a Markdown report for the plans and instances in lamin_schemas.yml
+lamin evolve ci plan --config lamin_schemas.yml --output schema-report.md
+```
+
+For all options on a command, run it with `--help`, for example
+`lamin evolve apply --help`.
+
+→ Python/R alternative: {mod}`lamindb.evolve`
+""",
 )
