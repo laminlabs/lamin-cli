@@ -1844,10 +1844,9 @@ def _generate_help() -> dict[str, dict[str, str | None]]:
         name = (*name, cmd.name)
         command_name = " ".join(name)
 
-        rendered_help = cmd.get_help(ctx)
-        docstring = (inspect.getdoc(cmd.callback) or cmd.help or "").split("\f", 1)[0].strip()
-        usage = rendered_help.split("\n")[0]
-        options = rendered_help.split("Options:", 1)[1]
+        docstring = inspect.getdoc(cmd.callback)
+        usage = cmd.get_help(ctx).split("\n")[0]
+        options = cmd.get_help(ctx).split("Options:")[1]
         out[command_name] = {
             "help": usage + "\n\nOptions:" + options,
             "docstring": docstring,
