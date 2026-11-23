@@ -84,6 +84,6 @@ lamin evolve ci plan --config lamin_schemas.yml --output schema-report.md
 For all options on a command, run it with `--help`, for example
 `lamin evolve apply --help`.
 
-→ Python/R alternative: {mod}`lamindb.evolve`
+→ Python/R alternative: {mod}`lamindb.setup.evolve`
 """,
 )

@@ -57,7 +57,7 @@ assert "typer" not in sys.modules
 
 
 @pytest.mark.parametrize("plain", [False, True])
-@pytest.mark.parametrize("namespace", ["lamindb_setup.evolve", "lamindb.evolve"])
+@pytest.mark.parametrize("namespace", ["lamindb_setup.evolve", "lamindb.setup.evolve"])
 def test_validate_uses_click_and_masks_default(tmp_path, run_cli, plain, namespace):
     plan = tmp_path / "plan_demo.py"
     plan.write_text(_PLAN.replace("lamindb_setup.evolve", namespace))
