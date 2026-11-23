@@ -84,5 +84,5 @@ def evolve() -> None:
     For all options on a command, run it with `--help`, for example
     `lamin evolve apply --help`.
 
-    → Python/R alternative: {mod}`lamindb.setup.evolve`
+    → Python alternative: {mod}`lamindb.setup.evolve`
     """
