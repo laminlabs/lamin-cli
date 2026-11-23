@@ -68,14 +68,12 @@ def test_repair_dangling_dry_run_reports_and_changes_nothing(
     ln.Feature.filter(name="prune_ft", is_type=True).one().delete()
     runs = ln.Run.filter().count()
 
-    # The deprecated alias forwards the switch.
-    for command in (("repair", "dangling"), ("prune-dangling",)):
-        result = run_cli(*command, "-i", instance.slug, "--dry-run")
+    result = run_cli("repair", "dangling", "-i", instance.slug, "--dry-run")
 
-        assert result.returncode == 0, result.stderr
-        assert "PruneSchema" in result.stdout
-        assert "[y/N]" not in result.stdout
-        assert result.stdout.rstrip().endswith("Dry run: nothing was changed.")
+    assert result.returncode == 0, result.stderr
+    assert "PruneSchema" in result.stdout
+    assert "[y/N]" not in result.stdout
+    assert result.stdout.rstrip().endswith("Dry run: nothing was changed.")
 
     assert ln.Schema.filter(name="PruneSchema").one_or_none() is not None
     assert ln.Run.filter().count() == runs

@@ -26,9 +26,6 @@ Exposes `lamin evolve` with these terraform-like subcommands:
 - `ci missing-exports`: report the objects each plan must export.
 - `ci verify-config`: check every committed plan is referenced or ignored.
 
-The `prune-dangling`, `remove-duplicates` and `verify-dtypes` commands are
-kept as deprecated aliases for their `repair` counterparts.
-
 `validate`, `plan` and `apply` require the plan to declare a
 `PLAN_TRANSFORM_STEM_UID` (see
 :func:`~lamindb_setup.evolve.engine._loader.require_stem_uid`); `init` is the way
@@ -132,9 +129,6 @@ _COMMAND_ORDER = (
     "repair",
     "utils",
     "ci",
-    "prune-dangling",
-    "remove-duplicates",
-    "verify-dtypes",
 )
 
 
@@ -349,9 +343,6 @@ def app(
     ctx.with_resource(no_default_instance())
 
 
-_INTROSPECTION_PANEL = "Introspection, debugging & migration"
-_DEPRECATED_PANEL = "Deprecated"
-
 _TARGETS_HELP = (
     "One or more plans to act on, each as 'path/to/plan.py:plan_variable' (the "
     "':plan_variable' suffix is optional when the file defines exactly one "
@@ -385,32 +376,6 @@ _SHOW_UNCHANGED_HELP = (
 )
 
 
-def _warn_deprecated(old: str, new: str) -> None:
-    """Print a deprecation notice steering `old` usage towards `new`."""
-    click.echo(f"Warning: {old} is deprecated; use {new} instead.", err=True)
-
-
-def _fold_deprecated_alias(
-    value: Path | None, alias_value: Path | None, *, alias: str, option: str
-) -> Path | None:
-    """The value of `option`, given either itself or its hidden `alias`.
-
-    The alias is a separate, hidden option so that `--help` lists only the
-    name to use.  It still works, with a deprecation warning; given together
-    with `option` and a different value, it is a usage error rather than a
-    silent choice between the two.
-    """
-    if alias_value is None:
-        return value
-    _warn_deprecated(alias, option)
-    if value is not None and value != alias_value:
-        raise click.BadParameter(
-            f"{alias} and {option} disagree; pass only {option}.",
-            param_hint=option,
-        )
-    return alias_value
-
-
 def _prune_lock_after_destroy(
     lock: LockFile, lock_path: Path, keys: Iterable[str]
 ) -> int:
@@ -438,27 +403,18 @@ def _prune_lock_after_destroy(
 @click.argument(
     "name",
     cls=_Argument,
-    required=False,
+    required=True,
     type=str,
     help="Plan name, e.g. 'mynewplan' -> plan_mynewplan.py.",
 )
 @click.option(
     "--output-dir",
-    "--directory",
     "-d",
     "directory",
     default=Path(),
     show_default=True,
     type=click.Path(path_type=Path),
     help="Directory in which to create the new plan file.",
-)
-@click.option(
-    "--add-uid",
-    "add_uid",
-    default=None,
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help="Deprecated: use 'lamin evolve utils add-uid <plan>'. Add a stem uid to this existing plan file instead of scaffolding.",
 )
 @click.option(
     "--minimal",
@@ -479,9 +435,7 @@ def _prune_lock_after_destroy(
     callback=_as_optional_list,
     help="Instance(s) to check the generated uid against for collisions. Repeat to require the uid to be free on several instances.",
 )
-def init(
-    name: str, directory: Path, add_uid: Path, minimal: bool, instance: list[str]
-) -> None:
+def init(name: str, directory: Path, minimal: bool, instance: list[str]) -> None:
     """Scaffold a new plan file with a fresh transform stem uid.
 
     Writes 'plan_<name>.py' into --output-dir (the current directory by default)
@@ -490,28 +444,10 @@ def init(
     """
     from lamindb_setup.evolve.engine import PLAN_STEM_UID_VAR
     from lamindb_setup.evolve.introspect import (
-        add_stem_uid_to_plan,
         generate_plan_stem_uid,
         plan_slug,
         render_plan,
     )
-
-    # Mode 1: add a stem uid to an existing plan file.
-    if add_uid is not None:
-        _warn_deprecated("init --add-uid", "utils add-uid")
-        if name is not None:
-            click.echo(
-                "Error: pass either a plan name or --add-uid, not both.", err=True
-            )
-            raise Exit(code=1)
-        uid = add_stem_uid_to_plan(add_uid, instance or ())
-        click.echo(f"Added {PLAN_STEM_UID_VAR} = {uid!r} to {add_uid}")
-        return
-
-    # Mode 2: scaffold a brand-new plan file.
-    if name is None:
-        click.echo("Error: provide a plan name or use --add-uid.", err=True)
-        raise Exit(code=1)
 
     slug = plan_slug(name)
     file_stem = slug if slug.startswith("plan_") else f"plan_{slug}"
@@ -1596,19 +1532,10 @@ def _destroy_outcome(
     "--output-dir",
     "-d",
     "output_dir",
-    default=None,
+    default=Path(),
     show_default=True,
     type=click.Path(path_type=Path),
     help="Directory to write the plan file into (default: the current directory).",
-)
-@click.option(
-    "-o",
-    "legacy_output_dir",
-    default=None,
-    show_default=True,
-    type=click.Path(path_type=Path),
-    hidden=True,
-    help="Deprecated: use -d/--output-dir.",
 )
 @click.option(
     "--space",
@@ -1652,7 +1579,6 @@ def introspect_instance_cmd(
     name: str,
     instance: str,
     output_dir: Path,
-    legacy_output_dir: Path,
     space: list[str],
     exclude_space: list[str],
     overwrite: bool,
@@ -1669,15 +1595,6 @@ def introspect_instance_cmd(
     from lamindb_setup.evolve.console import progress_reporter
     from lamindb_setup.evolve.introspect import introspect_instance, plan_slug
 
-    output_dir = (
-        _fold_deprecated_alias(
-            output_dir,
-            legacy_output_dir,
-            alias="introspect -o",
-            option="-d/--output-dir",
-        )
-        or Path()
-    )
     output = output_dir / f"plan_{plan_slug(name)}.py"
 
     try:
@@ -1979,97 +1896,6 @@ def _attach_prune_report(
     )
 
 
-@app.command("prune-dangling", no_args_is_help=True, deprecated=True, cls=_Command)
-@click.option(
-    "--instance",
-    "-i",
-    "instance",
-    required=True,
-    show_default=True,
-    type=str,
-    help=_INSTANCE_HELP,
-)
-@click.option(
-    "--permanent",
-    "permanent",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Delete irreversibly instead of moving objects to the trash.",
-)
-@click.option(
-    "--space",
-    "-s",
-    "space",
-    default=None,
-    show_default=True,
-    type=str,
-    multiple=True,
-    callback=_as_optional_list,
-    help="Restrict pruning to one or more space uids (repeat to add spaces).",
-)
-@click.option(
-    "--exclude-space",
-    "-x",
-    "exclude_space",
-    default=None,
-    show_default=True,
-    type=str,
-    multiple=True,
-    callback=_as_optional_list,
-    help="Exclude one or more space uids from pruning (repeat to add spaces); applied after --space.",
-)
-@click.option(
-    "--yes",
-    "-y",
-    "yes",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Skip the confirmation prompt.",
-)
-@click.option(
-    "--dry-run",
-    "dry_run",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help=_DRY_RUN_HELP,
-)
-@click.option(
-    "--config",
-    "-c",
-    "config",
-    default=None,
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help=_REPAIR_CONFIG_HELP,
-)
-@click.pass_context
-def prune_dangling_cmd(
-    ctx: click.Context,
-    instance: str,
-    permanent: bool,
-    space: list[str],
-    exclude_space: list[str],
-    yes: bool,
-    dry_run: bool,
-    config: Path,
-) -> None:
-    """Deprecated alias for 'repair dangling'."""
-    _warn_deprecated("prune-dangling", "repair dangling")
-    ctx.invoke(
-        repair_dangling,
-        instance=instance,
-        permanent=permanent,
-        space=space,
-        exclude_space=exclude_space,
-        yes=yes,
-        dry_run=dry_run,
-        config=config,
-    )
-
-
 @repair_app.command("duplicates", no_args_is_help=True, cls=_Command)
 @click.option(
     "--instance",
@@ -2301,97 +2127,6 @@ def _attach_dedup_report(
         operation="repair-duplicates",
         filename="repair-duplicates-report.txt",
         folder="repair-duplicates-reports",
-    )
-
-
-@app.command("remove-duplicates", no_args_is_help=True, deprecated=True, cls=_Command)
-@click.option(
-    "--instance",
-    "-i",
-    "instance",
-    required=True,
-    show_default=True,
-    type=str,
-    help=_INSTANCE_HELP,
-)
-@click.option(
-    "--permanent",
-    "permanent",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Delete irreversibly instead of moving objects to the trash.",
-)
-@click.option(
-    "--space",
-    "-s",
-    "space",
-    default=None,
-    show_default=True,
-    type=str,
-    multiple=True,
-    callback=_as_optional_list,
-    help="Restrict the scan to one or more space uids (repeat to add spaces).",
-)
-@click.option(
-    "--exclude-space",
-    "-x",
-    "exclude_space",
-    default=None,
-    show_default=True,
-    type=str,
-    multiple=True,
-    callback=_as_optional_list,
-    help="Exclude one or more space uids from the scan (repeat to add spaces); applied after --space.",
-)
-@click.option(
-    "--yes",
-    "-y",
-    "yes",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Skip the confirmation prompt.",
-)
-@click.option(
-    "--dry-run",
-    "dry_run",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help=_DRY_RUN_HELP,
-)
-@click.option(
-    "--config",
-    "-c",
-    "config",
-    default=None,
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help=_REPAIR_CONFIG_HELP,
-)
-@click.pass_context
-def remove_duplicates_cmd(
-    ctx: click.Context,
-    instance: str,
-    permanent: bool,
-    space: list[str],
-    exclude_space: list[str],
-    yes: bool,
-    dry_run: bool,
-    config: Path,
-) -> None:
-    """Deprecated alias for 'repair duplicates'."""
-    _warn_deprecated("remove-duplicates", "repair duplicates")
-    ctx.invoke(
-        repair_duplicates,
-        instance=instance,
-        permanent=permanent,
-        space=space,
-        exclude_space=exclude_space,
-        yes=yes,
-        dry_run=dry_run,
-        config=config,
     )
 
 
@@ -3162,87 +2897,6 @@ def _ensure_locks_committed(lock_files: Iterable[Path], *, dry_run: bool) -> Non
         click.echo(f"Note: a real run would refuse: {exc}", err=True)
 
 
-@app.command("verify-dtypes", no_args_is_help=True, deprecated=True, cls=_Command)
-@click.option(
-    "--instance",
-    "-i",
-    "instance",
-    required=True,
-    show_default=True,
-    type=str,
-    help=_INSTANCE_HELP,
-)
-@click.option(
-    "--space",
-    "-s",
-    "space",
-    default=None,
-    show_default=True,
-    type=str,
-    multiple=True,
-    callback=_as_optional_list,
-    help="Restrict verification to one or more space uids (repeat to add spaces).",
-)
-@click.option(
-    "--exclude-space",
-    "-x",
-    "exclude_space",
-    default=None,
-    show_default=True,
-    type=str,
-    multiple=True,
-    callback=_as_optional_list,
-    help="Exclude one or more space uids from verification (repeat to add spaces); applied after --space.",
-)
-@click.option(
-    "--yes",
-    "-y",
-    "yes",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Skip the confirmation prompt.",
-)
-@click.option(
-    "--dry-run",
-    "dry_run",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help=_DRY_RUN_HELP,
-)
-@click.option(
-    "--config",
-    "-c",
-    "config",
-    default=None,
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help=_REPAIR_CONFIG_HELP,
-)
-@click.pass_context
-def verify_dtypes_cmd(
-    ctx: click.Context,
-    instance: str,
-    space: list[str],
-    exclude_space: list[str],
-    yes: bool,
-    dry_run: bool,
-    config: Path,
-) -> None:
-    """Deprecated alias for 'repair dtypes'."""
-    _warn_deprecated("verify-dtypes", "repair dtypes")
-    ctx.invoke(
-        repair_dtypes,
-        instance=instance,
-        space=space,
-        exclude_space=exclude_space,
-        yes=yes,
-        dry_run=dry_run,
-        config=config,
-    )
-
-
 # === CI subcommands ===========================================================
 
 ci_app = Group(
@@ -3433,16 +3087,6 @@ def ci_plan(
     help=_CI_INSTANCE_HELP,
 )
 @click.option(
-    "--yes",
-    "-y",
-    "yes",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    hidden=True,
-    help="Deprecated and ignored: ci apply never prompts.",
-)
-@click.option(
     "--strict-renames/--no-strict-renames",
     "strict_renames",
     default=True,
@@ -3490,7 +3134,6 @@ def ci_apply(
     config: Path,
     changed: list[str],
     instance: list[str],
-    yes: bool,
     strict_renames: bool,
     allow_data_validated_changes: bool,
     strict_uids: bool,
@@ -3523,12 +3166,6 @@ def ci_apply(
     from lamindb_setup.evolve.console import report_stage
     from lamindb_setup.evolve.engine import SheetExportError, TrackError
 
-    if yes:
-        click.echo(
-            "Warning: ci apply --yes is deprecated and has no effect; "
-            "ci apply never prompts.",
-            err=True,
-        )
     check_output_format(output_format, output)
     cfg = _load_ci_config(ctx, config)
 
@@ -3606,16 +3243,6 @@ def ci_apply(
     help="Write the Markdown drift report to this file (always also printed).",
 )
 @click.option(
-    "--report",
-    "-r",
-    "report",
-    default=None,
-    show_default=True,
-    type=click.Path(path_type=Path),
-    hidden=True,
-    help="Deprecated: use -o/--output.",
-)
-@click.option(
     "--exit-zero",
     "exit_zero",
     default=False,
@@ -3631,14 +3258,6 @@ def ci_apply(
     type=int,
     help="Truncate the rendered report to at most this many characters (e.g. to fit GitHub's issue-body limit).",
 )
-@click.option(
-    "--github-issue",
-    "github_issue",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Deprecated: use '--format-max-chars'. Condense the report to fit GitHub's issue-body character limit.",
-)
 @click.pass_context
 def ci_drift(
     ctx: click.Context,
@@ -3646,10 +3265,8 @@ def ci_drift(
     instance: list[str],
     output_dir: Path,
     output: Path,
-    report: Path,
     exit_zero: bool,
     format_max_chars: int,
-    github_issue: bool,
 ) -> None:
     """Detect drift across the configured instances for scheduled runs.
 
@@ -3664,15 +3281,11 @@ def ci_drift(
     --instance restricts the run to the named instances.
     """
     from lamindb_setup.evolve.ci import (
-        GITHUB_ISSUE_MAX_CHARS,
         render_drift_report,
         run_drift_detection,
     )
     from lamindb_setup.evolve.console import report_stage
 
-    report_file = _fold_deprecated_alias(
-        output, report, alias="ci drift --report/-r", option="-o/--output"
-    )
     cfg = _load_ci_config(ctx, config)
 
     if output_dir is None:
@@ -3680,16 +3293,11 @@ def ci_drift(
     result = run_drift_detection(
         cfg, output_dir, instances=instance or None, report=report_stage
     )
-    max_chars = format_max_chars
-    if github_issue:
-        _warn_deprecated("--github-issue", "--format-max-chars")
-        if max_chars is None:
-            max_chars = GITHUB_ISSUE_MAX_CHARS
-    markdown = render_drift_report(result, max_chars=max_chars)
+    markdown = render_drift_report(result, max_chars=format_max_chars)
 
-    if report_file is not None:
-        report_file.parent.mkdir(parents=True, exist_ok=True)
-        report_file.write_text(markdown, encoding="utf-8")
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(markdown, encoding="utf-8")
     click.echo(markdown)
 
     # An instance that could not be checked fails the run whatever --exit-zero
@@ -3767,14 +3375,6 @@ class _ReportFormat(str, enum.Enum):
     help="Output format: 'markdown' (default) for a report, or 'json' payload.",
 )
 @click.option(
-    "--json",
-    "json_output",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    help="Deprecated: use '--format json'. Emit a JSON payload.",
-)
-@click.option(
     "--fail-on-missing",
     "fail_on_missing",
     default=False,
@@ -3790,7 +3390,6 @@ def ci_missing_exports(
     instance: list[str],
     output: Path,
     output_format: _ReportFormat,
-    json_output: bool,
     fail_on_missing: bool,
 ) -> None:
     """Report the full closure of tracked objects that plans must export.
@@ -3821,10 +3420,7 @@ def ci_missing_exports(
         click.echo(f"Error: {exc}", err=True)
         raise Exit(code=1) from exc
 
-    if json_output:
-        _warn_deprecated("--json", "--format json")
-    as_json = json_output or output_format is _ReportFormat.json
-    if as_json:
+    if output_format is _ReportFormat.json:
         payload = _json.dumps(dataclasses.asdict(result), indent=2)
     else:
         payload = render_missing_exports_report(result)

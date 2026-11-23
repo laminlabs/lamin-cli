@@ -85,14 +85,6 @@ def configure_help(app: Group) -> None:
                             "name": "Introspection, debugging & migration",
                             "commands": ["introspect", "repair", "utils", "ci"],
                         },
-                        {
-                            "name": "Deprecated",
-                            "commands": [
-                                "prune-dangling",
-                                "remove-duplicates",
-                                "verify-dtypes",
-                            ],
-                        },
                     ]
                 },
             )

@@ -376,65 +376,6 @@ def test_ci_drift_cli_format_max_chars_truncates(
     assert "Report condensed to fit GitHub" in condensed.stdout
 
 
-def test_ci_drift_cli_github_issue_is_deprecated(
-    instance, run_cli, tmp_path: Path
-) -> None:
-    config = _live_config(tmp_path, instance.slug)
-
-    result = run_cli("ci", "drift", "-c", str(config), "--github-issue")
-
-    assert result.returncode == 0, result.stderr
-    assert "--format-max-chars" in result.stderr
-    assert "lamin evolve drift" in result.stdout
-
-
-def test_ci_drift_cli_report_is_a_deprecated_alias_of_output(
-    instance, run_cli, tmp_path: Path
-) -> None:
-    config = _live_config(tmp_path, instance.slug)
-    out = tmp_path / "drift.md"
-
-    result = run_cli("ci", "drift", "-c", str(config), "-r", str(out))
-
-    assert result.returncode == 0, result.stderr
-    assert "lamin evolve drift" in out.read_text(encoding="utf-8")
-    assert (
-        "Warning: ci drift --report/-r is deprecated; use -o/--output instead."
-        in result.stderr
-    )
-
-
-def test_ci_drift_report_is_hidden_and_may_not_contradict_output(
-    tmp_path: Path,
-) -> None:
-    from click.testing import CliRunner
-    from lamin_cli.evolve._commands import app
-
-    runner = CliRunner()
-    # Under FORCE_COLOR (as in CI) rich styles the help; compare it unstyled.
-    help_text = _ANSI_ESCAPE_RE.sub(
-        "",
-        runner.invoke(
-            app, ["ci", "drift", "--help"], terminal_width=200, env={"COLUMNS": "200"}
-        ).output,
-    )
-    assert "--report" not in help_text
-    assert not re.search(r"(?<![\w-])-r\b", help_text)
-    assert "--output" in help_text
-
-    # Refused before the configuration is even read.
-    result = runner.invoke(
-        app,
-        ["ci", "drift", "-c", "definitely_missing.yml"]
-        + ["-o", str(tmp_path / "a.md"), "-r", str(tmp_path / "b.md")],
-        terminal_width=200,
-        env={"COLUMNS": "200"},
-    )
-    assert result.exit_code == 2
-    output = _collapse_rich_output(result.output)
-    assert "ci drift --report/-r and -o/--output disagree" in output
-
-
 # --- ci apply ---------------------------------------------------------------
 
 
@@ -513,9 +454,7 @@ def test_ci_apply_cli_runs(
     )
     out = tmp_path / "apply.md"
 
-    result = run_cli(
-        "ci", "apply", "-c", str(config), "-y", "-f", "markdown", "-o", str(out)
-    )
+    result = run_cli("ci", "apply", "-c", str(config), "-f", "markdown", "-o", str(out))
 
     assert result.returncode == 0, result.stderr
     assert "CiSchema" in out.read_text(encoding="utf-8")
@@ -531,19 +470,6 @@ def test_ci_apply_cli_missing_config() -> None:
     result = CliRunner().invoke(app, ["ci", "apply", "-c", "definitely_missing.yml"])
     assert result.exit_code == 1
     assert "Error" in result.output
-
-
-def test_ci_apply_yes_is_deprecated_and_hidden() -> None:
-    from click.testing import CliRunner
-    from lamin_cli.evolve._commands import app
-
-    runner = CliRunner()
-    result = runner.invoke(app, ["ci", "apply", "-c", "definitely_missing.yml", "-y"])
-    assert result.exit_code == 1
-    assert "ci apply --yes is deprecated and has no effect" in result.output
-
-    help_text = runner.invoke(app, ["ci", "apply", "--help"]).output
-    assert "--yes" not in help_text
 
 
 def test_ci_apply_cli_rejects_unconfigured_changed_file(
@@ -638,12 +564,6 @@ def test_ci_missing_exports_cli_emits_json(
     payload = json.loads(result.stdout[result.stdout.index("{") :])
     (group,) = payload["instances"][0]["groups"]
     assert [obj["name"] for obj in group["objects"]] == ["ci_col"]
-
-    # --json still works but is deprecated
-    legacy = run_cli(*missing, "--json")
-    assert legacy.returncode == 0, legacy.stderr
-    assert json.loads(legacy.stdout[legacy.stdout.index("{") :]) == payload
-    assert "--format json" in legacy.stderr
 
 
 def test_ci_missing_exports_offers_only_the_formats_it_renders() -> None:

@@ -674,7 +674,7 @@ def test_init_command_scaffolds_plan(tmp_path: Path) -> None:
         is_valid_stem_uid,
     )
 
-    result = _run_cli("init", "mynewplan", "--directory", str(tmp_path))
+    result = _run_cli("init", "mynewplan", "--output-dir", str(tmp_path))
 
     assert result.returncode == 0, result.stderr
     plan_file = tmp_path / "plan_mynewplan.py"
@@ -690,7 +690,7 @@ def test_init_command_scaffolds_plan(tmp_path: Path) -> None:
 
 
 def test_init_generated_plan_validates(tmp_path: Path) -> None:
-    init_result = _run_cli("init", "sample", "--directory", str(tmp_path))
+    init_result = _run_cli("init", "sample", "--output-dir", str(tmp_path))
     assert init_result.returncode == 0, init_result.stderr
 
     plan_file = tmp_path / "plan_sample.py"
@@ -699,7 +699,7 @@ def test_init_generated_plan_validates(tmp_path: Path) -> None:
 
 
 def test_init_rich_scaffold_has_imports_and_examples(tmp_path: Path) -> None:
-    result = _run_cli("init", "rich", "--directory", str(tmp_path))
+    result = _run_cli("init", "rich", "--output-dir", str(tmp_path))
     assert result.returncode == 0, result.stderr
 
     text = (tmp_path / "plan_rich.py").read_text()
@@ -726,7 +726,7 @@ def test_init_rich_scaffold_has_imports_and_examples(tmp_path: Path) -> None:
 
 
 def test_init_minimal_scaffold_omits_examples(tmp_path: Path) -> None:
-    result = _run_cli("init", "lean", "--minimal", "--directory", str(tmp_path))
+    result = _run_cli("init", "lean", "--minimal", "--output-dir", str(tmp_path))
     assert result.returncode == 0, result.stderr
 
     text = (tmp_path / "plan_lean.py").read_text()
@@ -740,7 +740,7 @@ def test_init_minimal_scaffold_omits_examples(tmp_path: Path) -> None:
 
 
 def test_init_minimal_generated_plan_validates(tmp_path: Path) -> None:
-    init_result = _run_cli("init", "lean", "--minimal", "--directory", str(tmp_path))
+    init_result = _run_cli("init", "lean", "--minimal", "--output-dir", str(tmp_path))
     assert init_result.returncode == 0, init_result.stderr
 
     plan_file = tmp_path / "plan_lean.py"
@@ -765,7 +765,7 @@ def test_init_command_refuses_existing_file(tmp_path: Path) -> None:
     plan_file = tmp_path / "plan_dup.py"
     plan_file.write_text("x = 1\n")
 
-    result = _run_cli("init", "dup", "--directory", str(tmp_path))
+    result = _run_cli("init", "dup", "--output-dir", str(tmp_path))
     assert result.returncode == 1
     assert "already exists" in result.stderr
 
@@ -780,7 +780,7 @@ def test_validate_errors_when_stem_uid_missing(tmp_path: Path) -> None:
     assert "utils add-uid" in result.stderr
 
 
-def test_init_add_uid_to_existing_plan(tmp_path: Path) -> None:
+def test_utils_add_uid_to_existing_plan(tmp_path: Path) -> None:
     from lamindb_setup.evolve.engine._track import (
         PLAN_STEM_UID_VAR,
         is_valid_stem_uid,
@@ -789,7 +789,7 @@ def test_init_add_uid_to_existing_plan(tmp_path: Path) -> None:
     plan_file = tmp_path / "plan_existing.py"
     plan_file.write_text(_PLAN_CODE_NO_UID)
 
-    result = _run_cli("init", "--add-uid", str(plan_file))
+    result = _run_cli("utils", "add-uid", str(plan_file))
     assert result.returncode == 0, result.stderr
 
     text = plan_file.read_text()
@@ -806,55 +806,6 @@ def test_init_add_uid_to_existing_plan(tmp_path: Path) -> None:
     assert validate_result.returncode == 0, validate_result.stderr
 
 
-def test_init_add_uid_refuses_duplicate(tmp_path: Path) -> None:
-    plan_file = tmp_path / "plan_has_uid.py"
-    plan_file.write_text(_PLAN_CODE)  # already declares the stem uid
-
-    result = _run_cli("init", "--add-uid", str(plan_file))
-    assert result.returncode == 1
-    assert "already defines" in result.stderr
-
-
-def test_init_add_uid_rejects_name_and_add_uid(tmp_path: Path) -> None:
-    plan_file = tmp_path / "plan_x.py"
-    plan_file.write_text(_PLAN_CODE_NO_UID)
-
-    result = _run_cli("init", "somename", "--add-uid", str(plan_file))
-    assert result.returncode == 1
-    assert "not both" in result.stderr
-
-
-def test_init_add_uid_warns_deprecated(tmp_path: Path) -> None:
-    plan_file = tmp_path / "plan_dep.py"
-    plan_file.write_text(_PLAN_CODE_NO_UID)
-
-    result = _run_cli("init", "--add-uid", str(plan_file))
-
-    assert result.returncode == 0, result.stderr
-    assert "utils add-uid" in result.stderr
-
-
-def test_utils_add_uid_adds_stem_uid(tmp_path: Path) -> None:
-    from lamindb_setup.evolve.engine._track import (
-        PLAN_STEM_UID_VAR,
-        is_valid_stem_uid,
-    )
-
-    plan_file = tmp_path / "plan_existing.py"
-    plan_file.write_text(_PLAN_CODE_NO_UID)
-
-    result = _run_cli("utils", "add-uid", str(plan_file))
-    assert result.returncode == 0, result.stderr
-
-    text = plan_file.read_text()
-    assert f"{PLAN_STEM_UID_VAR} = " in text
-    assert text.index(PLAN_STEM_UID_VAR) < text.index("@create_plan")
-
-    namespace: dict[str, object] = {}
-    exec(compile(text, str(plan_file), "exec"), namespace)
-    assert is_valid_stem_uid(namespace[PLAN_STEM_UID_VAR])
-
-
 def test_utils_add_uid_refuses_duplicate(tmp_path: Path) -> None:
     plan_file = tmp_path / "plan_has_uid.py"
     plan_file.write_text(_PLAN_CODE)  # already declares the stem uid
@@ -862,13 +813,6 @@ def test_utils_add_uid_refuses_duplicate(tmp_path: Path) -> None:
     result = _run_cli("utils", "add-uid", str(plan_file))
     assert result.returncode == 1
     assert "already defines" in result.stderr
-
-
-def test_init_output_dir_alias_matches_directory(tmp_path: Path) -> None:
-    # The new --output-dir and the legacy --directory name the same option.
-    result = _run_cli("init", "viaoutdir", "--output-dir", str(tmp_path))
-    assert result.returncode == 0, result.stderr
-    assert (tmp_path / "plan_viaoutdir.py").exists()
 
 
 def test_init_prints_the_workflow_for_the_file_it_wrote(
@@ -950,18 +894,6 @@ def test_no_help_text_is_swallowed_as_rich_markup() -> None:
             assert Text.from_markup(text).plain == text, (" ".join(path), text)
 
 
-def test_repair_deprecated_aliases_warn() -> None:
-    # The top-level maintenance commands are deprecated aliases for 'repair *'.
-    for old, _new in (
-        ("prune-dangling", "repair dangling"),
-        ("remove-duplicates", "repair duplicates"),
-        ("verify-dtypes", "repair dtypes"),
-    ):
-        result = _run_cli(old, "--help")
-        assert result.returncode == 0, result.stderr
-        assert "deprecated" in result.stdout.lower()
-
-
 @pytest.mark.parametrize(
     "command",
     [
@@ -971,9 +903,6 @@ def test_repair_deprecated_aliases_warn() -> None:
         ("repair", "stranded-values"),
         ("repair", "sheet-schemas"),
         ("repair", "align-uids", "plan_x.py", "--source", "acc/src"),
-        ("prune-dangling",),
-        ("remove-duplicates",),
-        ("verify-dtypes",),
     ],
     ids=lambda command: " ".join(command[:2]),
 )
@@ -2010,18 +1939,6 @@ def test_prune_dangling_command_is_registered() -> None:
     assert "--exclude-space" in result.stdout
 
 
-def test_prune_dangling_listed_in_deprecated_panel() -> None:
-    result = subprocess.run(
-        [sys.executable, str(_CLI_LAUNCHER), "--help"],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
-    )
-    assert result.returncode == 0, result.stderr
-    assert "Deprecated" in result.stdout
-    assert "prune-dangling" in result.stdout
-
-
 def test_repair_sheet_schemas_command_is_registered() -> None:
     result = subprocess.run(
         [
@@ -2059,18 +1976,6 @@ def test_remove_duplicates_command_is_registered() -> None:
     assert "--permanent" in result.stdout
     assert "--space" in result.stdout
     assert "--exclude-space" in result.stdout
-
-
-def test_remove_duplicates_listed_in_deprecated_panel() -> None:
-    result = subprocess.run(
-        [sys.executable, str(_CLI_LAUNCHER), "--help"],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
-    )
-    assert result.returncode == 0, result.stderr
-    assert "Deprecated" in result.stdout
-    assert "remove-duplicates" in result.stdout
 
 
 def test_every_user_facing_error_derives_from_the_shared_base() -> None:
@@ -2323,47 +2228,6 @@ def test_output_help_names_the_formats_that_write_a_document(
 
     assert "Works for every --format" not in help_text
     assert "Needs --format markdown or --format json." in help_text
-
-
-def test_introspect_dash_o_is_a_hidden_deprecated_alias_of_output_dir(
-    instance, run_cli, tmp_path: Path
-) -> None:
-    introspect = ["introspect", "aliased", "-i", instance.slug, "--no-verify"]
-
-    legacy = run_cli(*introspect, "-o", str(tmp_path / "legacy"))
-    current = run_cli(*introspect, "-d", str(tmp_path / "current"))
-
-    assert legacy.returncode == 0, legacy.stderr
-    assert (tmp_path / "legacy" / "plan_aliased.py").is_file()
-    assert (
-        "Warning: introspect -o is deprecated; use -d/--output-dir instead."
-        in legacy.stderr
-    )
-    assert current.returncode == 0, current.stderr
-    assert (tmp_path / "current" / "plan_aliased.py").is_file()
-    assert "deprecated" not in current.stderr
-    assert not re.search(r"(?<![\w-])-o\b", _help_text("introspect"))
-
-
-def test_introspect_dash_o_disagreeing_with_output_dir_is_a_usage_error(
-    tmp_path: Path,
-) -> None:
-    from click.testing import CliRunner
-    from lamin_cli.evolve._commands import app
-
-    result = CliRunner().invoke(
-        app,
-        ["introspect", "x", "-i", "acc/inst", "-d", str(tmp_path / "a")]
-        + ["-o", str(tmp_path / "b")],
-        terminal_width=200,
-        env={"COLUMNS": "200"},
-    )
-
-    assert result.exit_code == 2
-    output = _collapse_rich_output(result.output + getattr(result, "stderr", ""))
-    assert "introspect -o and -d/--output-dir disagree" in output
-    assert not (tmp_path / "a").exists()
-    assert not (tmp_path / "b").exists()
 
 
 def test_several_plans_render_as_one_json_array(tmp_path: Path) -> None:
