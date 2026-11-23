@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from _support.output import command_output
 
 _SUPPORT = Path(__file__).parent / "_support" / "cli_child.py"
 _PLAN = """from lamindb_setup.evolve import FeatureType, PlanContext, create_plan
@@ -72,7 +73,7 @@ def test_validate_uses_click_and_masks_default(tmp_path, run_cli, plain, namespa
         faults=[{"event": "import", "match": "typer", "raise": "AssertionError"}],
     )
     assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
+    payload = json.loads(command_output(result.stdout))
     assert payload
     assert "Measurements" in result.stdout
 
@@ -138,7 +139,7 @@ def test_introspect_generates_and_verifies_a_native_plan(
     assert "NativeMeasurements" in plan.read_text()
     validated = run_cli("validate", str(plan), "-f", "json")
     assert validated.returncode == 0, validated.stderr
-    assert json.loads(validated.stdout)
+    assert json.loads(command_output(validated.stdout))
 
 
 @pytest.mark.parametrize("plain", [False, True])

@@ -16,6 +16,7 @@ from pathlib import Path
 _CLI_LAUNCHER = Path(__file__).resolve().parent / "_support" / "cli_child.py"
 
 import pytest
+from _support.output import command_output
 from lamin_cli.evolve._commands import _prune_lock_after_destroy
 from lamindb_setup.evolve import Feature, FeatureType, LaminDType
 from lamindb_setup.evolve.authoring._plan import PlanContext, create_plan
@@ -395,7 +396,7 @@ def test_validate_command_markdown_format(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.lstrip().startswith("## Plan summary: my_plan")
+    assert command_output(result.stdout).lstrip().startswith("## Plan summary: my_plan")
     assert "**Schema** `CliSchema`" in result.stdout
     # the same Markdown is written to the output file
     written = out_file.read_text()
@@ -650,7 +651,7 @@ def test_version_option_prints_version() -> None:
     result = _run_cli("--version")
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == __version__
+    assert command_output(result.stdout).strip() == __version__
 
 
 def test_log_queries_option_is_accepted_by_an_offline_command(
@@ -992,7 +993,7 @@ def test_utils_generate_stem_uid_prints_valid_uid() -> None:
     result = _run_cli("utils", "generate-stem-uid")
 
     assert result.returncode == 0, result.stderr
-    uid = result.stdout.strip()
+    uid = command_output(result.stdout).strip()
     assert is_valid_stem_uid(uid)
 
 
@@ -1002,7 +1003,7 @@ def test_utils_generate_stem_uid_count_yields_distinct_uids() -> None:
     result = _run_cli("utils", "generate-stem-uid", "--count", "5")
 
     assert result.returncode == 0, result.stderr
-    uids = result.stdout.split()
+    uids = command_output(result.stdout).split()
     assert len(uids) == 5
     assert len(set(uids)) == 5
     assert all(is_valid_stem_uid(uid) for uid in uids)
@@ -1137,7 +1138,7 @@ def test_utils_fingerprint_capture_prints_json_without_output(tmp_path: Path) ->
     result = _run_cli("utils", "fingerprint", str(plan_file))
 
     assert result.returncode == 0, result.stderr
-    data = json.loads(result.stdout)
+    data = json.loads(command_output(result.stdout))
     assert sum(data.values()) == 6
 
 
