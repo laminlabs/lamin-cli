@@ -128,6 +128,35 @@ def test_load_path_containment(
             assert result.is_absolute() == Path(key).is_absolute()
 
 
+@pytest.mark.parametrize("destination", ["file", "outside-directory", "directory"])
+def test_load_environment_path_containment(
+    tmp_path, monkeypatch, load_record, destination
+):
+    root = tmp_path / "dev"
+    root.mkdir()
+    monkeypatch.chdir(root)
+    cached = tmp_path / "cached-requirements.txt"
+    cached.write_text("package==1")
+    environment = SimpleNamespace(cache=MagicMock(return_value=cached))
+    load_record.latest_run = SimpleNamespace(environment=environment)
+    target = root / "script__requirements.txt"
+    if destination != "file":
+        if destination == "outside-directory":
+            outside = tmp_path / "outside"
+            outside.mkdir()
+            target.symlink_to(outside, target_is_directory=True)
+        else:
+            target.mkdir()
+        with pytest.raises(click.ClickException, match="environment|Environment"):
+            load("transform", uid=load_record.uid, with_env=True)
+        environment.cache.assert_not_called()
+        assert not list(target.iterdir())
+        assert cached.read_text() == "package==1"
+    else:
+        load("transform", uid=load_record.uid, with_env=True)
+        assert target.read_text() == "package==1"
+
+
 def test_decompose_url():
     urls = [
         "https://lamin.ai/laminlabs/arrayloader-benchmarks/transform/1GCKs8zLtkc85zKv",
