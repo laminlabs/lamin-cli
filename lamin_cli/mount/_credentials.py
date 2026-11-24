@@ -188,6 +188,10 @@ def write_profile_config(
     """
     from lamindb_setup.core._settings_store import settings_dir
 
+    for field, value in (("storage root", storage_root), ("endpoint", endpoint)):
+        if value is not None and ("\n" in value or "\r" in value):
+            raise ValueError(f"AWS profile {field} must not contain line breaks.")
+
     directory = Path(settings_dir) / "mount-aws"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
 
