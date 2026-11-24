@@ -206,15 +206,6 @@ def check_output_format(output_format: OutputFormat, output: Path | None) -> Non
         )
 
 
-def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
-    """Print the installed package version and exit when `--version` is given."""
-    if value:
-        from lamindb_setup.evolve import __version__
-
-        click.echo(__version__)
-        raise Exit()
-
-
 _PROFILE_HELP = (
     "Profile the command with pyinstrument and write the report here. A "
     "'.html' suffix produces the interactive flame view, anything else a "
@@ -281,16 +272,6 @@ _PROJECT_ROOT_HELP = (
     help="Manage LaminDB schema plans.",
 )
 @click.option(
-    "--version",
-    "version",
-    default=False,
-    show_default=True,
-    is_flag=True,
-    callback=_version_callback,
-    is_eager=True,
-    help="Print the installed lamindb-setup evolution version and exit.",
-)
-@click.option(
     "--log-queries",
     "log_queries",
     default=False,
@@ -310,7 +291,6 @@ _PROJECT_ROOT_HELP = (
 @click.pass_context
 def app(
     ctx: click.Context,
-    version: bool,
     log_queries: bool,
     project_root: Path,
     profile: Path | None,

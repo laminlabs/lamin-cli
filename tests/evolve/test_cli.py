@@ -645,13 +645,12 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_version_option_prints_version() -> None:
-    from lamindb_setup.evolve import __version__
-
+def test_evolve_rejects_version_option() -> None:
     result = _run_cli("--version")
 
-    assert result.returncode == 0, result.stderr
-    assert command_output(result.stdout).strip() == __version__
+    assert result.returncode == 2, result.stderr
+    assert "No such option" in result.stderr
+    assert "--version" in result.stderr
 
 
 def test_log_queries_option_is_accepted_by_an_offline_command(
