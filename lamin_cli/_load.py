@@ -39,10 +39,14 @@ def _write_note_file(
     cwd = Path.cwd().resolve()
     filename = f"{note_name}.md"
     if active_dev_dir is not None and is_path_within(cwd, active_dev_dir):
+        target_dir = active_dev_dir
         target_path = active_dev_dir.joinpath(*relative_parents, filename)
     else:
+        target_dir = cwd
         target_path = cwd / filename
 
+    if not is_path_within(target_path, target_dir):
+        raise click.ClickException(f"Cannot load outside {target_dir}: {target_path}")
     target_path.parent.mkdir(parents=True, exist_ok=True)
     if target_path.exists():
         response = input(f"! {target_path} exists: replace? (y/n)")
@@ -320,6 +324,11 @@ def load(
             target_path = Path(transform.key)
             if active_dev_dir is not None:
                 target_path = active_dev_dir / target_path
+            target_dir = active_dev_dir if active_dev_dir is not None else Path.cwd()
+            if not is_path_within(target_path, target_dir):
+                raise click.ClickException(
+                    f"Cannot load outside {target_dir}: {target_path}"
+                )
             if len(target_path.parents) > 1:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
             if target_path.exists():
@@ -343,10 +352,18 @@ def load(
                     transform.latest_run is not None
                     and transform.latest_run.environment is not None
                 ):
-                    filepath_env_cache = transform.latest_run.environment.cache()
                     target_env_filename = (
                         target_path.parent / f"{target_path.stem}__requirements.txt"
                     )
+                    if (
+                        not is_path_within(target_env_filename, target_dir)
+                        or target_env_filename.is_dir()
+                    ):
+                        raise click.ClickException(
+                            f"Environment path must be a file within {target_dir}: "
+                            f"{target_env_filename}"
+                        )
+                    filepath_env_cache = transform.latest_run.environment.cache()
                     shutil.move(filepath_env_cache, target_env_filename)
                     logger.important(f"environment is here: {target_env_filename}")
                 else:
