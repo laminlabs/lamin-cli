@@ -176,12 +176,39 @@ def test_expiring_credentials_use_a_refreshing_profile():
     assert "AWS_CONFIG_FILE" in command.env
 
 
-def test_profile_holds_no_secrets_and_is_private():
+@pytest.mark.parametrize(
+    "root, endpoint",
+    [
+        ("s3://my-bucket", None),
+        ("s3://my-bucket/a 'quoted' \"path\"", None),
+        ("s3://my-bucket/%0A%0D", "https://s3.example.com"),
+    ],
+)
+def test_profile_holds_no_secrets_and_is_private(root, endpoint):
+    import configparser
+    import shlex
+    import sys
+
     backend = _backends.BACKENDS_BY_NAME["mount-s3"]
-    command = build_command(backend, _target("s3://my-bucket", "s3"), _options())
+    target = _target(root, "s3", {**CREDENTIALS, "endpoint_url": endpoint})
+    command = build_command(backend, target, _options())
     config = Path(command.env["AWS_CONFIG_FILE"])
     text = config.read_text()
-    assert "credential_process" in text
+    parsed = configparser.RawConfigParser()
+    parsed.read(config)
+    assert parsed.sections() == ["profile lamin"]
+    profile = dict(parsed["profile lamin"])
+    assert shlex.split(profile.pop("credential_process")) == [
+        sys.executable,
+        "-m",
+        "lamin_cli",
+        "settings",
+        "mount",
+        "credentials",
+        "--root",
+        root,
+    ]
+    assert profile == ({"endpoint_url": endpoint} if endpoint else {})
     for secret in CREDENTIALS.values():
         assert secret not in text
     assert config.stat().st_mode & 0o777 == 0o600
