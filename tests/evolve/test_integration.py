@@ -12,11 +12,11 @@ import pytest
 from _support.output import command_output
 
 _SUPPORT = Path(__file__).parent / "_support" / "cli_child.py"
-_PLAN = """from lamindb_setup.evolve import FeatureType, PlanContext, create_plan
+_PLAN = """from {setup_package} import evolve
 PLAN_TRANSFORM_STEM_UID = "testUID00001"
-@create_plan
-def demo(ctx: PlanContext, exports: None) -> None:
-    FeatureType("Measurements")
+@evolve.create_plan
+def demo(ctx: evolve.PlanContext, exports: None) -> None:
+    evolve.FeatureType("Measurements")
 """
 
 
@@ -57,10 +57,10 @@ assert "typer" not in sys.modules
 
 
 @pytest.mark.parametrize("plain", [False, True])
-@pytest.mark.parametrize("namespace", ["lamindb_setup.evolve", "lamindb.setup.evolve"])
-def test_validate_uses_click_and_masks_default(tmp_path, run_cli, plain, namespace):
+@pytest.mark.parametrize("setup_package", ["lamindb_setup", "lamindb.setup"])
+def test_validate_uses_click_and_masks_default(tmp_path, run_cli, plain, setup_package):
     plan = tmp_path / "plan_demo.py"
-    plan.write_text(_PLAN.replace("lamindb_setup.evolve", namespace))
+    plan.write_text(_PLAN.format(setup_package=setup_package))
     result = run_cli(
         "validate",
         str(plan),
