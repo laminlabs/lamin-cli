@@ -214,6 +214,43 @@ def test_profile_holds_no_secrets_and_is_private(root, endpoint):
     assert config.stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.parametrize("field", ["root", "endpoint", "query-endpoint"])
+@pytest.mark.parametrize("newline", ["\n", "\r", "\r\n"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_profile_rejects_line_breaks(tmp_path, field, newline, existing):
+    from urllib.parse import quote
+
+    from lamin_cli.mount._credentials import write_profile_config
+
+    root, endpoint = "s3://my-bucket/prefix", "https://s3.example.com"
+    if existing:
+        config = write_profile_config(root, endpoint)
+        original = config.read_bytes()
+    before = set(tmp_path.rglob("*"))
+    payload = (
+        newline
+        + "[profile injected]"
+        + newline
+        + "credential_process = harmless-marker"
+        + newline
+        + "#"
+    )
+    if field == "root":
+        root += payload
+    elif field == "endpoint":
+        endpoint += payload
+    else:
+        root += "?endpoint_url=" + quote(endpoint + payload, safe="")
+        endpoint = None
+    backend = _backends.BACKENDS_BY_NAME["mount-s3"]
+    target = _target(root, "s3", {**CREDENTIALS, "endpoint_url": endpoint})
+    with pytest.raises(ValueError, match="line breaks"):
+        build_command(backend, target, _options())
+    assert set(tmp_path.rglob("*")) == before
+    if existing:
+        assert config.read_bytes() == original
+
+
 def test_static_credentials_can_be_forced():
     backend = _backends.BACKENDS_BY_NAME["mount-s3"]
     command = build_command(
