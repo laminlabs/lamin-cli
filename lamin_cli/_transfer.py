@@ -27,6 +27,7 @@ def transfer(
     source: str | None = None,
     depth: int = 0,
     transfer: str | None = None,
+    limit: int | None = 20,
 ):
     """Transfer one object from a source database into the current default database."""
     if entity is not None and entity.startswith("https://") and "lamin" in entity:
@@ -58,6 +59,7 @@ def transfer(
         source_db=source,
         depth=depth,
         transfer=transfer,
+        limit=limit,
     )
 
 

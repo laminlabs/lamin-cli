@@ -28,6 +28,7 @@ def io():
     ```
     lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE
     lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE --depth 1
+    lamin io sync https://lamin.ai/laminlabs/lamindata/record/UrcIKR8v0ywim0pE --depth 1 --limit none
     lamin io sync record --uid UrcIKR8v0ywim0pE --from laminlabs/lamindata
     lamin io sync artifact --key example_datasets/mini_immuno/dataset1.h5ad --from laminlabs/lamindata
     ```
@@ -52,6 +53,27 @@ def io():
     lamin io exportdb --output-dir path/to/parquet/files
     ```
     """
+
+
+def _parse_sync_limit(ctx, param, value: str | int | None) -> int | None:
+    """'none' transfers every record. Otherwise an integer >= 0."""
+    if value is None or (isinstance(value, str) and value.lower() == "none"):
+        return None
+    if isinstance(value, bool):
+        raise click.BadParameter(
+            "must be an integer >= 0 or 'none'.", ctx=ctx, param=param
+        )
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise click.BadParameter(
+            "must be an integer >= 0 or 'none'.", ctx=ctx, param=param
+        ) from exc
+    if parsed < 0:
+        raise click.BadParameter(
+            "must be an integer >= 0 or 'none'.", ctx=ctx, param=param
+        )
+    return parsed
 
 
 @io.command("sync")
@@ -88,6 +110,20 @@ def io():
     default=None,
     help="What to copy: `sqlrecord`, `notes`, or `annotations`. Omit to use the registry default.",
 )
+@click.option(
+    "--limit",
+    # 20 matches lamindb.models.query_manager.SEARCH_QUERY_DEFAULT_LIMIT.
+    type=str,
+    default="20",
+    show_default=True,
+    callback=_parse_sync_limit,
+    help=(
+        "Maximum number of records to transfer at each type level when --depth "
+        "is greater than 0. The most recent records are kept. "
+        "Pass 'none' to transfer every record. Same default as "
+        "to_dataframe() and search()."
+    ),
+)
 def sync(
     entity: str | None = None,
     uid: str | None = None,
@@ -96,6 +132,7 @@ def sync(
     source: str | None = None,
     depth: int = 0,
     transfer_mode: str | None = None,
+    limit: int | None = 20,
 ) -> None:
     """Sync an object to the current database."""
     from lamin_cli._transfer import transfer as transfer_
@@ -108,6 +145,7 @@ def sync(
         source=source,
         depth=depth,
         transfer=transfer_mode,
+        limit=limit,
     )
 
 
