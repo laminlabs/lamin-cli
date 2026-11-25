@@ -75,17 +75,21 @@ def test_io_transfer_ulabel():
             cwd=source_dir,
         )
         uid = uid_file.read_text().strip()
-        run(["lamin", "connect", target])
-        run(
-            [
-                "lamin",
-                "io",
-                "sync",
-                f"https://lamin.ai/{handle}/{source_name}/ulabel/{uid}",
-            ]
+        url = f"https://lamin.ai/{handle}/{source_name}/ulabel/{uid}"
+        rejected = subprocess.run(
+            ["lamin", "io", "sync", url, "--limit", "-3"],
+            capture_output=True,
+            text=True,
+            check=False,
         )
+        assert rejected.returncode != 0
+        assert "none" in (rejected.stderr or "") + (rejected.stdout or "")
+        run(["lamin", "connect", target])
+        run(["lamin", "io", "sync", url, "--limit", "5"])
         ln.connect(target)
-        assert ln.ULabel.get(uid).name == "from-source"
+        synced = ln.ULabel.get(uid)
+        assert synced.name == "from-source"
+        assert synced.run.params["limit"] == 5
     finally:
         subprocess.run(["lamin", "connect", target], check=False)
         ln.connect(target)

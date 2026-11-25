@@ -112,12 +112,13 @@ def test_notion_sync_accepts_zero_depth(monkeypatch):
 def test_transfer_url_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync(*, registry, uid, source_db, depth=None, transfer=None):
+    def fake_sync(*, registry, uid, source_db, depth=None, transfer=None, limit=None):
         calls["registry"] = registry
         calls["uid"] = uid
         calls["source_db"] = source_db
         calls["depth"] = depth
         calls["transfer"] = transfer
+        calls["limit"] = limit
         return []
 
     monkeypatch.setattr("lamindb.core.sync", fake_sync)
@@ -141,18 +142,20 @@ def test_transfer_url_forwards_args(monkeypatch):
         "source_db": "laminlabs/lamindata",
         "depth": 1,
         "transfer": "annotations",
+        "limit": 20,
     }
 
 
 def test_transfer_entity_uid_forwards_args(monkeypatch):
     calls: dict[str, object] = {}
 
-    def fake_sync(*, registry, uid, source_db, depth=None, transfer=None):
+    def fake_sync(*, registry, uid, source_db, depth=None, transfer=None, limit=None):
         calls["registry"] = registry
         calls["uid"] = uid
         calls["source_db"] = source_db
         calls["depth"] = depth
         calls["transfer"] = transfer
+        calls["limit"] = limit
         return []
 
     monkeypatch.setattr("lamindb.core.sync", fake_sync)
@@ -173,6 +176,7 @@ def test_transfer_entity_uid_forwards_args(monkeypatch):
     assert calls["registry"] is ln.Artifact
     assert calls["uid"] == "e2G7k9EVul4JbfsE"
     assert calls["source_db"] == "laminlabs/lamindata"
+    assert calls["limit"] == 20
 
 
 def test_notion_sync_requires_notion_uuid():
