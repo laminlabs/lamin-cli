@@ -1,12 +1,51 @@
+import html
 import os
 import time
 from pathlib import Path
 from types import SimpleNamespace
 
 import lamindb as ln
+import pytest
 from lamin_cli.agents import _common
 
 _SHELL_TOOL_NAMES = frozenset({"Bash"})
+
+
+@pytest.mark.parametrize(
+    "block_kind", ["user", "assistant", "thinking", "command", "output"]
+)
+def test_report_preserves_long_blocks(block_kind):
+    text = "Trace context. " * 400 + '\nFinal evidence: <failed> & "unverified".'
+    if block_kind in {"user", "assistant"}:
+        entries = [{"role": block_kind, "content": [{"type": "text", "text": text}]}]
+    elif block_kind == "thinking":
+        entries = [
+            {"role": "assistant", "content": [{"type": "thinking", "thinking": text}]}
+        ]
+    else:
+        entries = [
+            _bash_entry(text if block_kind == "command" else "pytest"),
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t1",
+                        "content": text if block_kind == "output" else "done",
+                    }
+                ],
+            },
+        ]
+
+    report = _common.render_transcript_html(
+        entries,
+        is_bookkeeping_bash_cmd=lambda _: False,
+        skill_marker=None,
+        shell_tool_names=_SHELL_TOOL_NAMES,
+    )
+
+    assert html.escape(text) in report
+    assert "<failed>" not in report
 
 
 def test_persistent_run_uid_file_is_scoped_by_instance(tmp_path):

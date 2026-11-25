@@ -19,8 +19,6 @@ if TYPE_CHECKING:
 
 # --- constants ---
 
-BLOCK_TRUNCATE = 4000
-
 HTML_TEMPLATE = """\
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Session Transcript</title>
@@ -477,7 +475,7 @@ _THINKING_BOLD = re.compile(r"\*\*([^*\n]+)\*\*")
 
 
 def _format_thinking_html(thinking: str) -> str:
-    escaped = html.escape(thinking[:BLOCK_TRUNCATE])
+    escaped = html.escape(thinking)
     return _THINKING_BOLD.sub(r"<strong>\1</strong>", escaped)
 
 
@@ -493,7 +491,7 @@ def render_thinking(thinking: str) -> str:
 def render_text(text: str) -> str:
     return (
         '<li class="step"><div class="dot dg"></div>'
-        f'<div class="bd"><div class="tx">{ansi_to_html(text[:BLOCK_TRUNCATE])}</div></div></li>'
+        f'<div class="bd"><div class="tx">{ansi_to_html(text)}</div></div></li>'
     )
 
 
@@ -501,7 +499,7 @@ def render_user_text(text: str) -> str:
     return (
         '<li class="step"><div class="dot db"></div>'
         '<div class="bd"><div class="user-msg"><div class="tt">User</div>'
-        f'<div class="tx">{ansi_to_html(text[:BLOCK_TRUNCATE])}</div></div></div></li>'
+        f'<div class="tx">{ansi_to_html(text)}</div></div></div></li>'
     )
 
 
@@ -524,14 +522,14 @@ def render_tool(
             )
             out_html = (
                 '<div class="iotag">OUT</div>'
-                f'<div class="iopre">{ansi_to_html(out[:BLOCK_TRUNCATE])}</div>'
+                f'<div class="iopre">{ansi_to_html(out)}</div>'
             )
         return (
             '<li class="step"><div class="dot dg"></div><div class="bd">'
             f'<div class="tt">{html.escape(name.capitalize())}<span class="lb">{html.escape(label)}</span></div>'
             '<div class="io">'
             '<div class="iotag">IN</div>'
-            f'<div class="iopre">{html.escape(cmd[:BLOCK_TRUNCATE])}</div>'
+            f'<div class="iopre">{html.escape(cmd)}</div>'
             f"{out_html}"
             "</div></div></li>"
         )
