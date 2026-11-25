@@ -3736,18 +3736,16 @@ def test_plan_preview_migrations_rehearses_listed_plans_together(
 def test_profile_option_writes_text_report(tmp_path: Path) -> None:
     report = tmp_path / "profile.txt"
     plan_file = tmp_path / "plan_cli.py"
-    plan_file.write_text(_PLAN_CODE)
+    # Give the sampling profiler time to observe the plan during validation.
+    plan_file.write_text("import time\ntime.sleep(0.05)\n" + _PLAN_CODE)
 
     result = _run_cli("--profile", str(report), "validate", str(plan_file))
 
     assert result.returncode == 0, result.stderr
     assert report.exists()
-    # The banner pyinstrument's text renderer always emits, plus the frame for
-    # the subcommand -- proving the profiler covered the command, not just the
-    # callback that started it.
     text = report.read_text()
     assert "Duration:" in text
-    assert "validate  lamin_cli/evolve/_commands.py" in text
+    assert f"{plan_file.name}:" in text
 
 
 def test_profile_option_writes_html_for_html_suffix(tmp_path: Path) -> None:
