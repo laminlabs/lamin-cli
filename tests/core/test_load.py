@@ -1,10 +1,160 @@
 import subprocess
+import sys
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import click
 import lamindb as ln
 import lamindb_setup as ln_setup
-from lamin_cli._load import decompose_url
+import pytest
+from lamin_cli._load import decompose_url, load
+
+
+@pytest.fixture
+def load_record(monkeypatch, tmp_path):
+    record = SimpleNamespace(
+        uid="testuid0000000000",
+        key="script.py",
+        name="note",
+        type=None,
+        source_code="# loaded content",
+        latest_run=None,
+        ablocks=MagicMock(),
+    )
+    record.ablocks.filter.return_value.order_by.return_value.first.return_value = (
+        SimpleNamespace(content="# loaded content")
+    )
+    records = MagicMock()
+    records.__len__.return_value = 1
+    records.first.return_value = record
+    records.filter.return_value = records
+    registry = SimpleNamespace(objects=records)
+    monkeypatch.setitem(
+        sys.modules,
+        "lamindb",
+        SimpleNamespace(
+            Transform=registry,
+            Record=registry,
+            Project=registry,
+            models=SimpleNamespace(Block=record.ablocks),
+            settings=SimpleNamespace(track_run_inputs=True),
+        ),
+    )
+    monkeypatch.setattr(ln_setup, "connect", lambda instance: None)
+    monkeypatch.setattr(
+        ln_setup,
+        "settings",
+        SimpleNamespace(
+            instance=SimpleNamespace(slug="test/instance"),
+            dev_dir=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "lamin_cli._load.get_current_run_file", lambda: tmp_path / "no-run"
+    )
+    monkeypatch.setattr(
+        "builtins.input", lambda _: pytest.fail("Unexpected overwrite prompt")
+    )
+    return record
+
+
+@pytest.mark.parametrize("use_dev_dir", [False, True])
+@pytest.mark.parametrize(
+    "entity, path, parent, allowed",
+    [
+        ("transform", "nested/output", None, True),
+        ("transform", "{root}/nested/output", None, True),
+        ("transform", "{outside}/new/output", None, False),
+        ("transform", "../dev-other/new/output", None, False),
+        ("transform", "outside-link/new/output", None, False),
+        ("transform", "file-link", None, False),
+        ("transform", "inside-link/new/output", None, True),
+        ("record", "nested/output", None, True),
+        ("record", "../dev-other/new/output", None, False),
+        ("record", "{outside}/new/output", None, False),
+        ("record", "outside-link/new/output", None, False),
+        ("record", "output", "topic", True),
+        ("record", "output", "../dev-other/new", False),
+        ("project", "output", "topic", True),
+        ("project", "output", "../../dev-other/new", False),
+        ("project", "file-link", None, False),
+        ("readme", "README", None, False),
+    ],
+)
+def test_load_path_containment(
+    tmp_path, monkeypatch, load_record, use_dev_dir, entity, path, parent, allowed
+):
+    root, outside = tmp_path / "dev", tmp_path / "dev-other"
+    (root / "subdir").mkdir(parents=True)
+    outside.mkdir()
+    monkeypatch.chdir(root / "subdir" if use_dev_dir else root)
+    ln_setup.settings.dev_dir = root if use_dev_dir else None
+    sentinel = outside / "sentinel"
+    sentinel.write_text("unchanged")
+    (root / "outside-link").symlink_to(outside, target_is_directory=True)
+    (root / "inside-link").symlink_to(root / "subdir", target_is_directory=True)
+    for filename in (
+        "file-link.py",
+        "file-link.md",
+        "README.md",
+        "Projects/file-link.md",
+    ):
+        link = root / filename
+        link.parent.mkdir(exist_ok=True)
+        link.symlink_to(sentinel)
+    name = path.format(root=root, outside=outside)
+    key = name + (".py" if entity == "transform" else ".md")
+    load_record.key, load_record.name = key, name
+    if parent is not None:
+        load_record.type = SimpleNamespace(name=parent, uid="parent", type=None)
+        if not use_dev_dir:
+            allowed = True  # Note hierarchy is flattened outside a dev-dir.
+    kwargs = {"key": "README.md"} if entity == "readme" else {"uid": load_record.uid}
+    before = set(tmp_path.rglob("*"))
+    if not allowed:
+        with pytest.raises(click.ClickException, match="outside"):
+            load("record" if entity == "readme" else entity, **kwargs)
+        assert set(tmp_path.rglob("*")) == before
+        assert sentinel.read_text() == "unchanged"
+    else:
+        result = load(entity, **kwargs)
+        expected = root / key
+        if parent is not None and use_dev_dir:
+            expected = root / ("Projects" if entity == "project" else "") / parent / key
+        assert result.resolve() == expected.resolve()
+        assert result.read_text().endswith("# loaded content")
+        if entity == "transform" and not use_dev_dir:
+            assert result.is_absolute() == Path(key).is_absolute()
+
+
+@pytest.mark.parametrize("destination", ["file", "outside-directory", "directory"])
+def test_load_environment_path_containment(
+    tmp_path, monkeypatch, load_record, destination
+):
+    root = tmp_path / "dev"
+    root.mkdir()
+    monkeypatch.chdir(root)
+    cached = tmp_path / "cached-requirements.txt"
+    cached.write_text("package==1")
+    environment = SimpleNamespace(cache=MagicMock(return_value=cached))
+    load_record.latest_run = SimpleNamespace(environment=environment)
+    target = root / "script__requirements.txt"
+    if destination != "file":
+        if destination == "outside-directory":
+            outside = tmp_path / "outside"
+            outside.mkdir()
+            target.symlink_to(outside, target_is_directory=True)
+        else:
+            target.mkdir()
+        with pytest.raises(click.ClickException, match="environment|Environment"):
+            load("transform", uid=load_record.uid, with_env=True)
+        environment.cache.assert_not_called()
+        assert not list(target.iterdir())
+        assert cached.read_text() == "package==1"
+    else:
+        load("transform", uid=load_record.uid, with_env=True)
+        assert target.read_text() == "package==1"
 
 
 def test_decompose_url():
