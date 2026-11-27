@@ -10,7 +10,11 @@ dynamic = ["version", "description"]
 dependencies = [
     "lamindb-core",  # pinned in lamindb
     "rich-click>=1.7",
+    "lamindb_setup[evolve]",  # schema planning and migration tools
 ]
+
+[project.optional-dependencies]
+profile = ["pyinstrument>=5"]
 
 [project.urls]
 Home = "https://github.com/laminlabs/lamin-cli"
