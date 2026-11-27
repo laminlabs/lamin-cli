@@ -125,21 +125,32 @@ main(prog_name="lamin")
     assert "--preview-migrations" in result.stdout
 
 
-def test_introspect_generates_and_verifies_a_native_plan(
-    instance, ln, run_cli, tmp_path
+def test_plan_apply_then_check_for_pending_changes(
+    instance, ln, run_cli, git_workspace, tmp_path
 ):
-    ln.Feature(name="NativeMeasurements", is_type=True).save()
+    (plan,) = git_workspace.publish(
+        {"plan_demo.py": _PLAN.format(setup_package="lamindb_setup")}
+    )
+    args = (str(plan), "-i", instance.slug)
 
-    result = run_cli("introspect", "captured", "-i", instance.slug, "-d", str(tmp_path))
+    preview = run_cli("plan", *args, "--fail-on-diff")
+    assert preview.returncode == 1, preview.stderr
+    assert "Measurements" in preview.stdout
 
-    assert result.returncode == 0, result.stderr
-    plan = tmp_path / "plan_captured.py"
-    assert plan.exists()
-    assert "lamindb_setup.evolve" in plan.read_text()
-    assert "NativeMeasurements" in plan.read_text()
-    validated = run_cli("validate", str(plan), "-f", "json")
-    assert validated.returncode == 0, validated.stderr
-    assert json.loads(command_output(validated.stdout))
+    report = tmp_path / "applied.json"
+    applied = run_cli("apply", *args, "-f", "json", "-o", str(report), input="y\n")
+    assert applied.returncode == 0, applied.stderr
+    assert "[y/N]" in applied.stderr
+    document = report.read_text()
+    assert json.loads(document)["title"] == "Applied: demo"
+    assert document in applied.stdout
+    assert "[y/N]" not in applied.stdout
+    assert ln.Feature.get(name="Measurements").is_type
+    assert len(list(plan.parent.glob("plan_demo.*.lock"))) == 1
+
+    settled = run_cli("plan", *args, "--fail-on-diff")
+    assert settled.returncode == 0, settled.stderr
+    assert "0 to create, 0 to update, 0 to delete" in settled.stdout
 
 
 @pytest.mark.parametrize("plain", [False, True])
@@ -181,5 +192,20 @@ assert "lamindb" not in sys.modules
         tmp_path,
         NO_RICH="1",
         LAMIN_CURRENT_INSTANCE="unconfigured/default",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_rich_help_configuration_lists_management_commands(tmp_path):
+    result = _python(
+        """from lamin_cli.evolve._click import Group, configure_help
+group = Group(name="evolve")
+configure_help(group)
+config = group.context_settings["rich_help_config"]
+assert config.show_arguments
+assert "apply" in config.command_groups["*evolve"][0]["commands"]
+""",
+        tmp_path,
+        NO_RICH="",
     )
     assert result.returncode == 0, result.stderr

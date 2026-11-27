@@ -78,7 +78,6 @@ def main() -> None:
         coverage.process_startup()
 
     import runpy
-    from pathlib import Path
 
     if not os.environ.get("LAMIN_SCHEMAS_TEST_ROOT"):
         sys.argv[1:1] = ["evolve"]

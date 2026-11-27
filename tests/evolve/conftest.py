@@ -91,20 +91,6 @@ def ln(instance, _database):
     return _database.ln
 
 
-@pytest.fixture
-def bt(instance):
-    import bionty
-
-    return bionty
-
-
-@pytest.fixture
-def pt(instance):
-    import pertdb
-
-    return pertdb
-
-
 class _HubHandler(http.server.BaseHTTPRequestHandler):
     """Answer every hub query with an empty result: nothing is on the hub."""
 
@@ -285,41 +271,52 @@ def git_workspace(tmp_path: Path) -> GitWorkspace:
 
 
 @pytest.fixture
-def instance_factory(instance, tmp_path):
-    """Create additional local instances without changing the parent's connection."""
+def invoke():
+    from click.testing import CliRunner
+    from lamin_cli.evolve._commands import app
 
-    def create(name: str):
-        storage = tmp_path / name / "storage"
-        script = """
-import json
-import runpy
-import sys
-from pathlib import Path
-
-support, storage, name = sys.argv[1:]
-helpers = runpy.run_path(support)
-sys.addaudithook(helpers["_audit_hook"]([]))
-import lamindb_setup as setup
-setup.init(storage=Path(storage), name=name, modules="bionty,pertdb")
-from django.db import connections
-print(json.dumps({"slug": setup.settings.instance.slug,
-                  "path": str(connections["default"].settings_dict["NAME"])}))
-"""
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                script,
-                str(_CLI_CHILD),
-                str(storage),
-                f"schema-evolution-{name}",
-            ],
-            cwd=tmp_path,
-            capture_output=True,
-            text=True,
-            check=True,
+    def call(*args, code=0, answer=None):
+        result = CliRunner().invoke(
+            app, [str(arg) for arg in args], input=answer, terminal_width=200
         )
-        info = json.loads(result.stdout.strip().splitlines()[-1])
-        return SimpleNamespace(slug=info["slug"], path=Path(info["path"]))
+        if result.exception and not isinstance(result.exception, SystemExit):
+            raise result.exception
+        assert result.exit_code == code, result.output
+        return result
 
-    return create
+    return call
+
+
+@pytest.fixture
+def stub(monkeypatch):
+    """Replace one backend operation and retain its calls for assertions."""
+    from unittest.mock import Mock
+
+    def replace(module, name, value=None, *, error=None):
+        mock = Mock(return_value=value, side_effect=error)
+        monkeypatch.setattr(module, name, mock)
+        return mock
+
+    return replace
+
+
+@pytest.fixture
+def plan_file(tmp_path):
+    path = tmp_path / "plan_demo.py"
+    path.write_text(
+        "from lamindb_setup.evolve import Feature, LaminDType, create_plan\n"
+        'PLAN_TRANSFORM_STEM_UID = "testUID00001"\n'
+        '@create_plan\ndef demo(ctx, exports: None):\n    Feature("score", dtype=LaminDType(float))\n'
+    )
+    return path
+
+
+@pytest.fixture
+def ci_config(plan_file):
+    path = plan_file.parent / "lamin_schemas.yml"
+    path.write_text(
+        "instances:\n"
+        "  - slug: org/source\n    plans: [plan_demo.py:demo]\n"
+        "  - slug: org/target\n    plans: [plan_demo.py:demo]\n"
+    )
+    return path
